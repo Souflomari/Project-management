@@ -19,7 +19,7 @@ import type {
 
 const PROJECT_SELECT = `
   id, name, client, discipline, responsable_id, phase_index, status, budget, start, deadline,
-  subtasks ( id, name, assignee_id, start, planned_days, done ),
+  subtasks ( id, name, assignee_id, start, planned_days, done, depends_on ),
   comments ( author, initials, color, text, when_label, created_at )
 `;
 
@@ -34,7 +34,7 @@ interface ProjectRow {
   budget: number;
   start: string;
   deadline: string;
-  subtasks: { id: number; name: string; assignee_id: number; start: string; planned_days: number; done: boolean }[];
+  subtasks: { id: number; name: string; assignee_id: number; start: string; planned_days: number; done: boolean; depends_on: number[] | null }[];
   comments: {
     author: string; initials: string; color: string; text: string; when_label: string; created_at: string;
   }[];
@@ -56,6 +56,7 @@ function rowToProject(row: ProjectRow): Project {
       start: s.start,
       plannedDays: s.planned_days,
       done: s.done,
+      dependsOn: s.depends_on ?? [],
     }));
   return {
     id: row.id,
@@ -84,6 +85,7 @@ function subtaskPatchToRow(patch: SubtaskPatch): Record<string, unknown> {
   if (patch.start !== undefined) row.start = patch.start;
   if (patch.plannedDays !== undefined) row.planned_days = patch.plannedDays;
   if (patch.done !== undefined) row.done = patch.done;
+  if (patch.dependsOn !== undefined) row.depends_on = patch.dependsOn;
   return row;
 }
 
@@ -168,6 +170,7 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
         start: input.start,
         planned_days: Math.max(1, Math.floor(input.plannedDays)),
         done: false,
+        depends_on: input.dependsOn ?? [],
       });
       if (error) throw new Error(error.message);
       return fetchProject(projectId);

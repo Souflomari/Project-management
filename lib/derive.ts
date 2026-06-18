@@ -15,11 +15,13 @@ import {
   REFERENCE_TS,
   taskEnd,
   toDate,
+  weekdaysInRange,
+  weeksInRange,
   workingDaysBetween,
   type DateRange,
 } from "./format";
-import { PHASES, PHASES_FULL, type Project, type Status, type Subtask, type TeamMember } from "./types";
-import { dueColor, ringColor, STATUS_META } from "./tokens";
+import { PHASES, PHASES_FULL, STATUSES, type Project, type Status, type Subtask, type TeamMember } from "./types";
+import { dueColor, PHASE_COLORS, ringColor, STATUS_META } from "./tokens";
 
 export interface DerivedSubtask extends Subtask {
   end: string;
@@ -188,8 +190,12 @@ export interface GanttBar {
   left: number;
   width: number;
   color: string;
-  done?: boolean;
-  assigneeInitials?: string;
+  done: boolean;
+  assigneeInitials: string;
+  /** Whether the bar falls inside the visible timeline window. */
+  visible: boolean;
+  /** Predecessor task ids (Finish-to-Start), for dependency arrows. */
+  dependsOn: number[];
 }
 
 export interface GanttRow {
@@ -237,22 +243,20 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
       width: g.width,
       color: p.ring,
       fill: p.progress,
-      subtasks: p.subtasksD
-        .map((s) => {
-          const sg = barGeom(s.start, s.end);
-          return {
-            id: s.id,
-            name: s.name,
-            left: sg.left,
-            width: sg.width,
-            color: s.color,
-            done: s.done,
-            assigneeInitials: s.assignee.initials,
-            visible: sg.visible,
-          };
-        })
-        .filter((b) => b.visible)
-        .map(({ visible, ...b }) => b),
+      subtasks: p.subtasksD.map((s) => {
+        const sg = barGeom(s.start, s.end);
+        return {
+          id: s.id,
+          name: s.name,
+          left: sg.left,
+          width: sg.width,
+          color: s.color,
+          done: s.done,
+          assigneeInitials: s.assignee.initials,
+          visible: sg.visible,
+          dependsOn: s.dependsOn,
+        };
+      }),
     };
   });
 
@@ -263,12 +267,20 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
 
 export interface TaskEvent {
   projectId: number;
+  subtaskId: number;
   projectName: string;
   taskName: string;
+  /** Deadline (task end). */
   date: string;
+  start: string;
+  plannedDays: number;
+  phaseIndex: number;
+  /** Phase accent (grey when done). */
+  color: string;
+  /** Project status colour (used for the status dot). */
+  statusColor: string;
   assigneeInitials: string;
   assigneeColor: string;
-  color: string;
   done: boolean;
 }
 
@@ -278,12 +290,17 @@ export function buildTaskEvents(projects: DerivedProject[]): TaskEvent[] {
     for (const s of p.subtasksD) {
       events.push({
         projectId: p.id,
+        subtaskId: s.id,
         projectName: p.name,
         taskName: s.name,
         date: s.end,
+        start: s.start,
+        plannedDays: s.plannedDays,
+        phaseIndex: p.phaseIndex,
+        color: s.done ? "#9AA39B" : PHASE_COLORS[p.phaseIndex],
+        statusColor: p.statusColor,
         assigneeInitials: s.assignee.initials,
         assigneeColor: s.assignee.color,
-        color: s.done ? "#9AA39B" : p.statusColor,
         done: s.done,
       });
     }
@@ -364,6 +381,16 @@ export interface TeamTask {
   done: boolean;
 }
 
+/** One heatmap cell — a sub-period (week or day) of the selected range. */
+export interface HeatBucket {
+  start: string;
+  end: string;
+  label: string;
+  days: number;
+  capacity: number;
+  pct: number;
+}
+
 export interface TeamLoad {
   member: TeamMember;
   periodDays: number;
@@ -371,17 +398,23 @@ export interface TeamLoad {
   chargePct: number;
   projectsActive: number;
   tasks: TeamTask[];
+  /** Per-week (month view) or per-day (week view) breakdown for the heatmap. */
+  buckets: HeatBucket[];
 }
 
 export function buildTeamLoad(
   projects: DerivedProject[],
   team: TeamMember[],
   range: DateRange,
+  bucketMode: "week" | "day" = "week",
 ): TeamLoad[] {
   const capacity = workingDaysBetween(range.start, range.end);
+  const bucketRanges = bucketMode === "day" ? weekdaysInRange(range) : weeksInRange(range);
 
   return team.map((member) => {
     const tasks: TeamTask[] = [];
+    const bucketDays = bucketRanges.map(() => 0);
+
     for (const p of projects) {
       for (const s of p.subtasksD) {
         if (s.assigneeId !== member.id) continue;
@@ -397,10 +430,26 @@ export function buildTeamLoad(
             done: s.done,
           });
         }
+        bucketRanges.forEach((b, i) => {
+          bucketDays[i] += overlapWorkingDays(s.start, s.end, b.start, b.end);
+        });
       }
     }
+
     const periodDays = tasks.reduce((sum, t) => sum + t.daysInPeriod, 0);
     const projectsActive = new Set(tasks.map((t) => t.projectId)).size;
+    const buckets: HeatBucket[] = bucketRanges.map((b, i) => {
+      const cap = workingDaysBetween(b.start, b.end);
+      return {
+        start: b.start,
+        end: b.end,
+        label: String(toDate(b.start).getDate()),
+        days: bucketDays[i],
+        capacity: cap,
+        pct: cap ? Math.round((bucketDays[i] / cap) * 100) : 0,
+      };
+    });
+
     return {
       member,
       periodDays,
@@ -408,8 +457,27 @@ export function buildTeamLoad(
       chargePct: capacity ? Math.round((periodDays / capacity) * 100) : 0,
       projectsActive,
       tasks: tasks.sort((a, b) => a.start.localeCompare(b.start)),
+      buckets,
     };
   });
+}
+
+// --------------------------------------------------------------- dashboard mix
+
+export interface StatusSlice {
+  status: Status;
+  label: string;
+  color: string;
+  count: number;
+}
+
+export function statusDistribution(all: DerivedProject[]): StatusSlice[] {
+  return STATUSES.map((status) => ({
+    status,
+    label: STATUS_META[status].label,
+    color: STATUS_META[status].color,
+    count: all.filter((p) => p.status === status).length,
+  }));
 }
 
 // ----------------------------------------------------------------- filters

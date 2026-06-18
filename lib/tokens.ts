@@ -55,3 +55,35 @@ export const DRAWER = {
   line: "#E2E6E0",
   sub: "#6F6F6F",
 } as const;
+
+/** Accent per study phase (ESQ → RÉC), used by Kanban headers + calendar chips. */
+export const PHASE_COLORS = [
+  "#9AA39B", // ESQ
+  "#7FA0A3", // APS
+  "#4C8AA3", // APD
+  "#3B7179", // PRO
+  "#17823D", // DCE
+  "#1D4459", // EXE
+  "#6A6557", // RÉC
+];
+
+/**
+ * Workload colour. Softer than the status red — overallocation should read as a
+ * management signal (muted terracotta), not a system error.
+ */
+export function chargeColor(pct: number): string {
+  if (pct > 110) return "#B4532E"; // deep terracotta
+  if (pct > 100) return "#C2683E"; // terracotta
+  if (pct >= 85) return "#E1832F"; // amber
+  return "#17823D"; // green
+}
+
+/** Heatmap cell colour by load %, used by the team weekly heatmap. */
+export function heatColor(pct: number): string {
+  if (pct <= 0) return "#EEF1EC";
+  if (pct < 50) return "#CDE4D3";
+  if (pct < 85) return "#7FB98C";
+  if (pct <= 100) return "#3F9B54";
+  if (pct <= 110) return "#E1832F";
+  return "#C2683E";
+}

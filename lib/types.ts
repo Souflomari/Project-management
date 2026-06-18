@@ -41,6 +41,8 @@ export interface Subtask {
   /** Planned effort in working days (end date is derived from this). */
   plannedDays: number;
   done: boolean;
+  /** Predecessor task ids (same project) — Finish-to-Start dependencies. */
+  dependsOn: number[];
 }
 
 export interface Comment {
@@ -78,6 +80,7 @@ export interface NewSubtaskInput {
   assigneeId: number;
   start: string;
   plannedDays: number;
+  dependsOn?: number[];
 }
 
 export interface NewTeamMemberInput {

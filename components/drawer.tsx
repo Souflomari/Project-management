@@ -233,6 +233,7 @@ export function ProjectDrawer() {
                   key={s.id}
                   projectId={p.id}
                   subtask={s}
+                  siblings={p.subtasksD}
                   team={team}
                   onUpdate={updateSubtask}
                   onDelete={deleteSubtask}
@@ -299,7 +300,7 @@ export function ProjectDrawer() {
               <div style={{ display: "flex", alignItems: "center", paddingLeft: 7 }}>
                 {p.members.map((m) => (
                   <div key={m.id} style={{ marginLeft: -7 }}>
-                    <Avatar initials={m.initials} color={m.color} size={30} fontSize={10.5} ring />
+                    <Avatar initials={m.initials} color={m.color} size={30} fontSize={10.5} ring title={`${m.name} · ${m.role}`} />
                   </div>
                 ))}
               </div>
@@ -315,7 +316,7 @@ export function ProjectDrawer() {
           <div style={{ ...LABEL, marginBottom: 10 }}>Notes &amp; commentaires</div>
           {selected.comments.map((cm, i) => (
             <div key={i} style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-              <Avatar initials={cm.initials} color={cm.color} size={28} fontSize={10} />
+              <Avatar initials={cm.initials} color={cm.color} size={28} fontSize={10} title={cm.author} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12 }}>
                   <span style={{ fontWeight: 700 }}>{cm.author}</span>{" "}
@@ -359,16 +360,23 @@ export function ProjectDrawer() {
 function SubtaskRow({
   projectId,
   subtask,
+  siblings,
   team,
   onUpdate,
   onDelete,
 }: {
   projectId: number;
   subtask: DerivedSubtask;
+  siblings: DerivedSubtask[];
   team: TeamMember[];
   onUpdate: (projectId: number, subtaskId: number, patch: SubtaskPatch) => void;
   onDelete: (projectId: number, subtaskId: number) => void;
 }) {
+  const depNames = new Map(siblings.map((s) => [s.id, s.name]));
+  const depOptions = siblings.filter((s) => s.id !== subtask.id && !subtask.dependsOn.includes(s.id));
+  const addDep = (id: number) => onUpdate(projectId, subtask.id, { dependsOn: [...subtask.dependsOn, id] });
+  const removeDep = (id: number) =>
+    onUpdate(projectId, subtask.id, { dependsOn: subtask.dependsOn.filter((x) => x !== id) });
   return (
     <div style={{ padding: "9px 2px", borderTop: `1px solid ${DRAWER.line}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -444,6 +452,36 @@ function SubtaskRow({
           style={{ ...fieldStyle, width: 52 }}
         />
         <span style={{ fontSize: 11, color: DRAWER.sub, whiteSpace: "nowrap" }}>j · fin {fmtFull(subtask.end)}</span>
+      </div>
+
+      {/* dependencies (Finish-to-Start) */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, paddingLeft: 27, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 10.5, color: DRAWER.sub }}>↳ après</span>
+        {subtask.dependsOn.map((id) => (
+          <span
+            key={id}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 3, padding: "1px 4px 1px 7px", color: "#3B5560" }}
+          >
+            {depNames.get(id) ?? `#${id}`}
+            <button onClick={() => removeDep(id)} title="Retirer" style={{ border: "none", background: "transparent", cursor: "pointer", color: DRAWER.sub, fontSize: 12, lineHeight: 1, padding: 0 }}>
+              ×
+            </button>
+          </span>
+        ))}
+        {depOptions.length > 0 ? (
+          <select
+            value=""
+            onChange={(e) => e.target.value && addDep(Number(e.target.value))}
+            style={{ ...fieldStyle, fontSize: 10.5, padding: "3px 5px", maxWidth: 150 }}
+          >
+            <option value="">+ dépendance…</option>
+            {depOptions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
       </div>
     </div>
   );

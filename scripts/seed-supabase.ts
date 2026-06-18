@@ -58,21 +58,36 @@ async function main() {
     const id = insert.data!.id as number;
 
     if (p.subtasks.length) {
-      check(
-        `subtasks "${p.name}"`,
-        (
-          await sb.from("subtasks").insert(
-            p.subtasks.map((s) => ({
-              project_id: id,
-              name: s.name,
-              assignee_id: s.assigneeId,
-              start: s.start,
-              planned_days: s.plannedDays,
-              done: s.done,
-            })),
-          )
-        ).error,
-      );
+      // Insert without deps first; a single multi-row INSERT returns rows in
+      // insertion order, so dbIds[k] is the DB id of the k-th sample task.
+      const ins = await sb
+        .from("subtasks")
+        .insert(
+          p.subtasks.map((s) => ({
+            project_id: id,
+            name: s.name,
+            assignee_id: s.assigneeId,
+            start: s.start,
+            planned_days: s.plannedDays,
+            done: s.done,
+          })),
+        )
+        .select("id");
+      check(`subtasks "${p.name}"`, ins.error);
+      const dbIds = (ins.data ?? []).map((r) => r.id as number);
+
+      // Remap each task's dependsOn (sample ids 1..n) to the DB ids.
+      for (let k = 0; k < p.subtasks.length; k++) {
+        const deps = p.subtasks[k].dependsOn
+          .map((sid) => dbIds[sid - 1])
+          .filter((v): v is number => typeof v === "number");
+        if (deps.length) {
+          check(
+            `deps "${p.name}"`,
+            (await sb.from("subtasks").update({ depends_on: deps }).eq("id", dbIds[k])).error,
+          );
+        }
+      }
     }
 
     if (p.comments.length) {

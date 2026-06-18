@@ -170,3 +170,29 @@ export function shiftISO(iso: string, days: number): string {
   d.setDate(d.getDate() + days);
   return toISO(d);
 }
+
+/** Monday–Sunday weeks overlapping a range, each clamped to the range. */
+export function weeksInRange(range: DateRange): DateRange[] {
+  const out: DateRange[] = [];
+  let cur = weekRange(range.start).start; // Monday on/before range start
+  for (let i = 0; i < 8 && cur <= range.end; i++) {
+    const wEnd = weekRange(cur).end;
+    out.push({
+      start: cur < range.start ? range.start : cur,
+      end: wEnd > range.end ? range.end : wEnd,
+    });
+    cur = shiftISO(wEnd, 1); // next Monday
+  }
+  return out;
+}
+
+/** Each weekday (Mon–Fri) within a range, as single-day buckets. */
+export function weekdaysInRange(range: DateRange): DateRange[] {
+  const out: DateRange[] = [];
+  let cur = range.start;
+  while (cur <= range.end) {
+    if (isWeekday(toDate(cur))) out.push({ start: cur, end: cur });
+    cur = shiftISO(cur, 1);
+  }
+  return out;
+}

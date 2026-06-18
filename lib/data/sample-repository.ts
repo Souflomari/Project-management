@@ -102,6 +102,7 @@ export const sampleRepository: ProjectRepository = {
       start: input.start,
       plannedDays: Math.max(1, Math.floor(input.plannedDays)),
       done: false,
+      dependsOn: input.dependsOn ?? [],
     };
     return replace({ ...p, subtasks: [...p.subtasks, subtask] });
   },

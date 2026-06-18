@@ -8,6 +8,7 @@ export function Avatar({
   size = 30,
   fontSize,
   ring,
+  title,
 }: {
   initials: string;
   color: string;
@@ -15,9 +16,12 @@ export function Avatar({
   fontSize?: number;
   /** Optional white ring (used when avatars overlap). */
   ring?: boolean;
+  /** Native tooltip — full name / role. */
+  title?: string;
 }) {
   return (
     <div
+      title={title}
       style={{
         width: size,
         height: size,
@@ -30,6 +34,7 @@ export function Avatar({
         color: "#fff",
         background: color,
         flexShrink: 0,
+        ...(title ? { cursor: "default" } : null),
         ...(ring ? { border: "2px solid var(--paper, #fff)" } : null),
       }}
     >
@@ -83,7 +88,7 @@ export function ProgressBar({
   pct,
   color,
   track = "#E4E8E2",
-  height = 3,
+  height = 7,
 }: {
   pct: number;
   color: string;
@@ -96,16 +101,16 @@ export function ProgressBar({
         flex: 1,
         height,
         background: track,
-        borderRadius: 999,
+        borderRadius: 3,
         overflow: "hidden",
       }}
     >
       <div
         style={{
           height: "100%",
-          width: `${pct}%`,
+          width: `${Math.min(100, Math.max(0, pct))}%`,
           background: color,
-          borderRadius: 999,
+          borderRadius: "3px 0 0 3px",
         }}
       />
     </div>

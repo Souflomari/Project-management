@@ -4,10 +4,10 @@ import { useState } from "react";
 
 import { Avatar } from "../ui";
 import { TeamMemberModal } from "../team-member-modal";
-import { buildTeamLoad } from "@/lib/derive";
+import { buildTeamLoad, type HeatBucket } from "@/lib/derive";
 import { MONS_LONG, MONTHS_FULL, monthRange, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
-import { FONT_NUM } from "@/lib/tokens";
+import { chargeColor, FONT_NUM, heatColor } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const navBtn: React.CSSProperties = {
@@ -21,21 +21,16 @@ const navBtn: React.CSSProperties = {
   color: "#3B5560",
 };
 
-function loadColor(pct: number): string {
-  if (pct > 100) return "#A42421";
-  if (pct >= 85) return "#E1832F";
-  return "#17823D";
-}
-
 export function Team() {
   const { allDerived, team, teamMode, teamAnchor, setTeamMode, teamPrev, teamNext, deleteTeamMember, openProject } = useProjects();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
 
-  const range = teamMode === "semaine" ? weekRange(teamAnchor) : monthRange(toDate(teamAnchor).getFullYear(), toDate(teamAnchor).getMonth());
-  const loads = buildTeamLoad(allDerived, team, range);
-  const capacity = loads[0]?.capacity ?? 0;
   const anchor = toDate(teamAnchor);
+  const range = teamMode === "semaine" ? weekRange(teamAnchor) : monthRange(anchor.getFullYear(), anchor.getMonth());
+  const loads = buildTeamLoad(allDerived, team, range, teamMode === "semaine" ? "day" : "week");
+  const capacity = loads[0]?.capacity ?? 0;
+
   const periodLabel =
     teamMode === "semaine"
       ? `${toDate(weekRange(teamAnchor).start).getDate()} – ${toDate(weekRange(teamAnchor).end).getDate()} ${MONTHS_FULL[toDate(weekRange(teamAnchor).end).getMonth()]}`
@@ -76,46 +71,46 @@ export function Team() {
       </div>
 
       <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6F6F6F" }}>
-        Charge = jours planifiés sur la période ÷ <strong>{capacity} jours ouvrés</strong> disponibles. 100 % = pleinement chargé.
+        Charge = jours planifiés ÷ <strong>{capacity} jours ouvrés</strong> de la période. La frise montre la charge {teamMode === "semaine" ? "par jour" : "semaine par semaine"} — pour repérer <em>quand</em> tombe la surcharge.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
         {loads.map((t) => {
-          const c = loadColor(t.chargePct);
+          const c = chargeColor(t.chargePct);
           return (
             <div key={t.member.id} style={{ background: "#fff", border: "1px solid #E2E6E0", borderRadius: 6, padding: "14px 16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                <Avatar initials={t.member.initials} color={t.member.color} size={42} fontSize={14} />
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <Avatar initials={t.member.initials} color={t.member.color} size={42} fontSize={14} title={`${t.member.name} · ${t.member.role}`} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 700 }}>{t.member.name}</div>
                   <div style={{ fontSize: 11.5, color: "#6F6F6F" }}>{t.member.role}</div>
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
                   <button onClick={() => openEdit(t.member)} title="Modifier" style={{ border: "1px solid #E2E6E0", background: "#fff", cursor: "pointer", borderRadius: 3, width: 26, height: 26, fontSize: 12, color: "#6F6F6F" }}>✎</button>
-                  <button onClick={() => deleteTeamMember(t.member.id)} title="Supprimer" style={{ border: "1px solid #E2E6E0", background: "#fff", cursor: "pointer", borderRadius: 3, width: 26, height: 26, fontSize: 14, color: "#A42421", lineHeight: 1 }}>×</button>
+                  <button onClick={() => deleteTeamMember(t.member.id)} title="Supprimer" style={{ border: "1px solid #E2E6E0", background: "#fff", cursor: "pointer", borderRadius: 3, width: 26, height: 26, fontSize: 14, color: "#B4532E", lineHeight: 1 }}>×</button>
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                   <span style={{ fontFamily: FONT_NUM, fontSize: 26, fontWeight: 600, lineHeight: 1, color: c }}>{t.chargePct}%</span>
                   <span style={{ fontSize: 11.5, color: "#6F6F6F" }}>{t.periodDays} j / {t.capacity} j</span>
                 </div>
                 <span style={{ fontSize: 11, color: "#6F6F6F" }}>{t.projectsActive} projet{t.projectsActive > 1 ? "s" : ""}</span>
               </div>
-              <div style={{ height: 5, background: "#E4E8E2", borderRadius: 999, overflow: "hidden", marginBottom: 12 }}>
-                <div style={{ height: "100%", borderRadius: 999, width: `${Math.min(100, t.chargePct)}%`, background: c }} />
-              </div>
+
+              <Heatmap buckets={t.buckets} mode={teamMode} />
 
               {t.tasks.length === 0 ? (
-                <div style={{ fontSize: 11.5, color: "#9AA39B" }}>Aucune tâche planifiée sur la période.</div>
+                <div style={{ fontSize: 11.5, color: "#9AA39B", marginTop: 12 }}>Aucune tâche planifiée sur la période.</div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 12 }}>
                   {t.tasks.map((task, i) => (
                     <div
                       key={i}
                       onClick={() => openProject(task.projectId)}
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", fontSize: 11.5 }}
+                      className="row-hover"
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", fontSize: 11.5, padding: "1px 2px", borderRadius: 2 }}
                     >
                       <div style={{ minWidth: 0 }}>
                         <span style={{ fontWeight: 600, color: task.done ? "#9AA39B" : "#233038" }}>{task.taskName}</span>
@@ -133,5 +128,25 @@ export function Team() {
 
       {modalOpen ? <TeamMemberModal member={editing} onClose={() => setModalOpen(false)} /> : null}
     </>
+  );
+}
+
+function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
+  if (buckets.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: 3 }}>
+      {buckets.map((b, i) => {
+        const bg = heatColor(b.pct);
+        const txt = b.pct === 0 ? "#9AA39B" : b.pct >= 50 ? "#fff" : "#3B5560";
+        return (
+          <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${b.label} · ${b.days}/${b.capacity} j · ${b.pct}%`}>
+            <div style={{ height: 30, borderRadius: 2, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontFamily: FONT_NUM, fontSize: 10.5, fontWeight: 600, color: txt }}>{b.pct > 0 ? `${b.pct}%` : ""}</span>
+            </div>
+            <div style={{ fontSize: 9, color: "#9AA39B", textAlign: "center", marginTop: 3 }}>{b.label}</div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

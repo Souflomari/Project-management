@@ -38,7 +38,9 @@ create table if not exists subtasks (
   assignee_id  int     not null references team_members(id),
   start        date    not null,
   planned_days int     not null default 1 check (planned_days >= 1),
-  done         boolean not null default false
+  done         boolean not null default false,
+  -- Predecessor task ids (Finish-to-Start dependencies), same project.
+  depends_on   int[]   not null default '{}'
 );
 
 create table if not exists comments (

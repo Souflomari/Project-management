@@ -93,7 +93,16 @@ function buildSubtasks(row: Row, idx: number): Subtask[] {
   return defs.map((d, i) => {
     running += d.plannedDays;
     const done = status === "terminé" ? true : running <= target + 0.5;
-    return { id: i + 1, name: d.name, assigneeId: d.assigneeId, start: d.start, plannedDays: d.plannedDays, done };
+    return {
+      id: i + 1,
+      name: d.name,
+      assigneeId: d.assigneeId,
+      start: d.start,
+      plannedDays: d.plannedDays,
+      done,
+      // Linear Finish-to-Start chain: each task depends on the previous one.
+      dependsOn: i === 0 ? [] : [i],
+    };
   });
 }
 
