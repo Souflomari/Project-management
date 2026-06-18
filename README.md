@@ -26,7 +26,8 @@ projet" adds one.
 - **Next.js 16** (App Router) + **React 19** + **TypeScript**
 - Styling ported directly from the design (inline styles, single "Design Setec"
   theme). Fonts (Montserrat, Oswald) load from Google Fonts.
-- No backend yet — realistic in-memory **sample data**.
+- Runs on realistic in-memory **sample data** out of the box, with an optional
+  **Supabase** backend (see below) that switches on via env vars.
 
 ## Getting started
 
@@ -55,19 +56,34 @@ lib/
     sample-data.ts          # the seed content (25 projects, 8 people)
     sample-repository.ts    # in-memory implementation
     index.ts                # exports the active repository  ← swap point
+  data/
+    supabase-client.ts      # supabase-js client (+ isSupabaseConfigured)
+    supabase-repository.ts   # Supabase implementation of ProjectRepository
   derive.ts                 # pure view-model derivation (KPIs, gantt, calendar…)
   format.ts                 # date / budget formatting
   store/projects-context.tsx# client store (state + actions, calls the repository)
 ```
 
-To connect Supabase later:
+The active repository is chosen automatically in `lib/data/index.ts`: if the
+Supabase env vars are present it uses `SupabaseRepository`, otherwise the sample
+data. Nothing in `app/` or `components/` imports a concrete repository, so the
+UI is unaffected either way.
 
-1. Add `lib/data/supabase-repository.ts` implementing `ProjectRepository`.
-2. Change the one export in `lib/data/index.ts` to point at it.
-3. (Optionally) move the store's write actions behind server actions.
+### Connecting Supabase
 
-Nothing in `app/` or `components/` imports a concrete repository, so the UI is
-unaffected.
+1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql)
+   in its SQL editor (tables + open demo RLS policies).
+2. Copy `.env.example` to `.env` and fill in all four values
+   (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`).
+3. Seed the database with the sample portfolio: `npm run seed`.
+4. Restart `npm run dev` — the app now reads/writes Supabase. On Vercel, set the
+   two `NEXT_PUBLIC_*` vars in the project settings.
+
+> The RLS policies in `schema.sql` are intentionally **open** (anon read/write)
+> for a no-auth demo. Lock them down with auth-scoped policies before using real
+> data. Writes currently go straight from the browser via the anon key; moving
+> them behind server actions is a natural follow-up.
 
 > **Note:** dates are anchored to a fixed reference "today" (`REFERENCE_DATE` in
 > `lib/format.ts`) so the curated sample data reads exactly as designed. Remove

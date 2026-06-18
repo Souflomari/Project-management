@@ -11,6 +11,10 @@ export const metadata: Metadata = {
     "Pilotage du portefeuille de projets d'ingénierie — Direction technique Setec.",
 };
 
+// Render reads at request time so live data (Supabase) is always fresh and the
+// build never reaches out to the database. Harmless for the sample-data build.
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: {

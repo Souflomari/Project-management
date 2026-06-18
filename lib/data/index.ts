@@ -1,13 +1,20 @@
 // Single swap point for the data layer.
 //
-// To move from sample data to Supabase later:
-//   1. add `supabase-repository.ts` implementing `ProjectRepository`
-//   2. change the line below to export it instead
-// Nothing else in the app imports a concrete repository.
+// The active repository is chosen at module load:
+//   • Supabase env vars present  → SupabaseRepository (real database)
+//   • otherwise                  → sampleRepository  (in-memory sample data)
+//
+// So the app deploys and runs on sample data today, and switches to Supabase the
+// moment NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are set —
+// nothing else in the app imports a concrete repository.
 
 import { sampleRepository } from "./sample-repository";
+import { createSupabaseRepository } from "./supabase-repository";
+import { isSupabaseConfigured } from "./supabase-client";
 import type { ProjectRepository } from "./repository";
 
-export const repository: ProjectRepository = sampleRepository;
+export const repository: ProjectRepository = isSupabaseConfigured()
+  ? createSupabaseRepository()
+  : sampleRepository;
 
 export type { ProjectRepository, NewProjectInput } from "./repository";
