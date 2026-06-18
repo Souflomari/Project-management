@@ -34,7 +34,7 @@ export function Dashboard() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14, marginBottom: 20 }}>
         <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} />
         <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} />
-        <Kpi title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} onClick={kpis.late > 0 ? goLate : undefined} />
+        <Kpi title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} accent={kpis.late > 0 ? STATUS_META["en retard"].color : undefined} onClick={kpis.late > 0 ? goLate : undefined} />
         <Card padding="16px 18px">
           <div style={{ ...TX.overline, color: C.ink400 }}>Avancement moyen</div>
           <div style={{ ...num(34), marginTop: 10 }}>{kpis.avg}%</div>
@@ -43,11 +43,11 @@ export function Dashboard() {
               s.count > 0 ? <div key={s.status} title={`${s.label} · ${s.count}`} style={{ width: `${(s.count / distTotal) * 100}%`, background: s.color }} /> : null,
             )}
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", marginTop: 7 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 9 }}>
             {dist.map((s) => (
-              <span key={s.status} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: C.ink500 }}>
-                <span style={{ width: 7, height: 7, borderRadius: 2, background: s.color }} />
-                {s.count}
+              <span key={s.status} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: C.ink500 }}>
+                <span style={{ width: 7, height: 7, borderRadius: R.xs, background: s.color, flexShrink: 0 }} />
+                {s.label} <span style={{ ...num(11), color: C.ink700 }}>{s.count}</span>
               </span>
             ))}
           </div>
@@ -57,7 +57,12 @@ export function Dashboard() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, alignItems: "start" }}>
         <Card padding="6px 20px 14px">
-          <h2 style={{ ...TX.h2, margin: "14px 0 6px" }}>Prochains rendus</h2>
+          <h2 style={{ ...TX.h2, margin: "14px 0 6px", display: "flex", alignItems: "baseline", gap: 8 }}>
+            Prochains rendus <span style={{ ...num(13), color: C.ink400 }}>{upcoming.length}</span>
+          </h2>
+          {upcoming.length === 0 ? (
+            <div style={{ ...TX.caption, color: C.ink500, padding: "10px 6px", borderTop: `1px solid ${C.line}` }}>Aucun rendu à venir.</div>
+          ) : null}
           {upcoming.map((r) => (
             <div
               key={r.id}
@@ -81,16 +86,24 @@ export function Dashboard() {
             <div
               {...rowProps(goLate)}
               className="row-hover row-focus"
-              style={{ display: "flex", gap: 8, alignItems: "center", padding: "9px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", color: "#B4532E", fontSize: 12, fontWeight: 600, borderRadius: 4 }}
+              style={{ display: "flex", gap: 8, alignItems: "center", padding: "9px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", color: STATUS_META["en retard"].color, fontSize: 12, fontWeight: 600, borderRadius: R.xs }}
             >
               <FlagIcon size={14} />
-              {staleCount} projet{staleCount > 1 ? "s" : ""} en souffrance (&gt; {STALE_DAYS} j) — voir →
+              {staleCount} projet{staleCount > 1 ? "s" : ""} en souffrance (plus de {STALE_DAYS}&#8239;j)
             </div>
           ) : null}
         </Card>
 
         <Card padding="6px 20px 14px">
-          <h2 style={{ ...TX.h2, margin: "14px 0 6px" }}>Points de vigilance</h2>
+          <h2 style={{ ...TX.h2, margin: "14px 0 6px", display: "flex", alignItems: "baseline", gap: 8 }}>
+            Points de vigilance <span style={{ ...num(13), color: C.ink400 }}>{alerts.length}</span>
+          </h2>
+          {alerts.length === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, ...TX.caption, color: C.ink500, padding: "10px 6px", borderTop: `1px solid ${C.line}` }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.brand, flexShrink: 0 }} />
+              Aucun point de vigilance.
+            </div>
+          ) : null}
           {alerts.map((a) => (
             <div
               key={a.id}
@@ -112,10 +125,10 @@ export function Dashboard() {
   );
 }
 
-function Kpi({ title, value, sub, color, onClick }: { title: string; value: string | number; sub: string; color?: string; onClick?: () => void }) {
+function Kpi({ title, value, sub, color, accent, onClick }: { title: string; value: string | number; sub: string; color?: string; accent?: string; onClick?: () => void }) {
   return (
-    <div {...(onClick ? { ...rowProps(onClick), className: "lift-hover row-focus" } : {})} style={onClick ? { borderRadius: 10, cursor: "pointer" } : undefined}>
-      <Card padding="16px 18px">
+    <div {...(onClick ? { ...rowProps(onClick), className: "lift-hover row-focus" } : {})} style={onClick ? { borderRadius: R.lg, cursor: "pointer" } : undefined}>
+      <Card padding="16px 18px" style={accent ? { borderTop: `2px solid ${accent}` } : undefined}>
         <div style={{ ...TX.overline, color: C.ink400 }}>{title}</div>
         <div style={{ ...num(34), marginTop: 10, color: color ?? C.ink900 }}>{value}</div>
         <div style={{ fontSize: 11.5, color: C.ink400, marginTop: 7 }}>{sub}</div>

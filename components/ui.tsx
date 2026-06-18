@@ -3,7 +3,7 @@
 // Shared primitive kit. One source of truth for buttons, inputs, cards, etc.
 // so divergent inline styles stop being expressible across views.
 
-import { useEffect, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
 
 import { CaretDownIcon, CloseIcon } from "./icons";
 import { C, R, SH, TX } from "@/lib/tokens";
@@ -277,12 +277,23 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    const node = ref.current;
+    const sel = "button,[href],input,select,textarea,[tabindex]:not([tabindex='-1'])";
+    (node?.querySelector<HTMLElement>("[autofocus]," + sel) ?? node)?.focus();
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") return onClose();
+      if (e.key !== "Tab" || !node) return;
+      const f = Array.from(node.querySelectorAll<HTMLElement>(sel)).filter((el) => !el.hasAttribute("disabled"));
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); prev?.focus?.(); };
   }, [onClose]);
 
   return (
@@ -291,11 +302,16 @@ export function Modal({
       style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .16s ease", padding: 20 }}
     >
       <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.md, boxShadow: SH.lg, padding: 24, color: C.ink900, animation: "popIn .2s cubic-bezier(.2,.7,.2,1)" }}
+        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.lg, boxShadow: SH.lg, padding: 24, color: C.ink900, animation: "popIn .2s cubic-bezier(.2,.7,.2,1)", outline: "none" }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: subtitle ? 4 : 16 }}>
-          <h2 style={{ ...TX.h2, margin: 0 }}>{title}</h2>
+          <h2 id="modal-title" style={{ ...TX.h2, margin: 0 }}>{title}</h2>
           <IconButton size={28} onClick={onClose} aria-label="Fermer">
             <CloseIcon size={15} />
           </IconButton>
@@ -389,10 +405,10 @@ export function StatusPill({
         fontWeight: 600,
         whiteSpace: "nowrap",
         color,
-        ...(filled && bg ? { background: bg, padding: "2px 8px", borderRadius: R.pill } : null),
+        ...(filled && bg ? { background: bg, padding: "3px 9px", borderRadius: R.pill } : null),
       }}
     >
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color }} />
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
       {label}
     </span>
   );
@@ -409,9 +425,16 @@ export function ProgressBar({
   track?: string;
   height?: number;
 }) {
+  const clamped = Math.min(100, Math.max(0, pct));
   return (
-    <div style={{ flex: 1, height, background: track, borderRadius: R.sm, overflow: "hidden" }}>
-      <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, pct))}%`, background: color, borderRadius: `${R.sm}px 0 0 ${R.sm}px` }} />
+    <div
+      role="progressbar"
+      aria-valuenow={Math.round(clamped)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      style={{ flex: 1, height, background: track, borderRadius: R.pill, overflow: "hidden" }}
+    >
+      <div style={{ height: "100%", width: `${clamped}%`, background: color, borderRadius: R.pill, transition: "width .3s ease" }} />
     </div>
   );
 }

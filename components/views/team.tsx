@@ -6,9 +6,9 @@ import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon } from
 import { TeamMemberModal } from "../team-member-modal";
 import { Avatar, Button, Card, EmptyState, IconButton, rowProps, Segmented, Toolbar } from "../ui";
 import { buildTeamLoad, type HeatBucket } from "@/lib/derive";
-import { MONS_LONG, MONTHS_FULL, monthRange, toDate, weekRange } from "@/lib/format";
+import { isToday, MONS_LONG, MONTHS_FULL, monthRange, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
-import { C, chargeColor, heatColor, num, TX } from "@/lib/tokens";
+import { C, chargeColor, num, R, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const MODE_OPTS: { value: TeamMode; label: string }[] = [
@@ -51,15 +51,15 @@ export function Team() {
         <IconButton onClick={teamNext} aria-label="Suivant"><ChevronRightIcon /></IconButton>
         <Segmented value={teamMode} options={MODE_OPTS} onChange={setTeamMode} />
         <div style={{ marginLeft: "auto" }}>
-          <Button onClick={openAdd} icon={<PlusIcon size={15} />}>Membre</Button>
+          <Button onClick={openAdd} icon={<PlusIcon size={15} />}>Nouveau membre</Button>
         </div>
       </Toolbar>
 
       <p style={{ ...TX.caption, color: C.ink400, margin: "0 0 20px" }}>
-        Charge sur <strong style={{ color: C.ink500, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · frise {teamMode === "semaine" ? "par jour" : "par semaine"}
+        Charge sur <strong style={{ color: C.ink500, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · répartition {teamMode === "semaine" ? "par jour" : "par semaine"} · la ligne = 100&#8239;% (pleine capacité)
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))", gap: 18 }}>
         {loads.map((t) => {
           const c = chargeColor(t.chargePct);
           const isRef = referenced.has(t.member.id);
@@ -68,7 +68,7 @@ export function Team() {
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                 <Avatar initials={t.member.initials} color={t.member.color} size={42} fontSize={15} title={`${t.member.name} · ${t.member.role}`} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{t.member.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.ink900 }}>{t.member.name}</div>
                   <div style={{ ...TX.caption, color: C.ink500 }}>{t.member.role}</div>
                 </div>
                 <div style={{ display: "flex", gap: 5 }}>
@@ -88,8 +88,8 @@ export function Team() {
 
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ ...num(26), color: c }}>{t.chargePct}%</span>
-                  <span style={{ ...TX.caption, color: C.ink500 }}>{t.periodDays} j / {t.capacity} j</span>
+                  <span style={{ ...num(26), color: c }}>{t.chargePct}&#8239;%</span>
+                  <span style={{ ...TX.caption, color: C.ink500 }}>{t.periodDays} / {t.capacity} j{t.chargePct > 100 ? ` · ${t.periodDays - t.capacity} j en trop` : ""}</span>
                 </div>
                 <span style={{ ...TX.caption, color: C.ink500 }}>{t.projectsActive} projet{t.projectsActive > 1 ? "s" : ""}</span>
               </div>
@@ -126,20 +126,33 @@ export function Team() {
   );
 }
 
+const WD = ["L", "M", "M", "J", "V", "S", "D"];
+
+/** Workload heatmap as bars against a 100%-capacity line: the bar fills toward
+ *  the dashed line at full capacity, and a terracotta cap rises above it when
+ *  the period is overbooked — so *when* overload happens is readable at a glance. */
 function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
   if (buckets.length === 0) return null;
+  const FULL = 32; // px height representing 100% capacity
+  const OVER = 10; // headroom above the line for the overflow cap
+  const H = FULL + OVER;
   return (
-    <div style={{ display: "flex", gap: 3 }}>
+    <div style={{ display: "flex", gap: mode === "semaine" ? 5 : 3, alignItems: "flex-end" }}>
       {buckets.map((b, i) => {
-        const bg = heatColor(b.pct);
-        // Cells are now light/muted, so dark ink keeps contrast across the ramp.
-        const txt = b.pct === 0 ? C.ink400 : C.ink800;
+        const d = toDate(b.start);
+        const today = mode === "semaine" && isToday(b.start);
+        const base = (Math.min(b.pct, 100) / 100) * FULL;
+        const over = b.pct > 100 ? Math.min((b.pct - 100) / 40, 1) * OVER : 0;
+        const lab = mode === "semaine" ? WD[(d.getDay() + 6) % 7] : String(d.getDate());
         return (
-          <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${b.label} · ${b.days}/${b.capacity} j · ${b.pct}%`}>
-            <div style={{ height: 30, borderRadius: 4, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontSize: 10.5, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: txt }}>{b.pct > 0 ? `${b.pct}%` : ""}</span>
+          <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${d.getDate()} ${MONTHS_FULL[d.getMonth()]} · ${b.days} / ${b.capacity} j · ${b.pct}%`}>
+            <div style={{ position: "relative", height: H, borderRadius: R.xs, background: C.subtle, boxShadow: `inset 0 0 0 1px ${C.line}`, overflow: "hidden" }}>
+              <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: base, background: chargeColor(b.pct) }} />
+              {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: over, background: "#B5532E" }} /> : null}
+              {b.pct > 100 ? <span style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9.5, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#7A2E22" }}>{b.pct}%</span> : null}
             </div>
-            <div style={{ fontSize: 9.5, color: C.ink400, textAlign: "center", marginTop: 3 }}>{b.label}</div>
+            <div style={{ fontSize: 10, fontWeight: today ? 700 : 450, color: today ? C.ink900 : C.ink400, textAlign: "center", marginTop: 4 }}>{lab}</div>
           </div>
         );
       })}

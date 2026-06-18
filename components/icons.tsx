@@ -81,7 +81,7 @@ export function EquipeIcon({ size = 17 }: IconProps) {
 
 export function SearchIcon({ size = 15 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#6F6F6F" strokeWidth={2}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.5" y2="16.5" />
     </svg>

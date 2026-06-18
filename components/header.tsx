@@ -22,9 +22,9 @@ export function Header() {
     <header
       style={{
         minHeight: 64,
-        background: "rgba(250,250,249,.8)",
-        backdropFilter: "saturate(180%) blur(8px)",
-        WebkitBackdropFilter: "saturate(180%) blur(8px)",
+        background: "rgba(250,250,249,.72)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         borderBottom: `1px solid ${C.line}`,
         display: "flex",
         alignItems: "center",
@@ -42,29 +42,32 @@ export function Header() {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div
-          className="ui-field"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            background: C.subtle,
-            border: "1px solid transparent",
-            borderRadius: R.sm,
-            padding: "0 12px",
-            height: 36,
-            width: 280,
-            color: C.ink400,
-          }}
-        >
-          <SearchIcon />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un projet…"
-            style={{ border: "none", background: "transparent", outline: "none", font: "inherit", fontSize: 13.5, color: C.ink900, width: "100%" }}
-          />
-        </div>
+        {item.key === "projets" ? (
+          <div
+            className="ui-field"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: C.surface,
+              border: `1px solid ${C.line}`,
+              borderRadius: R.sm,
+              padding: "0 12px",
+              height: 36,
+              width: 280,
+              color: C.ink400,
+            }}
+          >
+            <SearchIcon />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un projet…"
+              aria-label="Rechercher un projet"
+              style={{ border: "none", background: "transparent", outline: "none", font: "inherit", fontSize: 14, color: C.ink900, width: "100%" }}
+            />
+          </div>
+        ) : null}
         <Button onClick={openAdd} icon={<PlusIcon size={15} />}>
           Nouveau projet
         </Button>

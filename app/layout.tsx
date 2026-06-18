@@ -4,17 +4,17 @@ import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 
 // Self-hosted at build time (no runtime CDN dependency) — fonts always load.
+// Loaded as VARIABLE fonts (no fixed `weight`) so in-between weights like 440 /
+// 540 / 580 render for real instead of snapping to the nearest static instance.
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700"],
   variable: "--font-ui",
 });
 
 const interTight = Inter_Tight({
   subsets: ["latin"],
   display: "swap",
-  weight: ["500", "600", "700"],
   variable: "--font-display",
 });
 

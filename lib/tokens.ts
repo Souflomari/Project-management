@@ -19,8 +19,10 @@ export const C = {
   ink900: "#1C1917", // primary text — darkened for content contrast
   ink800: "#292524", // strong body
   ink700: "#44403C", // body
-  ink500: "#78716C", // secondary (receded)
-  ink400: "#A8A29E", // muted / placeholder
+  ink600: "#5A534E", // tertiary text (bridges the 700→500 gap; AA on white ≈ 6.6:1)
+  ink500: "#78716C", // secondary (receded) — AA floor for body text ≈ 4.7:1
+  ink400: "#A8A29E", // NON-TEXT only: hairlines, dots, disabled glyphs (sub-AA)
+  ink300: "#C4BFB9", // disabled text/control
   line: "#EEECE9", // soft warm hairline (low contrast — structure, not noise)
   lineStrong: "#E3E0DB", // hover / modal border
   surface: "#FFFFFF",
@@ -38,6 +40,9 @@ export const C = {
 } as const;
 
 export const R = { xs: 6, sm: 8, md: 10, lg: 14, xl: 18, pill: 999 } as const;
+
+/** 4px-based spacing scale. Use instead of ad-hoc inline magic numbers. */
+export const SP = { 0: 0, 1: 2, 2: 4, 3: 8, 4: 12, 5: 16, 6: 20, 7: 24, 8: 32, 9: 40, 10: 48, 11: 64 } as const;
 
 // Soft, low-contrast elevation. Surfaces mostly rest borderless-or-bordered with
 // no shadow; shadow appears on lift / overlays only.
@@ -117,20 +122,33 @@ export const DRAWER = {
 /** Accent per study phase (ESQ → RÉC) — muted, single-family ramp. */
 export const PHASE_COLORS = ["#9C9488", "#6E8E84", "#5C81A0", "#4E7B82", "#3F8E5E", "#6C7286", "#8C7A66"];
 
-/** Workload colour — calm green → amber → terracotta as load rises. */
-export function chargeColor(pct: number): string {
-  if (pct > 110) return "#B5532E";
-  if (pct > 100) return "#C2683E";
-  if (pct >= 85) return "#B45309";
-  return "#15803D";
+/** Load tier — single source of truth so the headline colour and the heatmap
+ *  cell always agree. Breakpoints 85 / 100 / 110. */
+export type LoadTier = "low" | "high" | "full" | "over" | "crit";
+export function loadTier(pct: number): LoadTier {
+  if (pct > 110) return "crit";
+  if (pct > 100) return "over";
+  if (pct >= 85) return "high";
+  if (pct > 0) return "full";
+  return "low";
 }
 
-/** Heatmap cell colour by load % — quiet, low-chroma sage → clay ramp. */
+/** Workload colour — calm green → amber → terracotta as load rises. */
+export function chargeColor(pct: number): string {
+  switch (loadTier(pct)) {
+    case "crit": return "#B5532E";
+    case "over": return "#C2683E";
+    case "high": return "#B45309";
+    default: return "#15803D";
+  }
+}
+
+/** Heatmap cell colour by load % — strictly darkening sage → terracotta ramp. */
 export function heatColor(pct: number): string {
   if (pct <= 0) return "#F2F1EF";
-  if (pct < 50) return "#E7EDE7";
-  if (pct < 85) return "#CADBCD";
-  if (pct <= 100) return "#A6C3AC"; // full but within capacity
-  if (pct <= 110) return "#E0C3AE"; // slightly over
-  return "#CFA088"; // well over
+  if (pct < 50) return "#E4ECE6";
+  if (pct < 85) return "#C2D8C7";
+  if (pct <= 100) return "#9FC0A6"; // full but within capacity
+  if (pct <= 110) return "#D2895F"; // slightly over (clearly darker + warmer)
+  return "#B5532E"; // well over — matches chargeColor "crit"
 }

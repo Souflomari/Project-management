@@ -7,9 +7,11 @@ import { MinusIcon } from "../icons";
 import { Avatar, IconButton, ProgressBar } from "../ui";
 import { buildKanban } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, FONT_NUM, PHASE_COLORS, R, TX } from "@/lib/tokens";
+import { C, FONT_NUM, PHASE_COLORS, R, SH, STATUS_META, TX } from "@/lib/tokens";
 
 const WIP_LIMIT = 6;
+const WIP_COLOR = STATUS_META["à risque"].color;
+const WIP_BG = STATUS_META["à risque"].bg;
 
 const numTab: React.CSSProperties = { fontVariantNumeric: "tabular-nums" };
 
@@ -18,6 +20,7 @@ export function Kanban() {
   const columns = buildKanban(filtered);
   const dragId = useRef<number | null>(null);
   const [overPhase, setOverPhase] = useState<number | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
 
   const toggleCollapse = (i: number) =>
@@ -29,7 +32,6 @@ export function Kanban() {
 
   const dropHandlers = (phaseIndex: number) => ({
     onDragOver: (e: React.DragEvent) => { e.preventDefault(); if (overPhase !== phaseIndex) setOverPhase(phaseIndex); },
-    onDragLeave: () => setOverPhase((cur) => (cur === phaseIndex ? null : cur)),
     onDrop: (e: React.DragEvent) => {
       e.preventDefault();
       if (dragId.current != null) { setPhase(dragId.current, phaseIndex); dragId.current = null; }
@@ -57,10 +59,10 @@ export function Kanban() {
                 {...dropHandlers(col.phaseIndex)}
                 onClick={() => toggleCollapse(col.phaseIndex)}
                 title={`${col.full} — déplier`}
-                style={{ width: 46, flexShrink: 0, background: isOver ? C.brand50 : C.subtle, borderRadius: R.md, border: `1px solid ${isOver ? C.brand : C.line}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}
+                style={{ width: 46, flexShrink: 0, background: C.subtle, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer", transition: "box-shadow .12s ease" }}
               >
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: accent, flexShrink: 0 }} />
-                <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? "#C2683E" : C.ink700 }}>{col.count}</span>
+                <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? WIP_COLOR : C.ink700 }}>{col.count}</span>
                 <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, letterSpacing: ".06em", color: C.ink700 }}>{col.label}</span>
               </div>
             );
@@ -70,7 +72,7 @@ export function Kanban() {
             <div
               key={col.phaseIndex}
               {...dropHandlers(col.phaseIndex)}
-              style={{ width: 256, flexShrink: 0, background: isOver ? C.brand50 : C.subtle, borderRadius: R.md, border: `1px solid ${isOver ? C.brand : C.line}`, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 230px)" }}
+              style={{ width: 256, flexShrink: 0, background: C.subtle, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 230px)", transition: "box-shadow .12s ease" }}
             >
               <div style={{ padding: "11px 12px 9px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -82,12 +84,12 @@ export function Kanban() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
                   <span
-                    title={overWip ? `WIP dépassé (${col.count}/${WIP_LIMIT})` : undefined}
-                    style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? "#C2683E" : C.ink700, background: overWip ? "#FBEEDD" : C.surface, borderRadius: 4, padding: "1px 8px" }}
+                    title={overWip ? `Limite dépassée (${col.count}/${WIP_LIMIT})` : undefined}
+                    style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? WIP_COLOR : C.ink700, background: overWip ? WIP_BG : C.surface, borderRadius: R.xs, padding: "1px 8px" }}
                   >
                     {overWip ? `${col.count}/${WIP_LIMIT}` : col.count}
                   </span>
-                  <IconButton size={20} onClick={() => toggleCollapse(col.phaseIndex)} title="Replier"><MinusIcon size={14} /></IconButton>
+                  <IconButton size={24} onClick={() => toggleCollapse(col.phaseIndex)} title="Replier" aria-label="Replier la colonne"><MinusIcon size={14} /></IconButton>
                 </div>
               </div>
 
@@ -96,16 +98,15 @@ export function Kanban() {
                   <div
                     key={c.id}
                     draggable
-                    onDragStart={(e) => { dragId.current = c.id; e.dataTransfer.effectAllowed = "move"; }}
-                    onDragEnd={() => { dragId.current = null; setOverPhase(null); }}
+                    onDragStart={(e) => { dragId.current = c.id; setDraggingId(c.id); e.dataTransfer.effectAllowed = "move"; }}
+                    onDragEnd={() => { dragId.current = null; setDraggingId(null); setOverPhase(null); }}
                     onClick={() => openProject(c.id)}
                     className="lift-hover"
-                    style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "11px 12px", cursor: "grab" }}
+                    style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "11px 12px", cursor: "grab", opacity: draggingId === c.id ? 0.4 : 1, boxShadow: draggingId === c.id ? SH.md : undefined, transition: "opacity .12s ease" }}
                   >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ ...TX.bodyStrong, lineHeight: 1.3, minWidth: 0 }}>{c.name}</div>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0, fontSize: 10, fontWeight: 600, color: c.statusColor, background: c.statusBg, padding: "2px 7px", borderRadius: 999, whiteSpace: "nowrap" }}>
-                        <span style={{ width: 5, height: 5, borderRadius: "50%", background: c.statusColor }} />
+                      <div style={{ ...TX.bodyStrong, lineHeight: 1.3, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.name}</div>
+                      <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, fontSize: 10.5, fontWeight: 540, color: c.statusColor, background: c.statusBg, padding: "2px 7px", borderRadius: R.xs, whiteSpace: "nowrap" }}>
                         {c.statusLabel}
                       </span>
                     </div>
@@ -125,7 +126,7 @@ export function Kanban() {
                     </div>
                   </div>
                 ))}
-                {col.cards.length === 0 ? <div style={{ ...TX.caption, color: C.ink400, textAlign: "center", padding: "14px 0" }}>—</div> : null}
+                {col.cards.length === 0 ? <div style={{ ...TX.caption, color: C.ink400, textAlign: "center", padding: "16px 0" }}>Aucun projet</div> : null}
               </div>
             </div>
           );

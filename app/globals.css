@@ -70,6 +70,16 @@ textarea::placeholder {
   background: #f5f4f2 !important;
   color: #1c1917 !important;
 }
+.cal-chip {
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+.cal-chip:hover {
+  background: #efedea !important;
+  box-shadow: 0 1px 2px rgba(28, 25, 23, 0.06);
+}
+.cal-chip:active {
+  cursor: grabbing;
+}
 .sortable {
   cursor: pointer;
   user-select: none;
@@ -77,6 +87,9 @@ textarea::placeholder {
 }
 .sortable:hover {
   color: #1c1917 !important;
+}
+.sortable:hover .sort-caret {
+  opacity: 0.4 !important;
 }
 .row-focus:focus-visible {
   outline: none;
@@ -94,16 +107,30 @@ textarea::placeholder {
 }
 
 /* primitives */
+.btn {
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.04s ease;
+}
 .btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(28, 25, 23, 0.14);
 }
+.btn:active {
+  transform: translateY(0.5px);
+}
 .btn-primary:hover {
   background: #000000 !important;
+}
+.btn-primary:active {
+  background: #000 !important;
+  filter: brightness(0.9);
 }
 .btn-secondary:hover {
   background: #f5f4f2 !important;
   border-color: #e3e0db !important;
+}
+.btn-secondary:active,
+.icon-btn:active {
+  background: #efedea !important;
 }
 .btn-ghost:hover {
   background: #f5f4f2 !important;
@@ -117,9 +144,31 @@ textarea::placeholder {
   border-color: #eccfc9 !important;
   color: #b5392e !important;
 }
-.ui-field:focus {
-  border-color: #a8a29e !important;
-  box-shadow: 0 0 0 3px rgba(28, 25, 23, 0.08);
+.ui-field:focus-visible,
+.ui-field:focus-within {
+  border-color: #1c1917 !important;
+  box-shadow: 0 0 0 3px rgba(28, 25, 23, 0.1);
+}
+
+/* Global focus fallback for any interactive element that doesn't set its own. */
+a:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+.sortable:focus-visible {
+  outline: 2px solid #1c1917;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @keyframes drawerIn {

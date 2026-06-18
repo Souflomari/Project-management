@@ -6,7 +6,17 @@
 
 export const REFERENCE_DATE = "2026-06-15";
 
-export const WEEK_SHORT = "15 → 21 juin";
+/** True if an ISO date is the app's "today". One definition, used everywhere. */
+export function isToday(iso: string): boolean {
+  return iso === REFERENCE_DATE;
+}
+
+// French typographic spaces. NNBSP (U+202F) before % ? ! ; and the "j" unit and
+// inside number groups; NBSP (U+00A0) before : and in date ranges/before €.
+export const NNBSP = " ";
+export const NBSP = " ";
+
+export const WEEK_SHORT = `15${NBSP}–${NBSP}21 juin`;
 export const WEEK_LABEL = "Semaine du 15 au 21 juin 2026";
 
 export const MONTHS = [
@@ -59,24 +69,25 @@ export function fmtFull(iso: string): string {
   return `${d.getDate()} ${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// Compact contexts (cells, chips) use "j"; prose (dueLabelFull) uses "jours".
 export function dueLabel(days: number): string {
-  if (days < 0) return `Retard ${-days} j`;
-  if (days === 0) return "Aujourd'hui";
+  if (days < 0) return `${-days}${NNBSP}j de retard`;
+  if (days === 0) return "Aujourd’hui";
   if (days === 1) return "Demain";
-  return `Dans ${days} j`;
+  return `Dans ${days}${NNBSP}j`;
 }
 
 export function dueLabelFull(days: number): string {
-  if (days < 0) return `Dépassée de ${-days} jours`;
-  if (days === 0) return "Aujourd'hui";
-  return `Dans ${days} jours`;
+  if (days < 0) return `${-days}${NNBSP}jours de retard`;
+  if (days === 0) return "Aujourd’hui";
+  return `Dans ${days}${NNBSP}jours`;
 }
 
 export function fmtBudget(k: number): string {
   if (!k) return "—";
   return k >= 1000
-    ? `${(k / 1000).toFixed(1).replace(".", ",")} M€`
-    : `${k} k€`;
+    ? `${(k / 1000).toFixed(1).replace(".", ",")}${NNBSP}M€`
+    : `${k.toLocaleString("fr-FR")}${NNBSP}k€`;
 }
 
 // ----------------------------------------------------------- working days

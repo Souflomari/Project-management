@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
 import { Button, IconButton, Modal, rowProps, Segmented, Select, Toolbar } from "../ui";
 import { buildMonthGrid, buildTaskEvents, eventsInRange, type TaskEvent } from "@/lib/derive";
-import { fmtFull, MONS_LONG, MONTHS_FULL, taskStartForEnd, toDate, WEEKDAYS, monthRange, weekRange } from "@/lib/format";
+import { fmtFull, isToday, MONS_LONG, MONTHS_FULL, taskStartForEnd, toDate, WEEKDAYS, monthRange, weekRange } from "@/lib/format";
 import { useProjects, type CalMode } from "@/lib/store/projects-context";
 import { C, num, PHASE_COLORS, TX } from "@/lib/tokens";
 import { PHASES } from "@/lib/types";
@@ -33,7 +33,7 @@ export function CalendarView() {
   const anchor = toDate(calAnchor);
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
-  const label = calMode === "semaine" ? weekLabel(calAnchor) : `${calMode === "agenda" ? "Agenda — " : ""}${MONS_LONG[month]} ${year}`;
+  const label = calMode === "semaine" ? weekLabel(calAnchor) : `${MONS_LONG[month]} ${year}`;
 
   const dnd = {
     onStart: (e: TaskEvent) => { dragged.current = e; },
@@ -130,10 +130,14 @@ function EventChip({ e, onOpen, dnd, compact }: { e: TaskEvent; onOpen: (id: num
       onDragStart={() => dnd.onStart(e)}
       onClick={(ev) => { ev.stopPropagation(); onOpen(e.projectId); }}
       title={`${e.projectName} — ${e.taskName} (${PHASES[e.phaseIndex]})`}
-      style={{ background: `${e.color}16`, borderRadius: 5, padding: "3px 7px", cursor: "grab", overflow: "hidden" }}
+      role="button"
+      tabIndex={0}
+      aria-label={`${e.projectName} — ${e.taskName}`}
+      onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onOpen(e.projectId); } }}
+      className="cal-chip"
+      style={{ background: C.subtle, borderLeft: `3px solid ${e.color}`, borderRadius: 4, padding: "3px 7px", cursor: "pointer", overflow: "hidden" }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 6, height: 6, borderRadius: "50%", background: e.color, flexShrink: 0 }} />
         <div style={{ flex: 1, fontSize: 11, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
         <span style={{ width: 5, height: 5, borderRadius: "50%", background: e.statusColor, flexShrink: 0 }} />
       </div>
@@ -149,7 +153,7 @@ function DayCell({ iso, dnd, children, style }: { iso: string; dnd: Dnd; childre
       onDragOver={(e) => { e.preventDefault(); if (!over) setOver(true); }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); dnd.onDrop(iso); }}
-      style={{ ...style, ...(over ? { outline: `2px dashed ${C.brand}`, outlineOffset: -2, background: C.brand50 } : null) }}
+      style={{ ...style, ...(over ? { boxShadow: `inset 0 0 0 2px ${C.brand}`, background: C.brand50 } : null) }}
     >
       {children}
     </div>
@@ -165,21 +169,26 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
         {cells.map((c, i) => {
+          const weekend = i % 7 >= 5;
           const base: React.CSSProperties = {
             minHeight: 98,
             borderRight: `1px solid ${C.line}`,
             borderBottom: `1px solid ${C.line}`,
             padding: "5px 6px",
-            background: c.day === null ? C.subtle : c.isToday ? C.brand50 : C.surface,
+            background: c.day === null ? C.subtle : weekend ? C.canvas : C.surface,
           };
           const inner = (
             <>
               {c.day !== null ? (
-                <div style={{ fontSize: 13, fontWeight: c.isToday ? 700 : 600, fontVariantNumeric: "tabular-nums", color: c.isToday ? C.brand : C.ink700 }}>{c.day}</div>
+                c.isToday ? (
+                  <div style={{ ...num(13), width: 22, height: 22, borderRadius: "50%", background: C.brand, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>{c.day}</div>
+                ) : (
+                  <div style={{ ...num(13), color: C.ink600, padding: "1px 2px" }}>{c.day}</div>
+                )
               ) : null}
               <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
                 {c.events.slice(0, 3).map((e, j) => (<EventChip key={j} e={e} onOpen={onOpen} dnd={dnd} />))}
-                {c.events.length > 3 ? <div style={{ fontSize: 10.5, color: C.ink400, fontWeight: 600 }}>+{c.events.length - 3} autres</div> : null}
+                {c.events.length > 3 ? <div style={{ fontSize: 11, color: C.ink500, fontWeight: 600, paddingLeft: 2 }}>+{c.events.length - 3} autres</div> : null}
               </div>
             </>
           );
@@ -197,7 +206,7 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
     const d = new Date(startD);
     d.setDate(startD.getDate() + i);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return { iso, dow: WEEKDAYS[i], num: d.getDate(), isToday: iso === "2026-06-15", events: events.filter((e) => e.date === iso) };
+    return { iso, dow: WEEKDAYS[i], num: d.getDate(), isToday: isToday(iso), events: events.filter((e) => e.date === iso) };
   });
 
   return (

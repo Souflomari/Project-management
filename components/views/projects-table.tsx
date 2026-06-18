@@ -10,7 +10,7 @@ import { useProjects } from "@/lib/store/projects-context";
 import { C, num, R, TX } from "@/lib/tokens";
 import { STATUSES } from "@/lib/types";
 
-const COLS = "2.5fr .7fr 1.4fr 1.3fr .9fr 46px 1fr";
+const COLS = "2.4fr 64px 1.4fr 1.2fr .9fr 46px 116px";
 
 type SortKey = "name" | "phase" | "rendu" | "progress" | "budget" | "resp" | "status";
 
@@ -61,19 +61,20 @@ export function ProjectsTable() {
         >
           {HEADERS.map((h) => {
             const active = sort?.key === h.key;
+            const right = h.key === "budget";
             return (
-              <div
+              <button
                 key={h.key}
                 className="sortable"
                 onClick={() => toggleSort(h.key)}
-                style={{ display: "flex", alignItems: "center", gap: 3, color: active ? C.ink900 : C.ink500 }}
-                title="Trier"
+                aria-sort={active ? (sort!.dir === 1 ? "ascending" : "descending") : "none"}
+                style={{ display: "flex", alignItems: "center", justifyContent: right ? "flex-end" : "flex-start", gap: 3, color: active ? C.ink700 : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.overline }}
               >
                 {h.label}
-                <span style={{ display: "inline-flex", opacity: active ? 1 : 0, transform: active && sort!.dir === -1 ? "rotate(180deg)" : "none", transition: "transform .12s" }}>
+                <span className="sort-caret" style={{ display: "inline-flex", opacity: active ? 1 : 0, transform: active && sort!.dir === -1 ? "rotate(180deg)" : "none", transition: "transform .12s, opacity .12s" }}>
                   <CaretDownIcon size={11} />
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -83,7 +84,7 @@ export function ProjectsTable() {
             key={p.id}
             {...rowProps(() => openProject(p.id))}
             className="row-hover row-focus"
-            style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", padding: "12px 18px", borderTop: `1px solid ${C.line}`, cursor: "pointer" }}
+            style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", minHeight: 58, padding: "10px 18px", borderTop: `1px solid ${C.line}`, cursor: "pointer" }}
           >
             <div style={{ minWidth: 0 }}>
               <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
@@ -101,18 +102,23 @@ export function ProjectsTable() {
 
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <ProgressBar pct={p.progress} color={p.ring} />
-              <span style={{ ...num(13), width: 34, textAlign: "right", color: C.ink700 }}>{p.progress}%</span>
+              <span style={{ ...num(13), width: 38, textAlign: "right", color: C.ink700 }}>{p.progress}&#8239;%</span>
             </div>
 
-            <div style={{ ...num(14), fontWeight: 500, color: C.ink700 }}>{p.budgetFmt}</div>
+            <div style={{ ...num(14), fontWeight: 500, color: C.ink700, textAlign: "right" }}>{p.budgetFmt}</div>
 
-            <div>
+            <div style={{ display: "flex", justifyContent: "center" }}>
               <Avatar initials={p.responsable.initials} color={p.responsable.color} size={30} fontSize={11} title={`${p.responsable.name} · ${p.responsable.role}`} />
             </div>
 
-            <div><StatusPill color={p.statusColor} label={p.statusLabel} /></div>
+            <div><StatusPill color={p.statusColor} bg={p.statusBg} label={p.statusLabel} filled /></div>
           </div>
         ))}
+        {rows.length === 0 ? (
+          <div style={{ padding: "40px 18px", textAlign: "center", ...TX.caption, color: C.ink400, borderTop: `1px solid ${C.line}` }}>
+            Aucun projet pour ce filtre.
+          </div>
+        ) : null}
       </div>
     </>
   );
