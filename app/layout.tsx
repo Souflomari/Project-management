@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 
 import "./globals.css";
-import { AppShell } from "@/components/app-shell";
-import { repository } from "@/lib/data";
-import { ProjectsProvider } from "@/lib/store/projects-context";
 
 export const metadata: Metadata = {
   title: "Setec · Pilotage des projets",
@@ -11,21 +8,11 @@ export const metadata: Metadata = {
     "Pilotage du portefeuille de projets d'ingénierie — Direction technique Setec.",
 };
 
-// Render reads at request time so live data (Supabase) is always fresh and the
-// build never reaches out to the database. Harmless for the sample-data build.
-export const dynamic = "force-dynamic";
-
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Initial reads go through the data seam (sample data today, Supabase later).
-  const [projects, team] = await Promise.all([
-    repository.listProjects(),
-    repository.listTeam(),
-  ]);
-
   return (
     <html lang="fr">
       <head>
@@ -36,11 +23,7 @@ export default async function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>
-        <ProjectsProvider initialProjects={projects} initialTeam={team}>
-          <AppShell>{children}</AppShell>
-        </ProjectsProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

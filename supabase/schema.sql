@@ -1,9 +1,9 @@
 -- Setec · Pilotage des projets — Supabase schema
 -- Run this in the Supabase SQL editor (or `supabase db` migration) before seeding.
 --
--- NOTE on security: the RLS policies below are intentionally OPEN (anyone with
--- the anon key can read and write). That's fine for a demo/portfolio build with
--- no auth yet. Before exposing real data, replace them with auth-scoped policies.
+-- Access is restricted to authenticated users (the app gates everything behind
+-- Supabase Auth magic-link login). Any signed-in user can read and write; tighten
+-- further (per-team / per-owner) when you add roles.
 
 -- ---------------------------------------------------------------- tables
 
@@ -63,7 +63,7 @@ create index if not exists idx_deliverables_project on deliverables (project_id,
 create index if not exists idx_comments_project     on comments (project_id, created_at);
 create index if not exists idx_project_members_proj on project_members (project_id);
 
--- ---------------------------------------------------------------- RLS (open)
+-- ---------------------------------------------------------- RLS (authenticated)
 
 alter table team_members    enable row level security;
 alter table projects        enable row level security;
@@ -76,9 +76,9 @@ declare t text;
 begin
   foreach t in array array['team_members','projects','project_members','deliverables','comments']
   loop
-    execute format('drop policy if exists "public read" on %I;', t);
-    execute format('drop policy if exists "public write" on %I;', t);
-    execute format('create policy "public read" on %I for select using (true);', t);
-    execute format('create policy "public write" on %I for all using (true) with check (true);', t);
+    execute format('drop policy if exists "authenticated read" on %I;', t);
+    execute format('drop policy if exists "authenticated write" on %I;', t);
+    execute format('create policy "authenticated read" on %I for select using (auth.uid() is not null);', t);
+    execute format('create policy "authenticated write" on %I for all using (auth.uid() is not null) with check (auth.uid() is not null);', t);
   end loop;
 end $$;

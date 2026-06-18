@@ -4,11 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { NAV_ICONS } from "./icons";
+import { signOutAction } from "@/app/actions";
 import { NAV_ITEMS, navItemForPath } from "@/lib/nav";
+import { useProjects } from "@/lib/store/projects-context";
 
 export function Sidebar() {
   const pathname = usePathname();
   const activeKey = navItemForPath(pathname).key;
+  const { serverBacked } = useProjects();
 
   return (
     <aside
@@ -114,6 +117,27 @@ export function Sidebar() {
           <div style={{ fontSize: 11, color: "#7FA0A3" }}>Directrice de projets</div>
         </div>
       </div>
+
+      {serverBacked ? (
+        <form action={signOutAction} style={{ padding: "2px 8px 0" }}>
+          <button
+            type="submit"
+            style={{
+              width: "100%",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: "#7FA0A3",
+              fontSize: 12,
+              fontWeight: 500,
+              padding: "6px 0",
+            }}
+          >
+            Se déconnecter
+          </button>
+        </form>
+      ) : null}
     </aside>
   );
 }

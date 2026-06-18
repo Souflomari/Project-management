@@ -27,7 +27,8 @@ projet" adds one.
 - Styling ported directly from the design (inline styles, single "Design Setec"
   theme). Fonts (Montserrat, Oswald) load from Google Fonts.
 - Runs on realistic in-memory **sample data** out of the box, with an optional
-  **Supabase** backend (see below) that switches on via env vars.
+  **Supabase** backend + **magic-link auth** (see below) that switches on via
+  env vars.
 
 ## Getting started
 
@@ -61,29 +62,47 @@ lib/
     supabase-repository.ts   # Supabase implementation of ProjectRepository
   derive.ts                 # pure view-model derivation (KPIs, gantt, calendar…)
   format.ts                 # date / budget formatting
-  store/projects-context.tsx# client store (state + actions, calls the repository)
+  store/projects-context.tsx# client store (state + actions)
+lib/supabase/              # auth-aware Supabase clients (config/server/browser)
+app/actions.ts             # server actions for writes (auth + RLS)
+proxy.ts                   # auth gate / session refresh (Next "proxy" middleware)
 ```
 
-The active repository is chosen automatically in `lib/data/index.ts`: if the
-Supabase env vars are present it uses `SupabaseRepository`, otherwise the sample
-data. Nothing in `app/` or `components/` imports a concrete repository, so the
-UI is unaffected either way.
+The active backend is chosen at request time:
+
+- **Sample mode** (no env vars): reads come from the in-memory sample data and
+  writes happen client-side for instant, session-local edits. No login.
+- **Supabase mode** (env vars set): the whole app is gated behind login;
+  reads use a request-scoped, authenticated Supabase client and writes go
+  through **server actions** (`app/actions.ts`) subject to RLS.
+
+Nothing in the views imports a concrete repository, so the UI is identical
+either way.
+
+### Authentication
+
+Login uses **Supabase Auth — email magic link**. When Supabase env vars are
+present, `proxy.ts` redirects unauthenticated visitors to `/login`; the magic
+link returns to `/auth/callback`, which exchanges the code for a session cookie.
 
 ### Connecting Supabase
 
 1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql)
-   in its SQL editor (tables + open demo RLS policies).
-2. Copy `.env.example` to `.env` and fill in all four values
+   in its SQL editor (tables + authenticated-only RLS policies).
+2. In **Authentication → Providers**, enable **Email** (magic link). Under
+   **Authentication → URL Configuration**, add your site URL and
+   `…/auth/callback` to the redirect allow-list (e.g. `http://localhost:3000`
+   and your Vercel URL).
+3. Copy `.env.example` to `.env` and fill in all four values
    (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`,
    `SUPABASE_SERVICE_ROLE_KEY`).
-3. Seed the database with the sample portfolio: `npm run seed`.
-4. Restart `npm run dev` — the app now reads/writes Supabase. On Vercel, set the
-   two `NEXT_PUBLIC_*` vars in the project settings.
+4. Seed the database with the sample portfolio: `npm run seed`.
+5. Restart `npm run dev`, then sign in with your email. On Vercel, set the two
+   `NEXT_PUBLIC_*` vars in the project settings (the service-role key is only
+   needed locally for seeding).
 
-> The RLS policies in `schema.sql` are intentionally **open** (anon read/write)
-> for a no-auth demo. Lock them down with auth-scoped policies before using real
-> data. Writes currently go straight from the browser via the anon key; moving
-> them behind server actions is a natural follow-up.
+> The RLS policies in `schema.sql` allow any **authenticated** user to read and
+> write. Tighten them (per-team / per-owner roles) when you introduce roles.
 
 > **Note:** dates are anchored to a fixed reference "today" (`REFERENCE_DATE` in
 > `lib/format.ts`) so the curated sample data reads exactly as designed. Remove

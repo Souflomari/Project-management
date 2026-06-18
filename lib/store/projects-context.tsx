@@ -18,7 +18,15 @@ import {
   type ReactNode,
 } from "react";
 
-import { repository } from "../data";
+import {
+  addCommentAction,
+  createProjectAction,
+  setPhaseAction,
+  setStatusAction,
+  toggleDeliverableAction,
+  toggleRenduAction,
+} from "@/app/actions";
+import { sampleRepository } from "../data";
 import {
   buildFilters,
   deriveAll,
@@ -33,6 +41,8 @@ interface ProjectsContextValue {
   // raw data
   projects: Project[];
   team: TeamMember[];
+  /** True when backed by Supabase (writes go through server actions). */
+  serverBacked: boolean;
 
   // derived
   allDerived: DerivedProject[];
@@ -83,10 +93,12 @@ const ProjectsContext = createContext<ProjectsContextValue | null>(null);
 export function ProjectsProvider({
   initialProjects,
   initialTeam,
+  serverBacked,
   children,
 }: {
   initialProjects: Project[];
   initialTeam: TeamMember[];
+  serverBacked: boolean;
   children: ReactNode;
 }) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
@@ -107,68 +119,82 @@ export function ProjectsProvider({
     setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   }, []);
 
-  // ---- data actions (delegate to the repository seam) ----
+  // ---- data actions ----
+  // Supabase mode → server actions (auth + RLS). Sample mode → in-memory
+  // repository on the client for instant, session-local edits.
+  const setPhase = useCallback(
+    (id: number, phaseIndex: number) => {
+      const op = serverBacked
+        ? setPhaseAction(id, phaseIndex)
+        : sampleRepository.setPhase(id, phaseIndex);
+      op.then(applyUpdate);
+    },
+    [serverBacked, applyUpdate],
+  );
+
   const advancePhase = useCallback(
     (id: number) => {
       const current = projects.find((p) => p.id === id);
       if (!current) return;
       const next = Math.min(current.phaseIndex + 1, FINAL_PHASE_INDEX);
-      repository.setPhase(id, next).then(applyUpdate);
+      setPhase(id, next);
     },
-    [projects, applyUpdate],
-  );
-
-  const setPhase = useCallback(
-    (id: number, phaseIndex: number) => {
-      repository.setPhase(id, phaseIndex).then(applyUpdate);
-    },
-    [applyUpdate],
+    [projects, setPhase],
   );
 
   const setStatus = useCallback(
     (id: number, status: Status) => {
-      repository.setStatus(id, status).then(applyUpdate);
+      const op = serverBacked
+        ? setStatusAction(id, status)
+        : sampleRepository.setStatus(id, status);
+      op.then(applyUpdate);
     },
-    [applyUpdate],
+    [serverBacked, applyUpdate],
   );
 
   const toggleRendu = useCallback(
     (id: number) => {
-      repository.toggleRendu(id).then(applyUpdate);
+      const op = serverBacked ? toggleRenduAction(id) : sampleRepository.toggleRendu(id);
+      op.then(applyUpdate);
     },
-    [applyUpdate],
+    [serverBacked, applyUpdate],
   );
 
   const toggleDeliverable = useCallback(
     (id: number, index: number) => {
-      repository.toggleDeliverable(id, index).then(applyUpdate);
+      const op = serverBacked
+        ? toggleDeliverableAction(id, index)
+        : sampleRepository.toggleDeliverable(id, index);
+      op.then(applyUpdate);
     },
-    [applyUpdate],
+    [serverBacked, applyUpdate],
   );
 
   const addComment = useCallback(
     (id: number) => {
       const text = commentDraft.trim();
       if (!text) return;
-      repository.addComment(id, text).then((updated) => {
+      const op = serverBacked
+        ? addCommentAction(id, text)
+        : sampleRepository.addComment(id, text);
+      op.then((updated) => {
         applyUpdate(updated);
         setCommentDraft("");
       });
     },
-    [commentDraft, applyUpdate],
+    [serverBacked, commentDraft, applyUpdate],
   );
 
   const submitAdd = useCallback(async () => {
     if (!newName.trim()) return false;
-    const created = await repository.createProject({
-      name: newName,
-      client: newClient,
-      responsableId: newResp,
-    });
+    const input = { name: newName, client: newClient, responsableId: newResp };
+    const created = serverBacked
+      ? await createProjectAction(input)
+      : await sampleRepository.createProject(input);
     setProjects((prev) => [created, ...prev]);
     setShowAdd(false);
     return true;
-  }, [newName, newClient, newResp]);
+  }, [serverBacked, newName, newClient, newResp]);
 
   // ---- ui actions ----
   const openProject = useCallback((id: number) => setSelectedId(id), []);
@@ -227,6 +253,7 @@ export function ProjectsProvider({
   const value: ProjectsContextValue = {
     projects,
     team,
+    serverBacked,
     allDerived,
     searched,
     filtered,

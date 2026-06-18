@@ -3,11 +3,10 @@
 // Implements exactly the same interface as the sample repository, so switching
 // to it (see index.ts) requires no changes anywhere in app/ or components/.
 
-import type { PostgrestError } from "@supabase/supabase-js";
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 
-import type { Project, Status } from "../types";
+import type { Project, Status, TeamMember } from "../types";
 import { STD_RENDUS } from "./sample-data";
-import { getSupabaseClient } from "./supabase-client";
 import type { NewProjectInput, ProjectRepository } from "./repository";
 
 const PROJECT_SELECT = `
@@ -82,9 +81,7 @@ function rowToProject(row: ProjectRow): Project {
   };
 }
 
-export function createSupabaseRepository(): ProjectRepository {
-  const sb = getSupabaseClient();
-
+export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository {
   async function fetchProject(id: number): Promise<Project> {
     const row = unwrap(
       await sb.from("projects").select(PROJECT_SELECT).eq("id", id).single(),
@@ -114,7 +111,7 @@ export function createSupabaseRepository(): ProjectRepository {
       const data = unwrap(
         await sb.from("team_members").select("id, name, initials, color, role").order("id"),
       );
-      return data;
+      return data as TeamMember[];
     },
 
     async createProject(input: NewProjectInput) {
