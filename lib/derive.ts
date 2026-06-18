@@ -59,7 +59,7 @@ export interface DerivedProject extends Project {
 }
 
 const FALLBACK_MEMBER: TeamMember = {
-  id: -1, name: "—", initials: "—", color: "#8B95A1", role: "",
+  id: -1, name: "—", initials: "—", color: "#A8A29E", role: "",
 };
 
 export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
@@ -73,7 +73,7 @@ export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
       ...s,
       end: taskEnd(s.start, s.plannedDays),
       assignee,
-      color: s.done ? "#8B95A1" : assignee.color,
+      color: s.done ? "#A8A29E" : assignee.color,
     };
   });
 
@@ -116,7 +116,7 @@ export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
     renduMon: rdate ? MONS[rdate.getMonth()] : "",
     renduDays,
     renduDaysLabel: nextTask ? dueLabel(renduDays as number) : p.subtasks.length ? "Livré ✓" : "—",
-    renduDueColor: nextTask ? dueColor(renduDays as number, false) : "#8B95A1",
+    renduDueColor: nextTask ? dueColor(renduDays as number, false) : "#A8A29E",
     deadlineFull: fmtFull(p.deadline),
     deadlineDaysLabel: dueLabelFull(daysFromToday(p.deadline)),
   };
@@ -297,7 +297,7 @@ export function buildTaskEvents(projects: DerivedProject[]): TaskEvent[] {
         start: s.start,
         plannedDays: s.plannedDays,
         phaseIndex: p.phaseIndex,
-        color: s.done ? "#8B95A1" : PHASE_COLORS[p.phaseIndex],
+        color: s.done ? "#A8A29E" : PHASE_COLORS[p.phaseIndex],
         statusColor: p.statusColor,
         assigneeInitials: s.assignee.initials,
         assigneeColor: s.assignee.color,

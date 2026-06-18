@@ -1,6 +1,22 @@
 import type { Metadata } from "next";
+import { Inter, Inter_Tight } from "next/font/google";
 
 import "./globals.css";
+
+// Self-hosted at build time (no runtime CDN dependency) — fonts always load.
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-ui",
+});
+
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
+});
 
 export const metadata: Metadata = {
   title: "Setec · Pilotage des projets",
@@ -14,15 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Inter+Tight:wght@500..700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="fr" className={`${inter.variable} ${interTight.variable}`}>
       <body>{children}</body>
     </html>
   );

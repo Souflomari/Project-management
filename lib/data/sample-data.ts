@@ -6,14 +6,14 @@ import { shiftISO, taskEnd, taskStartForEnd } from "../format";
 import type { Project, Status, Subtask, TeamMember } from "../types";
 
 export const TEAM: TeamMember[] = [
-  { id: 0, name: "C. Mercier", initials: "CM", color: "#17823D", role: "Cheffe de projet senior" },
-  { id: 1, name: "A. Lefèvre", initials: "AL", color: "#3A9095", role: "Ingénieur OA" },
+  { id: 0, name: "C. Mercier", initials: "CM", color: "#15803D", role: "Cheffe de projet senior" },
+  { id: 1, name: "A. Lefèvre", initials: "AL", color: "#2C7A8C", role: "Ingénieur OA" },
   { id: 2, name: "N. Diallo", initials: "ND", color: "#4C8AA3", role: "Ingénieure hydraulique" },
-  { id: 3, name: "M. Caron", initials: "MC", color: "#E1832F", role: "Chef de projet géotech." },
-  { id: 4, name: "L. Petit", initials: "LP", color: "#A42421", role: "Ingénieure VRD" },
+  { id: 3, name: "M. Caron", initials: "MC", color: "#B45309", role: "Chef de projet géotech." },
+  { id: 4, name: "L. Petit", initials: "LP", color: "#B5392E", role: "Ingénieure VRD" },
   { id: 5, name: "S. Roux", initials: "SR", color: "#3B7179", role: "Chef de projet énergie" },
-  { id: 6, name: "H. Bonnet", initials: "HB", color: "#9C7257", role: "Architecte bâtiment" },
-  { id: 7, name: "F. Aubry", initials: "FA", color: "#1D4459", role: "Directeur ferroviaire" },
+  { id: 6, name: "H. Bonnet", initials: "HB", color: "#8A6F5C", role: "Architecte bâtiment" },
+  { id: 7, name: "F. Aubry", initials: "FA", color: "#2F4A63", role: "Directeur ferroviaire" },
 ];
 
 // [name, client, discipline, leadIdx, phaseIndex, progress, status, budget(k€), start, deadline, renduLabel, renduDate]
@@ -55,20 +55,22 @@ const SEED_COMMENTS: Record<number, { ri: number; text: string; when: string }[]
   21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", when: "il y a 4 j" }],
 };
 
-// A few duration profiles so derived progress varies across projects.
+// A few duration profiles so derived progress varies across projects. Kept
+// modest so per-person monthly load stays realistic (rarely over capacity).
 const DAY_PROFILES = [
-  [8, 14, 10, 16, 8],
-  [6, 12, 9, 20, 7],
-  [10, 18, 12, 14, 11],
-  [5, 10, 8, 12, 6],
-  [9, 16, 11, 18, 9],
+  [4, 6, 5, 7, 4],
+  [3, 5, 4, 8, 3],
+  [5, 7, 6, 6, 5],
+  [3, 4, 4, 5, 3],
+  [4, 7, 5, 6, 4],
 ];
 
 /** Build the editable task list for a project, with done flags ~matching progress. */
 function buildSubtasks(row: Row, idx: number): Subtask[] {
   const [, , , lead, , progress, status, , start, deadline, renduLabel, renduDate] = row;
-  const pool = [lead, (lead + 3) % 8, (lead + 5) % 8].filter((v, i, a) => a.indexOf(v) === i);
-  const m = (i: number) => pool[i % pool.length];
+  // Spread the five tasks across distinct members so no one person carries a
+  // whole project in a single period (keeps the team heatmap credible).
+  const m = (i: number) => (lead + i) % TEAM.length;
   const d = DAY_PROFILES[idx % DAY_PROFILES.length];
 
   const t1Start = start;
@@ -83,7 +85,7 @@ function buildSubtasks(row: Row, idx: number): Subtask[] {
     { name: "Études préliminaires & relevés", assigneeId: m(1), start: t2Start, plannedDays: d[1] },
     { name: renduLabel, assigneeId: lead, start: t3Start, plannedDays: d[2] },
     { name: "Coordination & validations MOA", assigneeId: m(2), start: t4Start, plannedDays: d[3] },
-    { name: "Clôture & DOE", assigneeId: m(1), start: t5Start, plannedDays: d[4] },
+    { name: "Clôture & DOE", assigneeId: m(4), start: t5Start, plannedDays: d[4] },
   ].sort((a, b) => a.start.localeCompare(b.start));
 
   const total = defs.reduce((s, d) => s + d.plannedDays, 0);

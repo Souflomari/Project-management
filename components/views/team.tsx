@@ -132,8 +132,8 @@ function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
     <div style={{ display: "flex", gap: 3 }}>
       {buckets.map((b, i) => {
         const bg = heatColor(b.pct);
-        // White only on the dark/saturated cells (≥85%); ink keeps contrast on the light/medium greens.
-        const txt = b.pct === 0 ? C.ink400 : b.pct >= 85 ? "#fff" : C.ink800;
+        // Cells are now light/muted, so dark ink keeps contrast across the ramp.
+        const txt = b.pct === 0 ? C.ink400 : C.ink800;
         return (
           <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${b.label} · ${b.days}/${b.capacity} j · ${b.pct}%`}>
             <div style={{ height: 30, borderRadius: 4, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>

@@ -4,8 +4,8 @@ import type { Status } from "./types";
 
 /** Body / UI text — Inter. Headings & figures — Inter Tight (Linear uses
  *  "Inter Display" for headings to add expression; Inter Tight is its public twin). */
-export const FONT_UI = "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif";
-export const FONT_DISPLAY = "'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif";
+export const FONT_UI = "var(--font-ui), system-ui, -apple-system, 'Segoe UI', sans-serif";
+export const FONT_DISPLAY = "var(--font-display), var(--font-ui), system-ui, -apple-system, sans-serif";
 export const FONT_NUM = FONT_DISPLAY;
 
 // ───────────────────────────────────────────────── design tokens
@@ -125,12 +125,12 @@ export function chargeColor(pct: number): string {
   return "#15803D";
 }
 
-/** Heatmap cell colour by load %. */
+/** Heatmap cell colour by load % — quiet, low-chroma sage → clay ramp. */
 export function heatColor(pct: number): string {
-  if (pct <= 0) return "#F5F4F2";
-  if (pct < 50) return "#DCEBE0";
-  if (pct < 85) return "#8FC4A1";
-  if (pct <= 100) return "#2E9153";
-  if (pct <= 110) return "#C2683E";
-  return "#B5532E";
+  if (pct <= 0) return "#F2F1EF";
+  if (pct < 50) return "#E7EDE7";
+  if (pct < 85) return "#CADBCD";
+  if (pct <= 100) return "#A6C3AC"; // full but within capacity
+  if (pct <= 110) return "#E0C3AE"; // slightly over
+  return "#CFA088"; // well over
 }
