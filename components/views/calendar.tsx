@@ -159,7 +159,7 @@ function DayCell({ iso, dnd, children, style }: { iso: string; dnd: Dnd; childre
 function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: number; events: TaskEvent[]; onOpen: (id: number) => void; dnd: Dnd }) {
   const cells = buildMonthGrid(year, month, events);
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,30,25,.06)" }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.subtle, borderBottom: `1px solid ${C.line}` }}>
         {WEEKDAYS.map((w) => (<div key={w} style={{ padding: "9px 12px", ...TX.overline, color: C.ink500 }}>{w}</div>))}
       </div>
@@ -170,7 +170,7 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
             borderRight: `1px solid ${C.line}`,
             borderBottom: `1px solid ${C.line}`,
             padding: "5px 6px",
-            background: c.day === null ? "#FAFBF9" : c.isToday ? C.brand50 : C.surface,
+            background: c.day === null ? C.subtle : c.isToday ? C.brand50 : C.surface,
           };
           const inner = (
             <>
@@ -201,7 +201,7 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
   });
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 8, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(7,1fr)", boxShadow: "0 1px 2px rgba(20,30,25,.06)" }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
       {days.map((d) => (
         <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320 }}>
           <div style={{ padding: "9px 10px", background: d.isToday ? C.brand50 : C.subtle, borderBottom: `1px solid ${C.line}` }}>
@@ -220,7 +220,7 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
 function AgendaView({ year, month, events, onOpen }: { year: number; month: number; events: TaskEvent[]; onOpen: (id: number) => void }) {
   const list = eventsInRange(events, monthRange(year, month));
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 8, overflow: "hidden", boxShadow: "0 1px 2px rgba(20,30,25,.06)" }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden" }}>
       {list.length === 0 ? (
         <div style={{ padding: 24, ...TX.body, color: C.ink500 }}>Aucune échéance ce mois-ci.</div>
       ) : (

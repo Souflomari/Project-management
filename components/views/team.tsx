@@ -55,11 +55,11 @@ export function Team() {
         </div>
       </Toolbar>
 
-      <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 16px" }}>
-        Charge = jours planifiés ÷ <strong>{capacity} jours ouvrés</strong> de la période. La frise montre la charge {teamMode === "semaine" ? "par jour" : "semaine par semaine"} — pour repérer <em>quand</em> tombe la surcharge.
+      <p style={{ ...TX.caption, color: C.ink400, margin: "0 0 20px" }}>
+        Charge sur <strong style={{ color: C.ink500, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · frise {teamMode === "semaine" ? "par jour" : "par semaine"}
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 18 }}>
         {loads.map((t) => {
           const c = chargeColor(t.chargePct);
           const isRef = referenced.has(t.member.id);

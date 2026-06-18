@@ -6,7 +6,7 @@ import { PlusIcon, SearchIcon } from "./icons";
 import { Button } from "./ui";
 import { navItemForPath } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, TX } from "@/lib/tokens";
+import { C, R, TX } from "@/lib/tokens";
 
 export function Header() {
   const pathname = usePathname();
@@ -14,19 +14,23 @@ export function Header() {
   const { search, setSearch, searched, filtered, openAdd } = useProjects();
 
   const subtitle =
-    item.key === "projets" ? `${searched.length} projets · ${filtered.length} affichés` : item.sub;
+    item.key === "projets"
+      ? `${filtered.length} affiché${filtered.length > 1 ? "s" : ""} sur ${searched.length}`
+      : item.sub;
 
   return (
     <header
       style={{
-        minHeight: 60,
-        background: C.surface,
+        minHeight: 64,
+        background: "rgba(250,250,249,.8)",
+        backdropFilter: "saturate(180%) blur(8px)",
+        WebkitBackdropFilter: "saturate(180%) blur(8px)",
         borderBottom: `1px solid ${C.line}`,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 18,
-        padding: "10px 24px",
+        padding: "12px 28px",
         position: "sticky",
         top: 0,
         zIndex: 30,
@@ -34,7 +38,7 @@ export function Header() {
     >
       <div style={{ minWidth: 0 }}>
         <h1 style={{ ...TX.h1, margin: 0 }}>{item.label}</h1>
-        <div style={{ ...TX.caption, color: C.ink500, marginTop: 2 }}>{subtitle}</div>
+        {subtitle ? <div style={{ ...TX.caption, color: C.ink400, marginTop: 3 }}>{subtitle}</div> : null}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -44,12 +48,13 @@ export function Header() {
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: C.surface,
-            border: `1px solid ${C.line}`,
-            borderRadius: 4,
+            background: C.subtle,
+            border: "1px solid transparent",
+            borderRadius: R.sm,
             padding: "0 12px",
             height: 36,
             width: 280,
+            color: C.ink400,
           }}
         >
           <SearchIcon />

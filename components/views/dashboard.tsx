@@ -7,7 +7,7 @@ import { Card, rowProps, StatusPill } from "../ui";
 import { computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
 import { WEEK_SHORT } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, num, STATUS_META, TX } from "@/lib/tokens";
+import { C, num, R, STATUS_META, TX } from "@/lib/tokens";
 
 const STALE_DAYS = 90;
 
@@ -31,14 +31,14 @@ export function Dashboard() {
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14, marginBottom: 20 }}>
         <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} />
         <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} />
-        <Kpi title="En retard" value={kpis.late} sub="action requise →" color={STATUS_META["en retard"].color} onClick={kpis.late > 0 ? goLate : undefined} />
-        <Card padding="14px 16px">
-          <div style={{ fontSize: 11.5, color: C.ink500, fontWeight: 600 }}>Avancement moyen</div>
-          <div style={{ ...num(32), marginTop: 6 }}>{kpis.avg}%</div>
-          <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginTop: 12, background: C.subtle }}>
+        <Kpi title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} onClick={kpis.late > 0 ? goLate : undefined} />
+        <Card padding="16px 18px">
+          <div style={{ ...TX.overline, color: C.ink400 }}>Avancement moyen</div>
+          <div style={{ ...num(34), marginTop: 10 }}>{kpis.avg}%</div>
+          <div style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 12, background: C.subtle }}>
             {dist.map((s) =>
               s.count > 0 ? <div key={s.status} title={`${s.label} · ${s.count}`} style={{ width: `${(s.count / distTotal) * 100}%`, background: s.color }} /> : null,
             )}
@@ -55,13 +55,9 @@ export function Dashboard() {
         <Kpi title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 16, alignItems: "start" }}>
-        <Card padding="16px 20px">
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
-            <h2 style={{ ...TX.h2, margin: 0 }}>Prochains rendus</h2>
-            <span style={{ ...TX.overline, color: C.ink400 }}>échéancier</span>
-          </div>
-          <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 4px" }}>Livrables triés par date d&apos;échéance.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, alignItems: "start" }}>
+        <Card padding="6px 20px 14px">
+          <h2 style={{ ...TX.h2, margin: "14px 0 6px" }}>Prochains rendus</h2>
           {upcoming.map((r) => (
             <div
               key={r.id}
@@ -93,9 +89,8 @@ export function Dashboard() {
           ) : null}
         </Card>
 
-        <Card padding="16px 20px">
-          <h2 style={{ ...TX.h2, margin: "0 0 4px" }}>Points de vigilance</h2>
-          <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 4px" }}>Projets en retard ou à risque.</p>
+        <Card padding="6px 20px 14px">
+          <h2 style={{ ...TX.h2, margin: "14px 0 6px" }}>Points de vigilance</h2>
           {alerts.map((a) => (
             <div
               key={a.id}
@@ -120,10 +115,10 @@ export function Dashboard() {
 function Kpi({ title, value, sub, color, onClick }: { title: string; value: string | number; sub: string; color?: string; onClick?: () => void }) {
   return (
     <div {...(onClick ? { ...rowProps(onClick), className: "lift-hover row-focus" } : {})} style={onClick ? { borderRadius: 10, cursor: "pointer" } : undefined}>
-      <Card padding="14px 16px">
-        <div style={{ fontSize: 11.5, color: C.ink500, fontWeight: 600 }}>{title}</div>
-        <div style={{ ...num(34), marginTop: 6, color }}>{value}</div>
-        <div style={{ fontSize: 11, color: C.ink400, marginTop: 6 }}>{sub}</div>
+      <Card padding="16px 18px">
+        <div style={{ ...TX.overline, color: C.ink400 }}>{title}</div>
+        <div style={{ ...num(34), marginTop: 10, color: color ?? C.ink900 }}>{value}</div>
+        <div style={{ fontSize: 11.5, color: C.ink400, marginTop: 7 }}>{sub}</div>
       </Card>
     </div>
   );

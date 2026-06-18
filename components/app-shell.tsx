@@ -14,7 +14,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <Header />
-        <div style={{ padding: "20px 24px 48px" }}>{children}</div>
+        <div style={{ padding: "28px 28px 56px", maxWidth: 1320, width: "100%", margin: "0 auto" }}>{children}</div>
       </div>
 
       <ProjectDrawer />

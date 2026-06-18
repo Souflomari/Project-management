@@ -7,7 +7,7 @@ import { CaretDownIcon } from "../icons";
 import { Avatar, PhaseBadge, ProgressBar, rowProps, StatusPill } from "../ui";
 import type { DerivedProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, num, R, SH, TX } from "@/lib/tokens";
+import { C, num, R, TX } from "@/lib/tokens";
 import { STATUSES } from "@/lib/types";
 
 const COLS = "2.5fr .7fr 1.4fr 1.3fr .9fr 46px 1fr";
@@ -47,17 +47,16 @@ export function ProjectsTable() {
   return (
     <>
       <FilterBar />
-      <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.md, overflow: "hidden", boxShadow: SH.sm }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden" }}>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: COLS,
             gap: 12,
-            padding: "8px 16px",
-            background: C.subtle,
+            padding: "11px 18px",
             borderBottom: `1px solid ${C.line}`,
             ...TX.overline,
-            color: C.ink500,
+            color: C.ink400,
           }}
         >
           {HEADERS.map((h) => {
@@ -84,7 +83,7 @@ export function ProjectsTable() {
             key={p.id}
             {...rowProps(() => openProject(p.id))}
             className="row-hover row-focus"
-            style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", padding: "8px 16px", borderTop: `1px solid ${C.line}`, cursor: "pointer" }}
+            style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", padding: "12px 18px", borderTop: `1px solid ${C.line}`, cursor: "pointer" }}
           >
             <div style={{ minWidth: 0 }}>
               <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>

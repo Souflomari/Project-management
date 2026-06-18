@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 
 import { useProjects } from "@/lib/store/projects-context";
-import { C } from "@/lib/tokens";
+import { C, R } from "@/lib/tokens";
 
 export function FilterBar({ trailing }: { trailing?: ReactNode }) {
   const { filters, setFilter } = useProjects();
@@ -23,13 +23,13 @@ export function FilterBar({ trailing }: { trailing?: ReactNode }) {
               fontSize: 13,
               fontWeight: 600,
               padding: "6px 12px",
-              borderRadius: 4,
+              borderRadius: R.sm,
               display: "inline-flex",
               alignItems: "center",
               gap: 7,
               whiteSpace: "nowrap",
-              border: `1px solid ${a ? C.brand : C.line}`,
-              background: a ? C.brand : C.surface,
+              border: `1px solid ${a ? C.solid : C.line}`,
+              background: a ? C.solid : C.surface,
               color: a ? "#fff" : C.ink700,
               transition: "background .12s, border-color .12s",
             }}
@@ -41,8 +41,8 @@ export function FilterBar({ trailing }: { trailing?: ReactNode }) {
                 fontWeight: 600,
                 fontVariantNumeric: "tabular-nums",
                 padding: "1px 6px",
-                borderRadius: 4,
-                background: a ? "rgba(255,255,255,.24)" : C.subtle,
+                borderRadius: R.xs,
+                background: a ? "rgba(255,255,255,.20)" : C.subtle,
                 color: a ? "#fff" : C.ink500,
               }}
             >

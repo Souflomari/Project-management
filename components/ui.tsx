@@ -45,8 +45,8 @@ export function Button({
     md: { fontSize: 13, padding: "8px 14px" },
   };
   const variants: Record<ButtonVariant, CSSProperties> = {
-    primary: { background: C.brand, color: "#fff" },
-    secondary: { background: C.surface, color: C.ink700, border: `1px solid ${C.line}` },
+    primary: { background: C.solid, color: "#fff" },
+    secondary: { background: C.surface, color: C.ink700, border: `1px solid ${C.lineStrong}` },
     ghost: { background: "transparent", color: C.ink500 },
   };
   return (
@@ -208,7 +208,7 @@ export function Segmented<T extends string>({
               padding: "5px 12px",
               borderRadius: R.sm,
               background: active ? C.surface : "transparent",
-              color: active ? C.brand : C.ink500,
+              color: active ? C.ink900 : C.ink500,
               boxShadow: active ? SH.sm : "none",
             }}
           >
@@ -224,15 +224,16 @@ export function Segmented<T extends string>({
 
 export function Card({
   children,
-  padding = "16px 20px",
+  padding = "18px 20px",
   style,
 }: {
   children: ReactNode;
   padding?: number | string;
   style?: CSSProperties;
 }) {
+  // Surfaces rest with a soft border and no shadow (structure, not noise).
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.md, boxShadow: SH.sm, padding, ...style }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, padding, ...style }}>
       {children}
     </div>
   );
@@ -287,7 +288,7 @@ export function Modal({
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(13,18,28,.42)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .16s ease", padding: 20 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .16s ease", padding: 20 }}
     >
       <div
         onClick={(e) => e.stopPropagation()}

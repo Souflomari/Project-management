@@ -7,21 +7,20 @@ import type { SubtaskPatch } from "@/lib/data/repository";
 import { deriveProject, type DerivedSubtask } from "@/lib/derive";
 import { fmtFull } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { DRAWER, FONT_NUM, STATUS_META } from "@/lib/tokens";
+import { DRAWER, FONT_DISPLAY, FONT_NUM, SH, STATUS_META } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
 
 const LABEL: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  letterSpacing: ".08em",
-  textTransform: "uppercase",
+  fontSize: 12,
+  fontWeight: 540,
+  letterSpacing: "0",
   color: DRAWER.sub,
 };
 
 const fieldStyle: React.CSSProperties = {
   border: `1px solid ${DRAWER.line}`,
-  borderRadius: 3,
-  padding: "5px 7px",
+  borderRadius: 8,
+  padding: "6px 9px",
   font: "inherit",
   fontSize: 12,
   outline: "none",
@@ -72,7 +71,7 @@ export function ProjectDrawer() {
     <>
       <div
         onClick={closeDrawer}
-        style={{ position: "fixed", inset: 0, background: "rgba(13,18,28,.38)", zIndex: 60, animation: "fadeIn .18s ease" }}
+        style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.30)", zIndex: 60, animation: "fadeIn .18s ease" }}
       />
       <aside
         style={{
@@ -86,7 +85,7 @@ export function ProjectDrawer() {
           color: DRAWER.ink,
           zIndex: 61,
           borderLeft: `1px solid ${DRAWER.line}`,
-          boxShadow: "-4px 0 16px rgba(20,30,25,.07)",
+          boxShadow: SH.drawer,
           overflowY: "auto",
           animation: "drawerIn .26s cubic-bezier(.2,.7,.2,1)",
         }}
@@ -112,7 +111,7 @@ export function ProjectDrawer() {
                 cursor: "pointer",
                 width: 30,
                 height: 30,
-                borderRadius: 3,
+                borderRadius: 8,
                 fontSize: 16,
                 color: DRAWER.sub,
                 lineHeight: 1,
@@ -121,7 +120,7 @@ export function ProjectDrawer() {
               ×
             </button>
           </div>
-          <h2 style={{ margin: "11px 0 4px", fontSize: 21, fontWeight: 700, letterSpacing: "-.01em", lineHeight: 1.18 }}>
+          <h2 style={{ margin: "12px 0 4px", fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.2 }}>
             {p.name}
           </h2>
           <div style={{ fontSize: 13, color: DRAWER.sub }}>
@@ -153,7 +152,7 @@ export function ProjectDrawer() {
                     fontWeight: 600,
                     whiteSpace: "nowrap",
                     padding: "6px 11px",
-                    borderRadius: 3,
+                    borderRadius: 8,
                     ...(active
                       ? { background: m.color, color: "#fff", border: `1px solid ${m.color}` }
                       : { background: DRAWER.panel, color: DRAWER.sub, border: `1px solid ${DRAWER.line}` }),
@@ -180,7 +179,7 @@ export function ProjectDrawer() {
                   color: "#fff",
                   background: DRAWER.ac,
                   padding: "6px 11px",
-                  borderRadius: 3,
+                  borderRadius: 8,
                 }}
               >
                 Avancer la phase →
@@ -199,9 +198,9 @@ export function ProjectDrawer() {
                       height: 13,
                       borderRadius: "50%",
                       ...(cur
-                        ? { background: DRAWER.paper, border: `3px solid ${DRAWER.ac}` }
+                        ? { background: DRAWER.paper, border: `3px solid ${DRAWER.done}` }
                         : isDone
-                          ? { background: DRAWER.ac, border: `3px solid ${DRAWER.ac}` }
+                          ? { background: DRAWER.done, border: `3px solid ${DRAWER.done}` }
                           : { background: DRAWER.line, border: `3px solid ${DRAWER.line}` }),
                     }}
                   />
@@ -249,7 +248,7 @@ export function ProjectDrawer() {
           </div>
 
           {/* add task */}
-          <div style={{ background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 4, padding: 11, marginBottom: 26 }}>
+          <div style={{ background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 10, padding: 11, marginBottom: 26 }}>
             <div style={{ ...LABEL, marginBottom: 8, fontSize: 10 }}>Nouvelle tâche</div>
             <input
               value={ntName}
@@ -291,7 +290,7 @@ export function ProjectDrawer() {
                   color: "#fff",
                   background: DRAWER.ac,
                   padding: "6px 12px",
-                  borderRadius: 3,
+                  borderRadius: 8,
                 }}
               >
                 Ajouter
@@ -351,7 +350,7 @@ export function ProjectDrawer() {
                 color: "#fff",
                 background: DRAWER.ac,
                 padding: "9px 15px",
-                borderRadius: 3,
+                borderRadius: 8,
               }}
             >
               Publier
@@ -402,7 +401,7 @@ function SubtaskRow({
           style={{
             width: 18,
             height: 18,
-            borderRadius: 3,
+            borderRadius: 8,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -411,7 +410,7 @@ function SubtaskRow({
             color: "#fff",
             cursor: "pointer",
             ...(subtask.done
-              ? { background: DRAWER.ac, border: `1px solid ${DRAWER.ac}` }
+              ? { background: DRAWER.done, border: `1px solid ${DRAWER.done}` }
               : { background: DRAWER.paper, border: `1.5px solid ${DRAWER.line}` }),
           }}
         >
@@ -477,7 +476,7 @@ function SubtaskRow({
         {subtask.dependsOn.map((id) => (
           <span
             key={id}
-            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 3, padding: "1px 4px 1px 7px", color: DRAWER.ink }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 8, padding: "1px 4px 1px 7px", color: DRAWER.ink }}
           >
             {depNames.get(id) ?? `#${id}`}
             <button onClick={() => removeDep(id)} title="Retirer" style={{ border: "none", background: "transparent", cursor: "pointer", color: DRAWER.sub, fontSize: 12, lineHeight: 1, padding: 0 }}>
@@ -506,7 +505,7 @@ function SubtaskRow({
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div style={{ background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 4, padding: "10px 12px" }}>
+    <div style={{ background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 10, padding: "10px 12px" }}>
       <div style={{ ...LABEL, fontSize: 10, letterSpacing: ".07em" }}>{label}</div>
       <div style={{ fontFamily: FONT_NUM, fontSize: 22, fontWeight: 600, marginTop: 3 }}>{value}</div>
       {hint ? <div style={{ fontSize: 10.5, color: DRAWER.sub, marginTop: 2 }}>{hint}</div> : null}

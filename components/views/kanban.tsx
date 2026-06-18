@@ -7,7 +7,7 @@ import { MinusIcon } from "../icons";
 import { Avatar, IconButton, ProgressBar } from "../ui";
 import { buildKanban } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, FONT_NUM, PHASE_COLORS, TX } from "@/lib/tokens";
+import { C, FONT_NUM, PHASE_COLORS, R, TX } from "@/lib/tokens";
 
 const WIP_LIMIT = 6;
 
@@ -40,8 +40,8 @@ export function Kanban() {
   return (
     <>
       <FilterBar />
-      <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 12px" }}>
-        Glissez une carte pour faire évoluer la phase. Limite WIP indicative : {WIP_LIMIT} projets par phase.
+      <p style={{ ...TX.caption, color: C.ink400, margin: "0 0 14px" }}>
+        Glissez une carte pour changer de phase · limite indicative {WIP_LIMIT} / phase
       </p>
 
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 10, alignItems: "flex-start" }}>
@@ -57,8 +57,9 @@ export function Kanban() {
                 {...dropHandlers(col.phaseIndex)}
                 onClick={() => toggleCollapse(col.phaseIndex)}
                 title={`${col.full} — déplier`}
-                style={{ width: 46, flexShrink: 0, background: isOver ? C.brand50 : C.subtle, borderRadius: 8, border: `1px solid ${isOver ? C.brand : C.line}`, borderTop: `3px solid ${accent}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer" }}
+                style={{ width: 46, flexShrink: 0, background: isOver ? C.brand50 : C.subtle, borderRadius: R.md, border: `1px solid ${isOver ? C.brand : C.line}`, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}
               >
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: accent, flexShrink: 0 }} />
                 <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? "#C2683E" : C.ink700 }}>{col.count}</span>
                 <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, letterSpacing: ".06em", color: C.ink700 }}>{col.label}</span>
               </div>
@@ -69,12 +70,15 @@ export function Kanban() {
             <div
               key={col.phaseIndex}
               {...dropHandlers(col.phaseIndex)}
-              style={{ width: 250, flexShrink: 0, background: isOver ? C.brand50 : C.subtle, borderRadius: 8, border: `1px solid ${isOver ? C.brand : C.line}`, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 230px)" }}
+              style={{ width: 256, flexShrink: 0, background: isOver ? C.brand50 : C.subtle, borderRadius: R.md, border: `1px solid ${isOver ? C.brand : C.line}`, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 230px)" }}
             >
-              <div style={{ borderTop: `3px solid ${accent}`, borderRadius: "8px 8px 0 0", padding: "8px 10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontFamily: FONT_NUM, fontSize: 13, fontWeight: 600, letterSpacing: ".04em", color: C.ink900 }}>{col.label}</div>
-                  <div style={{ fontSize: 10.5, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{col.full}</div>
+              <div style={{ padding: "11px 12px 9px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: accent, flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: FONT_NUM, fontSize: 13, fontWeight: 600, color: C.ink900 }}>{col.label}</div>
+                    <div style={{ fontSize: 10.5, color: C.ink400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{col.full}</div>
+                  </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
                   <span
@@ -96,7 +100,7 @@ export function Kanban() {
                     onDragEnd={() => { dragId.current = null; setOverPhase(null); }}
                     onClick={() => openProject(c.id)}
                     className="lift-hover"
-                    style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 6, padding: "10px 11px", cursor: "grab", boxShadow: "0 1px 2px rgba(20,30,25,.05)" }}
+                    style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "11px 12px", cursor: "grab" }}
                   >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                       <div style={{ ...TX.bodyStrong, lineHeight: 1.3, minWidth: 0 }}>{c.name}</div>
