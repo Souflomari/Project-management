@@ -2,9 +2,11 @@
 
 import { usePathname } from "next/navigation";
 
-import { SearchIcon } from "./icons";
+import { PlusIcon, SearchIcon } from "./icons";
+import { Button } from "./ui";
 import { navItemForPath } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
+import { C, TX } from "@/lib/tokens";
 
 export function Header() {
   const pathname = usePathname();
@@ -12,44 +14,42 @@ export function Header() {
   const { search, setSearch, searched, filtered, openAdd } = useProjects();
 
   const subtitle =
-    item.key === "projets"
-      ? `${searched.length} projets · ${filtered.length} affichés`
-      : item.sub;
+    item.key === "projets" ? `${searched.length} projets · ${filtered.length} affichés` : item.sub;
 
   return (
     <header
       style={{
-        minHeight: 54,
-        background: "#fff",
-        borderBottom: "1px solid #D7DDD3",
+        minHeight: 60,
+        background: C.surface,
+        borderBottom: `1px solid ${C.line}`,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 18,
-        padding: "9px 22px",
+        padding: "10px 24px",
         position: "sticky",
-        top: 46,
+        top: 0,
         zIndex: 30,
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 700, letterSpacing: "-.01em" }}>
-          {item.label}
-        </h1>
-        <div style={{ fontSize: 12, color: "#6F6F6F", marginTop: 1 }}>{subtitle}</div>
+        <h1 style={{ ...TX.h1, margin: 0 }}>{item.label}</h1>
+        <div style={{ ...TX.caption, color: C.ink500, marginTop: 2 }}>{subtitle}</div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div
+          className="ui-field"
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            background: "#F1F3EF",
-            border: "1px solid #E2E6E0",
-            borderRadius: 3,
-            padding: "8px 12px",
-            width: 230,
+            background: C.surface,
+            border: `1px solid ${C.line}`,
+            borderRadius: 4,
+            padding: "0 12px",
+            height: 36,
+            width: 280,
           }}
         >
           <SearchIcon />
@@ -57,37 +57,12 @@ export function Header() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher un projet…"
-            style={{
-              border: "none",
-              background: "transparent",
-              outline: "none",
-              font: "inherit",
-              fontSize: 13,
-              color: "#233038",
-              width: "100%",
-            }}
+            style={{ border: "none", background: "transparent", outline: "none", font: "inherit", fontSize: 13.5, color: C.ink900, width: "100%" }}
           />
         </div>
-        <button
-          onClick={openAdd}
-          style={{
-            border: "none",
-            cursor: "pointer",
-            background: "#17823D",
-            color: "#fff",
-            font: "inherit",
-            fontWeight: 600,
-            fontSize: 13,
-            padding: "8px 13px",
-            borderRadius: 3,
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            whiteSpace: "nowrap",
-          }}
-        >
-          <span style={{ fontSize: 16, lineHeight: 0 }}>+</span>Nouveau projet
-        </button>
+        <Button onClick={openAdd} icon={<PlusIcon size={15} />}>
+          Nouveau projet
+        </Button>
       </div>
     </header>
   );

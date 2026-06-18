@@ -9,8 +9,8 @@ body {
 }
 
 body {
-  background: #0e0f12;
-  color: #233038;
+  background: #f4f6f2;
+  color: #1a2329;
   font-family: "Montserrat", sans-serif;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
@@ -78,6 +78,34 @@ textarea::placeholder {
 }
 .pan.is-panning * {
   cursor: grabbing !important;
+}
+
+/* primitives */
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 130, 61, 0.18);
+}
+.btn-primary:hover {
+  background: #126731 !important;
+}
+.btn-secondary:hover {
+  background: #eef1ec !important;
+}
+.btn-ghost:hover {
+  background: #eef1ec !important;
+}
+.icon-btn:hover {
+  background: #eef1ec !important;
+  border-color: #d4dad3 !important;
+}
+.icon-btn.icon-danger:hover {
+  background: #f7e4e3 !important;
+  border-color: #e7c4c2 !important;
+  color: #a42421 !important;
+}
+.ui-field:focus {
+  border-color: #17823d !important;
+  box-shadow: 0 0 0 3px rgba(23, 130, 61, 0.18);
 }
 
 @keyframes drawerIn {

@@ -2,12 +2,65 @@
 // theme. Most layout colours are kept inline in components to match the source
 // pixel-for-pixel; this module centralises the few values used across views.
 
+import type { CSSProperties } from "react";
+
 import type { Status } from "./types";
 
 /** UI font (everything except numeric displays). */
 export const FONT_UI = "'Montserrat', sans-serif";
-/** Numeric / display font used for KPIs, percentages, dates. */
+/** Numeric / display font used for KPIs, percentages, dates (>= 14px only). */
 export const FONT_NUM = "'Oswald', sans-serif";
+
+// ───────────────────────────────────────────────── design tokens
+
+/** One palette. Neutrals (the spine), a single brand green, the nav rail. */
+export const C = {
+  ink900: "#1A2329", // primary text
+  ink700: "#45525B", // secondary text
+  ink500: "#6B7780", // muted
+  ink400: "#97A1A8", // faint
+  line: "#E6EAE6", // hairline border / divider
+  lineStrong: "#D4DAD3", // stronger border (hover, modal)
+  surface: "#FFFFFF",
+  canvas: "#F4F6F2", // app background
+  subtle: "#EEF1EC", // inset / track / segmented bg
+  brand: "#17823D",
+  brandHover: "#126731",
+  brand50: "#E6F1E9",
+  brandDot: "#2E9E3F", // the single "live" green
+  navy: "#1D4459", // nav rail
+  navyMuted: "#8FB0B2",
+  navyActive: "rgba(255,255,255,.12)",
+} as const;
+
+export const R = { sm: 4, md: 8, pill: 999 } as const;
+
+export const SH = {
+  sm: "0 1px 2px rgba(20,30,25,.06)",
+  md: "0 4px 12px rgba(20,30,25,.10)",
+  lg: "0 16px 40px -12px rgba(20,30,25,.28)",
+  drawer: "-8px 0 32px -12px rgba(20,30,25,.18)",
+  focus: "0 0 0 3px rgba(23,130,61,.18)",
+} as const;
+
+/** Type scale by role (Montserrat). Numbers use `num()`. */
+export const TX: Record<
+  "h1" | "h2" | "body" | "bodyStrong" | "caption" | "micro" | "overline",
+  CSSProperties
+> = {
+  h1: { fontSize: 20, fontWeight: 700, letterSpacing: "-.01em", lineHeight: 1.2 },
+  h2: { fontSize: 16, fontWeight: 700, letterSpacing: "-.005em", lineHeight: 1.25 },
+  body: { fontSize: 14, fontWeight: 500, lineHeight: 1.45 },
+  bodyStrong: { fontSize: 14, fontWeight: 600, lineHeight: 1.45 },
+  caption: { fontSize: 12, fontWeight: 500, lineHeight: 1.4 },
+  micro: { fontSize: 11, fontWeight: 600, lineHeight: 1.35 },
+  overline: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" },
+};
+
+/** Oswald numeric display (>= 14px). */
+export function num(size: number): CSSProperties {
+  return { fontFamily: FONT_NUM, fontWeight: 600, letterSpacing: ".01em", lineHeight: 1, fontVariantNumeric: "tabular-nums", fontSize: size };
+}
 
 export interface StatusMeta {
   label: string;
@@ -46,14 +99,14 @@ export function dueColor(days: number, delivered: boolean): string {
   return "#6F6F6F";
 }
 
-/** Drawer (single "Design Setec" theme) colour palette. */
+/** Drawer palette — aliases onto the unified tokens. */
 export const DRAWER = {
-  ac: "#17823D",
-  ink: "#233038",
-  paper: "#FFFFFF",
-  panel: "#F1F3EF",
-  line: "#E2E6E0",
-  sub: "#6F6F6F",
+  ac: C.brand,
+  ink: C.ink900,
+  paper: C.surface,
+  panel: C.subtle,
+  line: C.line,
+  sub: C.ink500,
 } as const;
 
 /** Accent per study phase (ESQ → RÉC), used by Kanban headers + calendar chips. */

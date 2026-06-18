@@ -373,7 +373,18 @@ function SubtaskRow({
   onDelete: (projectId: number, subtaskId: number) => void;
 }) {
   const depNames = new Map(siblings.map((s) => [s.id, s.name]));
-  const depOptions = siblings.filter((s) => s.id !== subtask.id && !subtask.dependsOn.includes(s.id));
+  const depsById = new Map(siblings.map((s) => [s.id, s.dependsOn]));
+  // A candidate predecessor would create a cycle if it (transitively) already
+  // depends on this task — exclude those from the options.
+  const reaches = (from: number, target: number, seen = new Set<number>()): boolean => {
+    if (from === target) return true;
+    if (seen.has(from)) return false;
+    seen.add(from);
+    return (depsById.get(from) ?? []).some((p) => reaches(p, target, seen));
+  };
+  const depOptions = siblings.filter(
+    (s) => s.id !== subtask.id && !subtask.dependsOn.includes(s.id) && !reaches(s.id, subtask.id),
+  );
   const addDep = (id: number) => onUpdate(projectId, subtask.id, { dependsOn: [...subtask.dependsOn, id] });
   const removeDep = (id: number) =>
     onUpdate(projectId, subtask.id, { dependsOn: subtask.dependsOn.filter((x) => x !== id) });

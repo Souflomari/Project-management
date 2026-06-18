@@ -3,53 +3,47 @@
 import type { ReactNode } from "react";
 
 import { useProjects } from "@/lib/store/projects-context";
-import { FONT_NUM } from "@/lib/tokens";
+import { C } from "@/lib/tokens";
 
 export function FilterBar({ trailing }: { trailing?: ReactNode }) {
   const { filters, setFilter } = useProjects();
 
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 8,
-        marginBottom: 14,
-        flexWrap: "wrap",
-        alignItems: "center",
-      }}
-    >
+    <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
       {filters.map((f) => {
         const a = f.active;
         return (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
+            className="btn"
             style={{
               cursor: "pointer",
               font: "inherit",
               fontSize: 13,
               fontWeight: 600,
-              padding: "7px 13px",
-              borderRadius: 3,
+              padding: "6px 12px",
+              borderRadius: 4,
               display: "inline-flex",
               alignItems: "center",
               gap: 7,
               whiteSpace: "nowrap",
-              border: `1px solid ${a ? "#17823D" : "#D9E0D8"}`,
-              background: a ? "#17823D" : "#fff",
-              color: a ? "#fff" : "#3B5560",
+              border: `1px solid ${a ? C.brand : C.line}`,
+              background: a ? C.brand : C.surface,
+              color: a ? "#fff" : C.ink700,
+              transition: "background .12s, border-color .12s",
             }}
           >
             {f.label}
             <span
               style={{
-                fontFamily: FONT_NUM,
                 fontSize: 11,
-                fontWeight: 500,
+                fontWeight: 600,
+                fontVariantNumeric: "tabular-nums",
                 padding: "1px 6px",
-                borderRadius: 3,
-                background: a ? "rgba(255,255,255,.24)" : "#EDEFEC",
-                color: a ? "#fff" : "#6F6F6F",
+                borderRadius: 4,
+                background: a ? "rgba(255,255,255,.24)" : C.subtle,
+                color: a ? "#fff" : C.ink500,
               }}
             >
               {f.count}
