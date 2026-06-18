@@ -1,30 +1,42 @@
-// The data-access seam. Every read/write the app needs goes through this
-// interface. Today it's backed by in-memory sample data; tomorrow a
-// `SupabaseRepository` implementing the same interface drops in with no UI
-// changes — see lib/data/index.ts for the single swap point.
+// The data-access seam. Every read/write goes through this interface; the
+// Supabase implementation drops in with no UI changes.
 
-import type { Project, Status, TeamMember } from "../types";
+import type {
+  NewSubtaskInput,
+  NewTeamMemberInput,
+  Project,
+  Status,
+  Subtask,
+  TeamMember,
+} from "../types";
 
 export interface NewProjectInput {
   name: string;
   client: string;
-  /** TeamMember.id of the responsible person. */
   responsableId: number;
 }
 
+export type SubtaskPatch = Partial<Omit<Subtask, "id">>;
+export type TeamMemberPatch = Partial<NewTeamMemberInput>;
+
 export interface ProjectRepository {
-  /** All projects in the portfolio. */
   listProjects(): Promise<Project[]>;
-  /** A single project by id, or null. */
   getProject(id: number): Promise<Project | null>;
-  /** The full team roster. */
   listTeam(): Promise<TeamMember[]>;
 
-  // --- mutations ---
+  // project mutations
   createProject(input: NewProjectInput): Promise<Project>;
   setPhase(id: number, phaseIndex: number): Promise<Project>;
   setStatus(id: number, status: Status): Promise<Project>;
-  toggleRendu(id: number): Promise<Project>;
-  toggleDeliverable(id: number, index: number): Promise<Project>;
   addComment(id: number, text: string): Promise<Project>;
+
+  // task (sous-tâche) mutations
+  addSubtask(projectId: number, input: NewSubtaskInput): Promise<Project>;
+  updateSubtask(projectId: number, subtaskId: number, patch: SubtaskPatch): Promise<Project>;
+  deleteSubtask(projectId: number, subtaskId: number): Promise<Project>;
+
+  // team mutations
+  addTeamMember(input: NewTeamMemberInput): Promise<TeamMember[]>;
+  updateTeamMember(id: number, patch: TeamMemberPatch): Promise<TeamMember[]>;
+  deleteTeamMember(id: number): Promise<TeamMember[]>;
 }

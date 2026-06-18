@@ -67,7 +67,7 @@ export function ProjectsTable() {
 
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {p.rendu.label}
+                {p.renduLabel}
               </div>
               <div style={{ fontSize: 10.5 }}>
                 {p.renduFmt} · <span style={{ color: p.renduDueColor, fontWeight: 600 }}>{p.renduDaysLabel}</span>

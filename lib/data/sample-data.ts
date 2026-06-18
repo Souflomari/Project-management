@@ -1,9 +1,9 @@
-// Realistic sample data for the Setec portfolio, ported verbatim from the
-// original design. This is the only file that knows the seed content; the
-// repository builds its results from here. Swapping to Supabase means replacing
-// the repository implementation, not this module.
+// Realistic sample data for the Setec portfolio. Each project is seeded with a
+// set of editable tasks (sous-tâches); progress and the "prochain rendu" are
+// derived from them. Swapping to Supabase replaces the repository, not this file.
 
-import type { Project, Status, TeamMember } from "../types";
+import { shiftISO, taskEnd, taskStartForEnd } from "../format";
+import type { Project, Status, Subtask, TeamMember } from "../types";
 
 export const TEAM: TeamMember[] = [
   { id: 0, name: "C. Mercier", initials: "CM", color: "#17823D", role: "Cheffe de projet senior" },
@@ -16,18 +16,7 @@ export const TEAM: TeamMember[] = [
   { id: 7, name: "F. Aubry", initials: "FA", color: "#1D4459", role: "Directeur ferroviaire" },
 ];
 
-/** Standard deliverable checklist applied to every project. */
-export const STD_RENDUS = [
-  "Note de cadrage",
-  "Rapport APS",
-  "Rapport APD",
-  "Dossier PRO",
-  "DCE",
-  "Visa exécution",
-  "DOE",
-];
-
-// [name, client, discipline, respIdx, phaseIndex, progress, status, budget(k€), start, deadline, renduLabel, renduDate]
+// [name, client, discipline, leadIdx, phaseIndex, progress, status, budget(k€), start, deadline, renduLabel, renduDate]
 type Row = [
   string, string, string, number, number, number, Status, number, string, string, string, string,
 ];
@@ -60,39 +49,69 @@ const ROWS: Row[] = [
   ["Data center Sud — Lot CVC", "OVHcloud", "Bâtiment / Énergie", 3, 5, 84, "à jour", 5200, "2025-01-01", "2026-09-05", "Visa exécution", "2026-06-21"],
 ];
 
-// Seed notes keyed by project id; `ri` is the author's TeamMember id.
 const SEED_COMMENTS: Record<number, { ri: number; text: string; when: string }[]> = {
   1: [{ ri: 7, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", when: "il y a 2 j" }],
   6: [{ ri: 1, text: "Accès à l'ouvrage soumis à autorisation — relance du MOA en cours.", when: "hier" }],
   21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", when: "il y a 4 j" }],
 };
 
-/** Build the seed project list. Returns fresh objects on every call. */
+// A few duration profiles so derived progress varies across projects.
+const DAY_PROFILES = [
+  [8, 14, 10, 16, 8],
+  [6, 12, 9, 20, 7],
+  [10, 18, 12, 14, 11],
+  [5, 10, 8, 12, 6],
+  [9, 16, 11, 18, 9],
+];
+
+/** Build the editable task list for a project, with done flags ~matching progress. */
+function buildSubtasks(row: Row, idx: number): Subtask[] {
+  const [, , , lead, , progress, status, , start, deadline, renduLabel, renduDate] = row;
+  const pool = [lead, (lead + 3) % 8, (lead + 5) % 8].filter((v, i, a) => a.indexOf(v) === i);
+  const m = (i: number) => pool[i % pool.length];
+  const d = DAY_PROFILES[idx % DAY_PROFILES.length];
+
+  const t1Start = start;
+  const t1End = taskEnd(t1Start, d[0]);
+  const t2Start = shiftISO(t1End, 3);
+  const t3Start = taskStartForEnd(renduDate, d[2]);
+  const t4Start = shiftISO(renduDate, 4);
+  const t5Start = taskStartForEnd(deadline, d[4]);
+
+  const defs: { name: string; assigneeId: number; start: string; plannedDays: number }[] = [
+    { name: "Cadrage & collecte de données", assigneeId: lead, start: t1Start, plannedDays: d[0] },
+    { name: "Études préliminaires & relevés", assigneeId: m(1), start: t2Start, plannedDays: d[1] },
+    { name: renduLabel, assigneeId: lead, start: t3Start, plannedDays: d[2] },
+    { name: "Coordination & validations MOA", assigneeId: m(2), start: t4Start, plannedDays: d[3] },
+    { name: "Clôture & DOE", assigneeId: m(1), start: t5Start, plannedDays: d[4] },
+  ].sort((a, b) => a.start.localeCompare(b.start));
+
+  const total = defs.reduce((s, d) => s + d.plannedDays, 0);
+  const target = (progress / 100) * total;
+  let running = 0;
+
+  return defs.map((d, i) => {
+    running += d.plannedDays;
+    const done = status === "terminé" ? true : running <= target + 0.5;
+    return { id: i + 1, name: d.name, assigneeId: d.assigneeId, start: d.start, plannedDays: d.plannedDays, done };
+  });
+}
+
 export function buildSampleProjects(): Project[] {
   return ROWS.map((r, idx) => {
     const id = idx + 1;
-    const ri = r[3];
-    const phaseIndex = r[4];
-    const status = r[6];
-    const memberIds = [ri, (ri + 3) % 8, (ri + 5) % 8].filter(
-      (v, i, a) => a.indexOf(v) === i,
-    );
     return {
       id,
       name: r[0],
       client: r[1],
       discipline: r[2],
-      responsableId: ri,
-      phaseIndex,
-      progress: r[5],
-      status,
+      responsableId: r[3],
+      phaseIndex: r[4],
+      status: r[6],
       budget: r[7],
       start: r[8],
       deadline: r[9],
-      rendu: { label: r[10], date: r[11] },
-      renduDone: status === "terminé",
-      memberIds,
-      checklist: STD_RENDUS.map((label, i) => ({ label, done: i < phaseIndex })),
+      subtasks: buildSubtasks(r, idx),
       comments: (SEED_COMMENTS[id] || []).map((c) => ({
         author: TEAM[c.ri].name,
         initials: TEAM[c.ri].initials,

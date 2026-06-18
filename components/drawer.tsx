@@ -1,12 +1,14 @@
 "use client";
 
+import { useState } from "react";
+
 import { Avatar } from "./ui";
-import { deriveProject } from "@/lib/derive";
+import type { SubtaskPatch } from "@/lib/data/repository";
+import { deriveProject, type DerivedSubtask } from "@/lib/derive";
+import { fmtFull } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { DRAWER } from "@/lib/tokens";
-import { FINAL_PHASE_INDEX, PHASES, STATUSES } from "@/lib/types";
-import { STATUS_META } from "@/lib/tokens";
-import { FONT_NUM } from "@/lib/tokens";
+import { DRAWER, FONT_NUM, STATUS_META } from "@/lib/tokens";
+import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
 
 const LABEL: React.CSSProperties = {
   fontSize: 11,
@@ -16,6 +18,17 @@ const LABEL: React.CSSProperties = {
   color: DRAWER.sub,
 };
 
+const fieldStyle: React.CSSProperties = {
+  border: `1px solid ${DRAWER.line}`,
+  borderRadius: 3,
+  padding: "5px 7px",
+  font: "inherit",
+  fontSize: 12,
+  outline: "none",
+  background: DRAWER.paper,
+  color: DRAWER.ink,
+};
+
 export function ProjectDrawer() {
   const {
     selected,
@@ -23,30 +36,37 @@ export function ProjectDrawer() {
     closeDrawer,
     advancePhase,
     setStatus,
-    toggleRendu,
-    toggleDeliverable,
     addComment,
     commentDraft,
     setCommentDraft,
+    addSubtask,
+    updateSubtask,
+    deleteSubtask,
   } = useProjects();
+
+  const [ntName, setNtName] = useState("");
+  const [ntAssignee, setNtAssignee] = useState<number | null>(null);
+  const [ntStart, setNtStart] = useState("2026-06-15");
+  const [ntDays, setNtDays] = useState(5);
 
   if (!selected) return null;
 
   const p = deriveProject(selected, team);
   const canAdvance = selected.phaseIndex < FINAL_PHASE_INDEX;
-  const checkDone = selected.checklist.filter((c) => c.done).length;
+  const doneCount = p.subtasksD.filter((s) => s.done).length;
+  const assigneeDefault = ntAssignee ?? p.responsableId;
+
+  function handleAdd() {
+    if (!ntName.trim()) return;
+    addSubtask(p.id, { name: ntName, assigneeId: assigneeDefault, start: ntStart, plannedDays: ntDays });
+    setNtName("");
+  }
 
   return (
     <>
       <div
         onClick={closeDrawer}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(13,18,28,.38)",
-          zIndex: 60,
-          animation: "fadeIn .18s ease",
-        }}
+        style={{ position: "fixed", inset: 0, background: "rgba(13,18,28,.38)", zIndex: 60, animation: "fadeIn .18s ease" }}
       />
       <aside
         style={{
@@ -54,8 +74,8 @@ export function ProjectDrawer() {
           top: 0,
           right: 0,
           bottom: 0,
-          width: 466,
-          maxWidth: "94vw",
+          width: 500,
+          maxWidth: "96vw",
           background: DRAWER.paper,
           color: DRAWER.ink,
           zIndex: 61,
@@ -77,7 +97,7 @@ export function ProjectDrawer() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ ...LABEL }}>Dossier projet · {p.phaseFull}</span>
+            <span style={LABEL}>Dossier projet · {p.phaseFull}</span>
             <button
               onClick={closeDrawer}
               style={{
@@ -104,10 +124,10 @@ export function ProjectDrawer() {
         </div>
 
         <div style={{ padding: "20px 24px 36px" }}>
-          {/* KPI cards */}
+          {/* stats */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
             <Stat label="Honoraires" value={p.budgetFmt} />
-            <Stat label="Avancement" value={`${p.progress}%`} />
+            <Stat label="Avancement" value={`${p.progress}%`} hint={`${doneCount}/${p.subtasksD.length} tâches`} />
           </div>
 
           {/* status */}
@@ -141,7 +161,7 @@ export function ProjectDrawer() {
 
           {/* phase stepper */}
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 11 }}>
-            <div style={{ ...LABEL }}>Phase d&apos;étude</div>
+            <div style={LABEL}>Phase d&apos;étude</div>
             {canAdvance ? (
               <button
                 onClick={() => advancePhase(selected.id)}
@@ -183,7 +203,6 @@ export function ProjectDrawer() {
                     style={{
                       fontFamily: FONT_NUM,
                       fontSize: 10,
-                      textAlign: "center",
                       color: cur || isDone ? DRAWER.ink : DRAWER.sub,
                       fontWeight: cur ? 700 : 500,
                     }}
@@ -195,95 +214,82 @@ export function ProjectDrawer() {
             })}
           </div>
 
-          {/* next rendu */}
-          <div style={{ ...LABEL, marginBottom: 9 }}>Prochain rendu</div>
-          <div
-            style={{
-              background: DRAWER.panel,
-              border: `1px solid ${DRAWER.line}`,
-              borderRadius: 4,
-              padding: "12px 14px",
-              marginBottom: 22,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{p.rendu.label}</div>
-                <div style={{ fontSize: 12.5, color: DRAWER.sub, marginTop: 2 }}>
-                  {p.renduFull} ·{" "}
-                  <span style={{ color: p.renduDueColor, fontWeight: 600 }}>{p.renduDaysLabel}</span>
-                </div>
+          {/* tasks */}
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={LABEL}>Tâches & planning</div>
+            <span style={{ fontSize: 11, color: DRAWER.sub }}>
+              {doneCount}/{p.subtasksD.length} · {p.doneDays}/{p.totalDays} j
+            </span>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            {p.subtasksD.length === 0 ? (
+              <div style={{ fontSize: 12.5, color: DRAWER.sub, padding: "8px 0", borderTop: `1px solid ${DRAWER.line}` }}>
+                Aucune tâche. Ajoutez la première ci-dessous.
               </div>
+            ) : (
+              p.subtasksD.map((s) => (
+                <SubtaskRow
+                  key={s.id}
+                  projectId={p.id}
+                  subtask={s}
+                  team={team}
+                  onUpdate={updateSubtask}
+                  onDelete={deleteSubtask}
+                />
+              ))
+            )}
+          </div>
+
+          {/* add task */}
+          <div style={{ background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 4, padding: 11, marginBottom: 26 }}>
+            <div style={{ ...LABEL, marginBottom: 8, fontSize: 10 }}>Nouvelle tâche</div>
+            <input
+              value={ntName}
+              onChange={(e) => setNtName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder="Intitulé de la tâche"
+              style={{ ...fieldStyle, width: "100%", marginBottom: 8 }}
+            />
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <select
+                value={assigneeDefault}
+                onChange={(e) => setNtAssignee(Number(e.target.value))}
+                style={{ ...fieldStyle, flex: 1, minWidth: 110 }}
+              >
+                {team.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <input type="date" value={ntStart} onChange={(e) => setNtStart(e.target.value)} style={fieldStyle} />
+              <input
+                type="number"
+                min={1}
+                value={ntDays}
+                onChange={(e) => setNtDays(Number(e.target.value))}
+                title="Jours planifiés"
+                style={{ ...fieldStyle, width: 56 }}
+              />
+              <span style={{ fontSize: 11, color: DRAWER.sub }}>j</span>
               <button
-                onClick={() => toggleRendu(selected.id)}
+                onClick={handleAdd}
                 style={{
+                  border: "none",
                   cursor: "pointer",
                   font: "inherit",
                   fontSize: 12,
                   fontWeight: 600,
-                  whiteSpace: "nowrap",
-                  padding: "9px 13px",
+                  color: "#fff",
+                  background: DRAWER.ac,
+                  padding: "6px 12px",
                   borderRadius: 3,
-                  ...(selected.renduDone
-                    ? { border: `1px solid ${DRAWER.line}`, background: DRAWER.panel, color: DRAWER.sub }
-                    : { border: "none", background: DRAWER.ac, color: "#fff" }),
                 }}
               >
-                {selected.renduDone ? "Annuler" : "Marquer rendu"}
+                Ajouter
               </button>
             </div>
-          </div>
-
-          {/* checklist */}
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 9 }}>
-            <div style={{ ...LABEL }}>Livrables (rendus)</div>
-            <span style={{ fontSize: 11, color: DRAWER.sub }}>
-              {checkDone}/{selected.checklist.length}
-            </span>
-          </div>
-          <div style={{ marginBottom: 26 }}>
-            {selected.checklist.map((ch, i) => (
-              <div
-                key={ch.label}
-                onClick={() => toggleDeliverable(selected.id, i)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 11,
-                  padding: "8px 4px",
-                  borderTop: `1px solid ${DRAWER.line}`,
-                  cursor: "pointer",
-                }}
-              >
-                <span
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 3,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    fontSize: 11,
-                    color: "#fff",
-                    ...(ch.done
-                      ? { background: DRAWER.ac, border: `1px solid ${DRAWER.ac}` }
-                      : { background: DRAWER.paper, border: `1.5px solid ${DRAWER.line}` }),
-                  }}
-                >
-                  {ch.done ? "✓" : ""}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    color: ch.done ? DRAWER.sub : DRAWER.ink,
-                    textDecoration: ch.done ? "line-through" : "none",
-                  }}
-                >
-                  {ch.label}
-                </span>
-              </div>
-            ))}
           </div>
 
           {/* team + deadline */}
@@ -323,21 +329,9 @@ export function ProjectDrawer() {
             <input
               value={commentDraft}
               onChange={(e) => setCommentDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addComment(selected.id);
-              }}
+              onKeyDown={(e) => e.key === "Enter" && addComment(selected.id)}
               placeholder="Ajouter une note…"
-              style={{
-                flex: 1,
-                border: `1px solid ${DRAWER.line}`,
-                borderRadius: 3,
-                padding: "9px 12px",
-                font: "inherit",
-                fontSize: 13,
-                outline: "none",
-                background: DRAWER.paper,
-                color: DRAWER.ink,
-              }}
+              style={{ ...fieldStyle, flex: 1, padding: "9px 12px", fontSize: 13 }}
             />
             <button
               onClick={() => addComment(selected.id)}
@@ -362,18 +356,105 @@ export function ProjectDrawer() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function SubtaskRow({
+  projectId,
+  subtask,
+  team,
+  onUpdate,
+  onDelete,
+}: {
+  projectId: number;
+  subtask: DerivedSubtask;
+  team: TeamMember[];
+  onUpdate: (projectId: number, subtaskId: number, patch: SubtaskPatch) => void;
+  onDelete: (projectId: number, subtaskId: number) => void;
+}) {
   return (
-    <div
-      style={{
-        background: DRAWER.panel,
-        border: `1px solid ${DRAWER.line}`,
-        borderRadius: 4,
-        padding: "10px 12px",
-      }}
-    >
+    <div style={{ padding: "9px 2px", borderTop: `1px solid ${DRAWER.line}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <span
+          onClick={() => onUpdate(projectId, subtask.id, { done: !subtask.done })}
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 3,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            fontSize: 11,
+            color: "#fff",
+            cursor: "pointer",
+            ...(subtask.done
+              ? { background: DRAWER.ac, border: `1px solid ${DRAWER.ac}` }
+              : { background: DRAWER.paper, border: `1.5px solid ${DRAWER.line}` }),
+          }}
+        >
+          {subtask.done ? "✓" : ""}
+        </span>
+        <input
+          defaultValue={subtask.name}
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (v && v !== subtask.name) onUpdate(projectId, subtask.id, { name: v });
+          }}
+          style={{
+            ...fieldStyle,
+            flex: 1,
+            border: "1px solid transparent",
+            background: "transparent",
+            fontSize: 13,
+            fontWeight: 500,
+            textDecoration: subtask.done ? "line-through" : "none",
+            color: subtask.done ? DRAWER.sub : DRAWER.ink,
+          }}
+        />
+        <button
+          onClick={() => onDelete(projectId, subtask.id)}
+          title="Supprimer"
+          style={{ border: "none", background: "transparent", cursor: "pointer", color: DRAWER.sub, fontSize: 15, lineHeight: 1, padding: 2 }}
+        >
+          ×
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, paddingLeft: 27, flexWrap: "wrap" }}>
+        <select
+          value={subtask.assigneeId}
+          onChange={(e) => onUpdate(projectId, subtask.id, { assigneeId: Number(e.target.value) })}
+          style={{ ...fieldStyle, maxWidth: 130 }}
+        >
+          {team.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={subtask.start}
+          onChange={(e) => onUpdate(projectId, subtask.id, { start: e.target.value })}
+          style={fieldStyle}
+        />
+        <input
+          type="number"
+          min={1}
+          value={subtask.plannedDays}
+          onChange={(e) => onUpdate(projectId, subtask.id, { plannedDays: Math.max(1, Number(e.target.value)) })}
+          title="Jours planifiés"
+          style={{ ...fieldStyle, width: 52 }}
+        />
+        <span style={{ fontSize: 11, color: DRAWER.sub, whiteSpace: "nowrap" }}>j · fin {fmtFull(subtask.end)}</span>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div style={{ background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 4, padding: "10px 12px" }}>
       <div style={{ ...LABEL, fontSize: 10, letterSpacing: ".07em" }}>{label}</div>
       <div style={{ fontFamily: FONT_NUM, fontSize: 22, fontWeight: 600, marginTop: 3 }}>{value}</div>
+      {hint ? <div style={{ fontSize: 10.5, color: DRAWER.sub, marginTop: 2 }}>{hint}</div> : null}
     </div>
   );
 }

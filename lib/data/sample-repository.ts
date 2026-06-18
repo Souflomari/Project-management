@@ -1,24 +1,26 @@
 // In-memory implementation of ProjectRepository backed by the sample data.
-//
-// State lives in a module-level array so a browser session sees its own
-// mutations persist while the tab is open. There is no real persistence yet —
-// that arrives with the Supabase implementation. The mutation methods are kept
-// faithful to the design's reducers so they can be reused as-is behind server
-// actions once a database is connected.
+// State lives in module-level arrays so a browser session sees its own edits.
 
 import { FINAL_PHASE_INDEX } from "../types";
-import type { Project, Status, TeamMember } from "../types";
-import {
-  STD_RENDUS,
-  TEAM,
-  buildSampleProjects,
-  buildSampleTeam,
-} from "./sample-data";
-import type { NewProjectInput, ProjectRepository } from "./repository";
+import type {
+  NewSubtaskInput,
+  NewTeamMemberInput,
+  Project,
+  Status,
+  TeamMember,
+} from "../types";
+import { buildSampleProjects, buildSampleTeam } from "./sample-data";
+import type {
+  NewProjectInput,
+  ProjectRepository,
+  SubtaskPatch,
+  TeamMemberPatch,
+} from "./repository";
 
 let projects: Project[] = buildSampleProjects();
+let team: TeamMember[] = buildSampleTeam();
 
-const clone = (p: Project): Project => structuredClone(p);
+const clone = <T>(v: T): T => structuredClone(v);
 
 function mustFind(id: number): Project {
   const p = projects.find((x) => x.id === id);
@@ -26,17 +28,13 @@ function mustFind(id: number): Project {
   return p;
 }
 
-/** Re-tick the checklist so finished phases stay ticked (design's recalcCheck). */
-function recalcCheck(p: Project): Project {
-  return {
-    ...p,
-    checklist: p.checklist.map((c, i) => ({ ...c, done: i < p.phaseIndex || c.done })),
-  };
-}
-
 function replace(updated: Project): Project {
   projects = projects.map((p) => (p.id === updated.id ? updated : p));
   return clone(updated);
+}
+
+function nextSubtaskId(p: Project): number {
+  return Math.max(0, ...p.subtasks.map((s) => s.id)) + 1;
 }
 
 export const sampleRepository: ProjectRepository = {
@@ -49,29 +47,24 @@ export const sampleRepository: ProjectRepository = {
     return p ? clone(p) : null;
   },
 
-  async listTeam(): Promise<TeamMember[]> {
-    return buildSampleTeam();
+  async listTeam() {
+    return team.map(clone);
   },
 
   async createProject(input: NewProjectInput) {
-    const ri = input.responsableId;
     const id = Math.max(0, ...projects.map((p) => p.id)) + 1;
     const np: Project = {
       id,
       name: input.name.trim(),
       client: input.client.trim() || "À définir",
       discipline: "À définir",
-      responsableId: ri,
+      responsableId: input.responsableId,
       phaseIndex: 0,
-      progress: 0,
       status: "à jour",
       budget: 0,
       start: "2026-06-15",
       deadline: "2027-06-30",
-      rendu: { label: "Note de cadrage", date: "2026-09-30" },
-      renduDone: false,
-      memberIds: [ri],
-      checklist: STD_RENDUS.map((label) => ({ label, done: false })),
+      subtasks: [],
       comments: [],
     };
     projects = [np, ...projects];
@@ -79,25 +72,11 @@ export const sampleRepository: ProjectRepository = {
   },
 
   async setPhase(id, phaseIndex) {
-    const next = recalcCheck({ ...mustFind(id), phaseIndex });
-    return replace(next);
+    return replace({ ...mustFind(id), phaseIndex: Math.min(Math.max(0, phaseIndex), FINAL_PHASE_INDEX) });
   },
 
   async setStatus(id, status: Status) {
     return replace({ ...mustFind(id), status });
-  },
-
-  async toggleRendu(id) {
-    const p = mustFind(id);
-    return replace({ ...p, renduDone: !p.renduDone });
-  },
-
-  async toggleDeliverable(id, index) {
-    const p = mustFind(id);
-    return replace({
-      ...p,
-      checklist: p.checklist.map((c, i) => (i === index ? { ...c, done: !c.done } : c)),
-    });
   },
 
   async addComment(id, text) {
@@ -113,12 +92,46 @@ export const sampleRepository: ProjectRepository = {
     };
     return replace({ ...p, comments: [...p.comments, comment] });
   },
+
+  async addSubtask(projectId, input: NewSubtaskInput) {
+    const p = mustFind(projectId);
+    const subtask = {
+      id: nextSubtaskId(p),
+      name: input.name.trim() || "Nouvelle tâche",
+      assigneeId: input.assigneeId,
+      start: input.start,
+      plannedDays: Math.max(1, Math.floor(input.plannedDays)),
+      done: false,
+    };
+    return replace({ ...p, subtasks: [...p.subtasks, subtask] });
+  },
+
+  async updateSubtask(projectId, subtaskId, patch: SubtaskPatch) {
+    const p = mustFind(projectId);
+    return replace({
+      ...p,
+      subtasks: p.subtasks.map((s) => (s.id === subtaskId ? { ...s, ...patch } : s)),
+    });
+  },
+
+  async deleteSubtask(projectId, subtaskId) {
+    const p = mustFind(projectId);
+    return replace({ ...p, subtasks: p.subtasks.filter((s) => s.id !== subtaskId) });
+  },
+
+  async addTeamMember(input: NewTeamMemberInput) {
+    const id = Math.max(-1, ...team.map((m) => m.id)) + 1;
+    team = [...team, { id, ...input }];
+    return team.map(clone);
+  },
+
+  async updateTeamMember(id, patch: TeamMemberPatch) {
+    team = team.map((m) => (m.id === id ? { ...m, ...patch } : m));
+    return team.map(clone);
+  },
+
+  async deleteTeamMember(id) {
+    team = team.filter((m) => m.id !== id);
+    return team.map(clone);
+  },
 };
-
-/** Advance a project by one phase (capped at the final phase). */
-export function nextPhaseIndex(current: number): number {
-  return Math.min(current + 1, FINAL_PHASE_INDEX);
-}
-
-// Re-export so consumers can reference the roster without a second import.
-export const SAMPLE_TEAM = TEAM;

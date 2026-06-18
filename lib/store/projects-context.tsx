@@ -1,14 +1,5 @@
 "use client";
 
-// Client-side store for the portfolio.
-//
-// Reads are seeded from the repository on the server (see app/layout.tsx) and
-// held in React state. Writes go through the same `repository` singleton and the
-// returned record is merged back into state — so the data seam is genuinely
-// exercised today. When Supabase is wired in, these actions become server
-// actions delegating to a SupabaseRepository; the components calling them do not
-// change.
-
 import {
   createContext,
   useCallback,
@@ -20,50 +11,60 @@ import {
 
 import {
   addCommentAction,
+  addSubtaskAction,
+  addTeamMemberAction,
   createProjectAction,
+  deleteSubtaskAction,
+  deleteTeamMemberAction,
   setPhaseAction,
   setStatusAction,
-  toggleDeliverableAction,
-  toggleRenduAction,
+  updateSubtaskAction,
+  updateTeamMemberAction,
 } from "@/app/actions";
 import { sampleRepository } from "../data";
+import type { SubtaskPatch, TeamMemberPatch } from "../data/repository";
+import { buildFilters, deriveAll, type DerivedProject, type FilterDef } from "../derive";
+import { toISO, toDate } from "../format";
 import {
-  buildFilters,
-  deriveAll,
-  type DerivedProject,
-  type FilterDef,
-} from "../derive";
-import { FINAL_PHASE_INDEX, type Project, type Status, type TeamMember } from "../types";
+  FINAL_PHASE_INDEX,
+  type NewSubtaskInput,
+  type NewTeamMemberInput,
+  type Project,
+  type Status,
+  type TeamMember,
+} from "../types";
 
 type FilterKey = "all" | Status;
+export type CalMode = "mois" | "semaine" | "agenda";
+export type TeamMode = "semaine" | "mois";
 
 interface ProjectsContextValue {
-  // raw data
   projects: Project[];
   team: TeamMember[];
-  /** True when backed by Supabase (writes go through server actions). */
   serverBacked: boolean;
 
-  // derived
   allDerived: DerivedProject[];
   searched: DerivedProject[];
   filtered: DerivedProject[];
   filters: FilterDef[];
   selected: Project | null;
 
-  // ui state
   search: string;
   filter: FilterKey;
   selectedId: number | null;
   showAdd: boolean;
-  calYear: number;
-  calMonth: number;
   newName: string;
   newClient: string;
   newResp: number;
   commentDraft: string;
 
-  // ui actions
+  calMode: CalMode;
+  calAnchor: string;
+  calProjectFilter: number | null;
+
+  teamMode: TeamMode;
+  teamAnchor: string;
+
   setSearch: (v: string) => void;
   setFilter: (f: FilterKey) => void;
   openProject: (id: number) => void;
@@ -74,21 +75,42 @@ interface ProjectsContextValue {
   setNewClient: (v: string) => void;
   setNewResp: (i: number) => void;
   setCommentDraft: (v: string) => void;
+
+  setCalMode: (m: CalMode) => void;
   calPrev: () => void;
   calNext: () => void;
+  setCalProjectFilter: (id: number | null) => void;
 
-  // data actions
+  setTeamMode: (m: TeamMode) => void;
+  teamPrev: () => void;
+  teamNext: () => void;
+
   advancePhase: (id: number) => void;
   setPhase: (id: number, phaseIndex: number) => void;
   setStatus: (id: number, status: Status) => void;
-  toggleRendu: (id: number) => void;
-  toggleDeliverable: (id: number, index: number) => void;
   addComment: (id: number) => void;
-  /** Returns true when a project was created. */
   submitAdd: () => Promise<boolean>;
+
+  addSubtask: (projectId: number, input: NewSubtaskInput) => void;
+  updateSubtask: (projectId: number, subtaskId: number, patch: SubtaskPatch) => void;
+  deleteSubtask: (projectId: number, subtaskId: number) => void;
+
+  addTeamMember: (input: NewTeamMemberInput) => void;
+  updateTeamMember: (id: number, patch: TeamMemberPatch) => void;
+  deleteTeamMember: (id: number) => void;
 }
 
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
+
+function shiftMonth(anchor: string, delta: number): string {
+  const d = toDate(anchor);
+  return toISO(new Date(d.getFullYear(), d.getMonth() + delta, 1));
+}
+function shiftDays(anchor: string, delta: number): string {
+  const d = toDate(anchor);
+  d.setDate(d.getDate() + delta);
+  return toISO(d);
+}
 
 export function ProjectsProvider({
   initialProjects,
@@ -102,32 +124,39 @@ export function ProjectsProvider({
   children: ReactNode;
 }) {
   const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [team] = useState<TeamMember[]>(initialTeam);
+  const [team, setTeam] = useState<TeamMember[]>(initialTeam);
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [calYear, setCalYear] = useState(2026);
-  const [calMonth, setCalMonth] = useState(5); // June
   const [newName, setNewName] = useState("");
   const [newClient, setNewClient] = useState("");
   const [newResp, setNewResp] = useState(0);
   const [commentDraft, setCommentDraft] = useState("");
 
+  const [calMode, setCalMode] = useState<CalMode>("mois");
+  const [calAnchor, setCalAnchor] = useState("2026-06-15");
+  const [calProjectFilter, setCalProjectFilter] = useState<number | null>(null);
+
+  const [teamMode, setTeamMode] = useState<TeamMode>("mois");
+  const [teamAnchor, setTeamAnchor] = useState("2026-06-15");
+
   const applyUpdate = useCallback((updated: Project) => {
     setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   }, []);
 
-  // ---- data actions ----
-  // Supabase mode → server actions (auth + RLS). Sample mode → in-memory
-  // repository on the client for instant, session-local edits.
+  // ---- project / task / team mutations (server actions vs sample repo) ----
+  const setStatus = useCallback(
+    (id: number, status: Status) => {
+      (serverBacked ? setStatusAction(id, status) : sampleRepository.setStatus(id, status)).then(applyUpdate);
+    },
+    [serverBacked, applyUpdate],
+  );
+
   const setPhase = useCallback(
     (id: number, phaseIndex: number) => {
-      const op = serverBacked
-        ? setPhaseAction(id, phaseIndex)
-        : sampleRepository.setPhase(id, phaseIndex);
-      op.then(applyUpdate);
+      (serverBacked ? setPhaseAction(id, phaseIndex) : sampleRepository.setPhase(id, phaseIndex)).then(applyUpdate);
     },
     [serverBacked, applyUpdate],
   );
@@ -136,49 +165,17 @@ export function ProjectsProvider({
     (id: number) => {
       const current = projects.find((p) => p.id === id);
       if (!current) return;
-      const next = Math.min(current.phaseIndex + 1, FINAL_PHASE_INDEX);
-      setPhase(id, next);
+      setPhase(id, Math.min(current.phaseIndex + 1, FINAL_PHASE_INDEX));
     },
     [projects, setPhase],
-  );
-
-  const setStatus = useCallback(
-    (id: number, status: Status) => {
-      const op = serverBacked
-        ? setStatusAction(id, status)
-        : sampleRepository.setStatus(id, status);
-      op.then(applyUpdate);
-    },
-    [serverBacked, applyUpdate],
-  );
-
-  const toggleRendu = useCallback(
-    (id: number) => {
-      const op = serverBacked ? toggleRenduAction(id) : sampleRepository.toggleRendu(id);
-      op.then(applyUpdate);
-    },
-    [serverBacked, applyUpdate],
-  );
-
-  const toggleDeliverable = useCallback(
-    (id: number, index: number) => {
-      const op = serverBacked
-        ? toggleDeliverableAction(id, index)
-        : sampleRepository.toggleDeliverable(id, index);
-      op.then(applyUpdate);
-    },
-    [serverBacked, applyUpdate],
   );
 
   const addComment = useCallback(
     (id: number) => {
       const text = commentDraft.trim();
       if (!text) return;
-      const op = serverBacked
-        ? addCommentAction(id, text)
-        : sampleRepository.addComment(id, text);
-      op.then((updated) => {
-        applyUpdate(updated);
+      (serverBacked ? addCommentAction(id, text) : sampleRepository.addComment(id, text)).then((u) => {
+        applyUpdate(u);
         setCommentDraft("");
       });
     },
@@ -188,13 +185,59 @@ export function ProjectsProvider({
   const submitAdd = useCallback(async () => {
     if (!newName.trim()) return false;
     const input = { name: newName, client: newClient, responsableId: newResp };
-    const created = serverBacked
-      ? await createProjectAction(input)
-      : await sampleRepository.createProject(input);
+    const created = serverBacked ? await createProjectAction(input) : await sampleRepository.createProject(input);
     setProjects((prev) => [created, ...prev]);
     setShowAdd(false);
     return true;
   }, [serverBacked, newName, newClient, newResp]);
+
+  const addSubtask = useCallback(
+    (projectId: number, input: NewSubtaskInput) => {
+      (serverBacked ? addSubtaskAction(projectId, input) : sampleRepository.addSubtask(projectId, input)).then(applyUpdate);
+    },
+    [serverBacked, applyUpdate],
+  );
+
+  const updateSubtask = useCallback(
+    (projectId: number, subtaskId: number, patch: SubtaskPatch) => {
+      (serverBacked
+        ? updateSubtaskAction(projectId, subtaskId, patch)
+        : sampleRepository.updateSubtask(projectId, subtaskId, patch)
+      ).then(applyUpdate);
+    },
+    [serverBacked, applyUpdate],
+  );
+
+  const deleteSubtask = useCallback(
+    (projectId: number, subtaskId: number) => {
+      (serverBacked
+        ? deleteSubtaskAction(projectId, subtaskId)
+        : sampleRepository.deleteSubtask(projectId, subtaskId)
+      ).then(applyUpdate);
+    },
+    [serverBacked, applyUpdate],
+  );
+
+  const addTeamMember = useCallback(
+    (input: NewTeamMemberInput) => {
+      (serverBacked ? addTeamMemberAction(input) : sampleRepository.addTeamMember(input)).then(setTeam);
+    },
+    [serverBacked],
+  );
+
+  const updateTeamMember = useCallback(
+    (id: number, patch: TeamMemberPatch) => {
+      (serverBacked ? updateTeamMemberAction(id, patch) : sampleRepository.updateTeamMember(id, patch)).then(setTeam);
+    },
+    [serverBacked],
+  );
+
+  const deleteTeamMember = useCallback(
+    (id: number) => {
+      (serverBacked ? deleteTeamMemberAction(id) : sampleRepository.deleteTeamMember(id)).then(setTeam);
+    },
+    [serverBacked],
+  );
 
   // ---- ui actions ----
   const openProject = useCallback((id: number) => setSelectedId(id), []);
@@ -202,28 +245,24 @@ export function ProjectsProvider({
   const openAdd = useCallback(() => {
     setNewName("");
     setNewClient("");
-    setNewResp(0);
+    setNewResp(team[0]?.id ?? 0);
     setShowAdd(true);
-  }, []);
+  }, [team]);
   const closeAdd = useCallback(() => setShowAdd(false), []);
+
   const calPrev = useCallback(() => {
-    setCalMonth((m) => {
-      if (m === 0) {
-        setCalYear((y) => y - 1);
-        return 11;
-      }
-      return m - 1;
-    });
-  }, []);
+    setCalAnchor((a) => (calMode === "semaine" ? shiftDays(a, -7) : shiftMonth(a, -1)));
+  }, [calMode]);
   const calNext = useCallback(() => {
-    setCalMonth((m) => {
-      if (m === 11) {
-        setCalYear((y) => y + 1);
-        return 0;
-      }
-      return m + 1;
-    });
-  }, []);
+    setCalAnchor((a) => (calMode === "semaine" ? shiftDays(a, 7) : shiftMonth(a, 1)));
+  }, [calMode]);
+
+  const teamPrev = useCallback(() => {
+    setTeamAnchor((a) => (teamMode === "semaine" ? shiftDays(a, -7) : shiftMonth(a, -1)));
+  }, [teamMode]);
+  const teamNext = useCallback(() => {
+    setTeamAnchor((a) => (teamMode === "semaine" ? shiftDays(a, 7) : shiftMonth(a, 1)));
+  }, [teamMode]);
 
   // ---- derived ----
   const allDerived = useMemo(() => deriveAll(projects, team), [projects, team]);
@@ -232,9 +271,7 @@ export function ProjectsProvider({
     const q = search.trim().toLowerCase();
     if (!q) return allDerived;
     return allDerived.filter((p) =>
-      `${p.name} ${p.client} ${p.discipline} ${p.responsable.name}`
-        .toLowerCase()
-        .includes(q),
+      `${p.name} ${p.client} ${p.discipline} ${p.responsable.name}`.toLowerCase().includes(q),
     );
   }, [allDerived, search]);
 
@@ -244,7 +281,6 @@ export function ProjectsProvider({
   );
 
   const filters = useMemo(() => buildFilters(searched, filter), [searched, filter]);
-
   const selected = useMemo(
     () => projects.find((p) => p.id === selectedId) ?? null,
     [projects, selectedId],
@@ -263,12 +299,15 @@ export function ProjectsProvider({
     filter,
     selectedId,
     showAdd,
-    calYear,
-    calMonth,
     newName,
     newClient,
     newResp,
     commentDraft,
+    calMode,
+    calAnchor,
+    calProjectFilter,
+    teamMode,
+    teamAnchor,
     setSearch,
     setFilter,
     openProject,
@@ -279,15 +318,24 @@ export function ProjectsProvider({
     setNewClient,
     setNewResp,
     setCommentDraft,
+    setCalMode,
     calPrev,
     calNext,
+    setCalProjectFilter,
+    setTeamMode,
+    teamPrev,
+    teamNext,
     advancePhase,
     setPhase,
     setStatus,
-    toggleRendu,
-    toggleDeliverable,
     addComment,
     submitAdd,
+    addSubtask,
+    updateSubtask,
+    deleteSubtask,
+    addTeamMember,
+    updateTeamMember,
+    deleteTeamMember,
   };
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;

@@ -1,12 +1,11 @@
-// Seed a Supabase project with the sample portfolio.
+// Seed a Supabase project with the sample portfolio (task model).
 //
 // Usage:
 //   1. run supabase/schema.sql in your Supabase project
 //   2. set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env
 //   3. npm run seed
 //
-// Uses the service-role key (server-only) to bypass RLS. Re-running clears the
-// existing rows first, so it is idempotent.
+// Uses the service-role key to bypass RLS. Idempotent (clears first).
 
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
@@ -31,7 +30,7 @@ function check(label: string, error: { message: string } | null) {
 }
 
 async function main() {
-  // Deleting projects cascades to project_members, deliverables and comments.
+  // Deleting projects cascades to subtasks and comments.
   check("clear projects", (await sb.from("projects").delete().gt("id", 0)).error);
 
   const team = buildSampleTeam();
@@ -48,42 +47,33 @@ async function main() {
         discipline: p.discipline,
         responsable_id: p.responsableId,
         phase_index: p.phaseIndex,
-        progress: p.progress,
         status: p.status,
         budget: p.budget,
         start: p.start,
         deadline: p.deadline,
-        rendu_label: p.rendu.label,
-        rendu_date: p.rendu.date,
-        rendu_done: p.renduDone,
       })
       .select("id")
       .single();
     check(`insert project "${p.name}"`, insert.error);
     const id = insert.data!.id as number;
 
-    check(
-      `deliverables "${p.name}"`,
-      (
-        await sb.from("deliverables").insert(
-          p.checklist.map((c, position) => ({
-            project_id: id,
-            position,
-            label: c.label,
-            done: c.done,
-          })),
-        )
-      ).error,
-    );
-
-    check(
-      `members "${p.name}"`,
-      (
-        await sb
-          .from("project_members")
-          .insert(p.memberIds.map((member_id) => ({ project_id: id, member_id })))
-      ).error,
-    );
+    if (p.subtasks.length) {
+      check(
+        `subtasks "${p.name}"`,
+        (
+          await sb.from("subtasks").insert(
+            p.subtasks.map((s) => ({
+              project_id: id,
+              name: s.name,
+              assignee_id: s.assigneeId,
+              start: s.start,
+              planned_days: s.plannedDays,
+              done: s.done,
+            })),
+          )
+        ).error,
+      );
+    }
 
     if (p.comments.length) {
       check(
