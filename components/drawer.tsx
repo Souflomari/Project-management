@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Avatar } from "./ui";
 import type { SubtaskPatch } from "@/lib/data/repository";
@@ -48,6 +48,12 @@ export function ProjectDrawer() {
   const [ntAssignee, setNtAssignee] = useState<number | null>(null);
   const [ntStart, setNtStart] = useState("2026-06-15");
   const [ntDays, setNtDays] = useState(5);
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") closeDrawer(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [closeDrawer]);
 
   if (!selected) return null;
 
@@ -471,7 +477,7 @@ function SubtaskRow({
         {subtask.dependsOn.map((id) => (
           <span
             key={id}
-            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 3, padding: "1px 4px 1px 7px", color: "#3B5560" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, background: DRAWER.panel, border: `1px solid ${DRAWER.line}`, borderRadius: 3, padding: "1px 4px 1px 7px", color: DRAWER.ink }}
           >
             {depNames.get(id) ?? `#${id}`}
             <button onClick={() => removeDep(id)} title="Retirer" style={{ border: "none", background: "transparent", cursor: "pointer", color: DRAWER.sub, fontSize: 12, lineHeight: 1, padding: 0 }}>

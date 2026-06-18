@@ -7,7 +7,7 @@ import { useProjects } from "@/lib/store/projects-context";
 import { C, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
-const PALETTE = ["#17823D", "#3A9095", "#4C8AA3", "#E1832F", "#A42421", "#3B7179", "#9C7257", "#1D4459", "#6A6557", "#8A6FB0"];
+const PALETTE = ["#1A7F37", "#2C7A8C", "#4C8AA3", "#B4690E", "#C5362C", "#3B7179", "#8A6F5C", "#2F4A63", "#6A6F7A", "#7A6FB0"];
 
 const label: React.CSSProperties = { ...TX.overline, color: C.ink500, display: "block", margin: "0 0 6px" };
 
@@ -37,6 +37,10 @@ export function TeamMemberModal({ member, onClose }: { member: TeamMember | null
     onClose();
   }
 
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && canSubmit) { e.preventDefault(); submit(); }
+  };
+
   return (
     <Modal
       title={editing ? "Modifier le membre" : "Nouveau membre"}
@@ -57,10 +61,10 @@ export function TeamMemberModal({ member, onClose }: { member: TeamMember | null
       </div>
 
       <label style={label}>Nom</label>
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ex. J. Martin" style={{ marginBottom: 14 }} />
+      <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} placeholder="ex. J. Martin" style={{ marginBottom: 14 }} />
 
       <label style={label}>Rôle</label>
-      <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="ex. Ingénieur structures" style={{ marginBottom: 14 }} />
+      <Input value={role} onChange={(e) => setRole(e.target.value)} onKeyDown={onEnter} placeholder="ex. Ingénieur structures" style={{ marginBottom: 14 }} />
 
       <label style={label}>Initiales</label>
       <Input value={initials} onChange={(e) => setInitials(e.target.value)} placeholder={initialsFrom(name)} style={{ width: 90, marginBottom: 14 }} />
@@ -72,7 +76,7 @@ export function TeamMemberModal({ member, onClose }: { member: TeamMember | null
             key={c}
             onClick={() => setColor(c)}
             className="btn"
-            style={{ width: 26, height: 26, borderRadius: "50%", background: c, cursor: "pointer", border: color === c ? "2px solid #1A2329" : "2px solid transparent" }}
+            style={{ width: 26, height: 26, borderRadius: "50%", background: c, cursor: "pointer", border: color === c ? `2px solid ${C.ink900}` : "2px solid transparent" }}
           />
         ))}
       </div>

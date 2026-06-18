@@ -12,16 +12,16 @@ const SUB_ROW_H = 28;
 
 function Legend() {
   return (
-    <span style={{ fontSize: 11, color: "#6B7780", display: "flex", alignItems: "center", gap: 14 }}>
+    <span style={{ fontSize: 11, color: "#5C6571", display: "flex", alignItems: "center", gap: 14 }}>
       <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, background: "#17823D" }} />
+        <span style={{ width: 16, height: 9, background: "#1A7F37" }} />
         avancement
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, background: "#17823D22", border: "1px solid #17823D66" }} />
+        <span style={{ width: 16, height: 9, background: "#1A7F3722", border: "1px solid #1A7F3766" }} />
         durée
       </span>
-      <span style={{ color: "#97A1A8" }}>▸ cliquez un projet pour ses tâches & dépendances</span>
+      <span style={{ color: "#8B95A1" }}>▸ cliquez un projet pour ses tâches & dépendances</span>
     </span>
   );
 }
@@ -79,7 +79,7 @@ export function PlanningGantt() {
           onMouseLeave={endPan}
           style={{
             background: "#fff",
-            border: "1px solid #E6EAE6",
+            border: "1px solid #ECEEF1",
             borderRadius: 8,
             overflow: "auto",
             maxHeight: "calc(100vh - 215px)",
@@ -87,7 +87,7 @@ export function PlanningGantt() {
         >
           <div style={{ minWidth: 1180 }}>
             {/* month header (sticky) */}
-            <div style={{ display: "flex", borderBottom: "1px solid #D4DAD3", position: "sticky", top: 0, background: "#EEF1EC", zIndex: 4 }}>
+            <div style={{ display: "flex", borderBottom: "1px solid #DDE1E6", position: "sticky", top: 0, background: "#F1F3F5", zIndex: 4 }}>
               <div
                 style={{
                   width: LEFT_W,
@@ -96,12 +96,12 @@ export function PlanningGantt() {
                   fontSize: 10,
                   letterSpacing: ".07em",
                   textTransform: "uppercase",
-                  color: "#6B7780",
+                  color: "#5C6571",
                   fontWeight: 700,
                   position: "sticky",
                   left: 0,
-                  background: "#EEF1EC",
-                  borderRight: "1px solid #D4DAD3",
+                  background: "#F1F3F5",
+                  borderRight: "1px solid #DDE1E6",
                   zIndex: 1,
                 }}
               >
@@ -117,14 +117,14 @@ export function PlanningGantt() {
                       bottom: 0,
                       left: `${m.left}%`,
                       width: `${m.width}%`,
-                      borderLeft: "1px solid #D4DAD3",
+                      borderLeft: "1px solid #DDE1E6",
                       display: "flex",
                       alignItems: "center",
                       paddingLeft: 6,
                       fontFamily: FONT_NUM,
                       fontSize: 10.5,
                       fontWeight: 500,
-                      color: "#6B7780",
+                      color: "#5C6571",
                     }}
                   >
                     {m.label}
@@ -142,7 +142,7 @@ export function PlanningGantt() {
                   <div
                     onClick={clickGuard(() => toggle(g.id))}
                     className="row-hover"
-                    style={{ display: "flex", borderTop: "1px solid #EEF1EC", cursor: "pointer", background: isOpen ? "#F6F9F4" : "#fff" }}
+                    style={{ display: "flex", borderTop: "1px solid #F1F3F5", cursor: "pointer", background: isOpen ? "#F1F3F5" : "#fff" }}
                   >
                     <div
                       style={{
@@ -151,8 +151,8 @@ export function PlanningGantt() {
                         padding: "8px 14px",
                         position: "sticky",
                         left: 0,
-                        background: isOpen ? "#F6F9F4" : "#fff",
-                        borderRight: "1px solid #EEF1EC",
+                        background: isOpen ? "#F1F3F5" : "#fff",
+                        borderRight: "1px solid #F1F3F5",
                         minWidth: 0,
                         display: "flex",
                         gap: 8,
@@ -160,10 +160,10 @@ export function PlanningGantt() {
                         zIndex: 1,
                       }}
                     >
-                      <span style={{ color: "#97A1A8", fontSize: 10, width: 10, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▸</span>
+                      <span style={{ color: "#8B95A1", fontSize: 10, width: 10, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▸</span>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</div>
-                        <div style={{ fontSize: 10.5, color: "#6B7780", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <div style={{ fontSize: 10.5, color: "#5C6571", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {g.responsable} · {g.taskCount} tâches
                         </div>
                       </div>
@@ -177,7 +177,7 @@ export function PlanningGantt() {
                             position: "absolute",
                             top: 9,
                             height: 16,
-                            borderRadius: 1,
+                            borderRadius: 4,
                             left: `${g.left}%`,
                             width: `${g.width}%`,
                             background: `${g.color}1f`,
@@ -186,7 +186,7 @@ export function PlanningGantt() {
                           }}
                         >
                           <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.85 }} />
-                          <span style={{ position: "absolute", right: 5, top: 1, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 600, color: g.fill > 55 ? "#fff" : "#3B5560" }}>
+                          <span style={{ position: "absolute", right: 5, top: 1, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 600, color: g.fill > 55 ? "#fff" : "#3A424D" }}>
                             {g.progress}%
                           </span>
                         </div>
@@ -212,7 +212,7 @@ export function PlanningGantt() {
                               position: "sticky",
                               left: 0,
                               background: "#FBFCFA",
-                              borderRight: "1px solid #EEF1EC",
+                              borderRight: "1px solid #F1F3F5",
                               minWidth: 0,
                               display: "flex",
                               alignItems: "center",
@@ -223,7 +223,7 @@ export function PlanningGantt() {
                             <span title={s.assigneeInitials} style={{ width: 18, height: 18, borderRadius: "50%", background: s.color, color: "#fff", fontSize: 8.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                               {s.assigneeInitials}
                             </span>
-                            <span style={{ fontSize: 11.5, color: s.done ? "#97A1A8" : "#1A2329", textDecoration: s.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <span style={{ fontSize: 11.5, color: s.done ? "#8B95A1" : "#0E1217", textDecoration: s.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                               {s.name}
                             </span>
                           </div>
@@ -237,7 +237,7 @@ export function PlanningGantt() {
                                   position: "absolute",
                                   top: SUB_ROW_H / 2 - 5,
                                   height: 10,
-                                  borderRadius: 1,
+                                  borderRadius: 4,
                                   left: `${s.left}%`,
                                   width: `${s.width}%`,
                                   background: s.color,
@@ -311,12 +311,12 @@ function GridLines({ months }: { months: { left: number }[] }) {
   return (
     <>
       {months.map((m, i) => (
-        <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: `${m.left}%`, borderLeft: "1px solid #E6EAE6" }} />
+        <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: `${m.left}%`, borderLeft: "1px solid #ECEEF1" }} />
       ))}
     </>
   );
 }
 
 function TodayLine({ left }: { left: number }) {
-  return <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: "#A42421", left: `${left}%`, zIndex: 1 }} />;
+  return <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: "#1A7F37", left: `${left}%`, zIndex: 1 }} />;
 }

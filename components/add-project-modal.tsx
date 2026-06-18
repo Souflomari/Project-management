@@ -21,6 +21,10 @@ export function AddProjectModal() {
     if (created) router.push("/projets");
   }
 
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && canSubmit) { e.preventDefault(); handleSubmit(); }
+  };
+
   return (
     <Modal
       title="Nouveau projet"
@@ -35,10 +39,10 @@ export function AddProjectModal() {
       }
     >
       <label style={label}>Intitulé du projet</label>
-      <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="ex. Viaduc de la Loire — Lot 2" style={{ marginBottom: 14 }} />
+      <Input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={onEnter} placeholder="ex. Viaduc de la Loire — Lot 2" style={{ marginBottom: 14 }} />
 
       <label style={label}>Maître d&apos;ouvrage</label>
-      <Input value={newClient} onChange={(e) => setNewClient(e.target.value)} placeholder="ex. Département du Rhône" style={{ marginBottom: 14 }} />
+      <Input value={newClient} onChange={(e) => setNewClient(e.target.value)} onKeyDown={onEnter} placeholder="ex. Département du Rhône" style={{ marginBottom: 14 }} />
 
       <label style={{ ...label, marginBottom: 8 }}>Responsable</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>

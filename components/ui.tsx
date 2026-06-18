@@ -1,10 +1,28 @@
+"use client";
+
 // Shared primitive kit. One source of truth for buttons, inputs, cards, etc.
 // so divergent inline styles stop being expressible across views.
 
-import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import { useEffect, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
 
 import { CaretDownIcon, CloseIcon } from "./icons";
 import { C, R, SH, TX } from "@/lib/tokens";
+
+/** Make a clickable row keyboard-operable (WCAG 2.1.1). Spread onto the row;
+ *  add `className="row-hover row-focus"`. */
+export function rowProps(onActivate: () => void) {
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: onActivate,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onActivate();
+      }
+    },
+  };
+}
 
 // ───────────────────────────────────────── Button
 
@@ -83,7 +101,7 @@ export function IconButton({
         background: C.surface,
         borderRadius: R.sm,
         cursor: "pointer",
-        color: tone === "danger" ? "#A42421" : C.ink500,
+        color: tone === "danger" ? "#C5362C" : C.ink500,
         padding: 0,
         flexShrink: 0,
         transition: "background .12s, border-color .12s, color .12s",
@@ -258,6 +276,14 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div
       onClick={onClose}

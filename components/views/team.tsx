@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon } from "../icons";
 import { TeamMemberModal } from "../team-member-modal";
-import { Avatar, Button, Card, EmptyState, IconButton, Segmented, Toolbar } from "../ui";
+import { Avatar, Button, Card, EmptyState, IconButton, rowProps, Segmented, Toolbar } from "../ui";
 import { buildTeamLoad, type HeatBucket } from "@/lib/derive";
 import { MONS_LONG, MONTHS_FULL, monthRange, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
@@ -103,8 +103,8 @@ export function Team() {
                   {t.tasks.map((task, i) => (
                     <div
                       key={i}
-                      onClick={() => openProject(task.projectId)}
-                      className="row-hover"
+                      {...rowProps(() => openProject(task.projectId))}
+                      className="row-hover row-focus"
                       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", ...TX.caption, padding: "2px 4px", borderRadius: 4 }}
                     >
                       <div style={{ minWidth: 0 }}>
@@ -132,7 +132,8 @@ function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
     <div style={{ display: "flex", gap: 3 }}>
       {buckets.map((b, i) => {
         const bg = heatColor(b.pct);
-        const txt = b.pct === 0 ? C.ink400 : b.pct >= 50 ? "#fff" : C.ink700;
+        // White only on the dark/saturated cells (≥85%); ink keeps contrast on the light/medium greens.
+        const txt = b.pct === 0 ? C.ink400 : b.pct >= 85 ? "#fff" : C.ink800;
         return (
           <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${b.label} · ${b.days}/${b.capacity} j · ${b.pct}%`}>
             <div style={{ height: 30, borderRadius: 4, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>

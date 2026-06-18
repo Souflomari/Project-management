@@ -3,11 +3,11 @@
 import { useRouter } from "next/navigation";
 
 import { FlagIcon } from "../icons";
-import { Card, StatusPill } from "../ui";
+import { Card, rowProps, StatusPill } from "../ui";
 import { computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
 import { WEEK_SHORT } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, num, TX } from "@/lib/tokens";
+import { C, num, STATUS_META, TX } from "@/lib/tokens";
 
 const STALE_DAYS = 90;
 
@@ -34,7 +34,7 @@ export function Dashboard() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 16 }}>
         <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} />
         <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} />
-        <Kpi title="En retard" value={kpis.late} sub="action requise" color="#A42421" />
+        <Kpi title="En retard" value={kpis.late} sub="action requise →" color={STATUS_META["en retard"].color} onClick={kpis.late > 0 ? goLate : undefined} />
         <Card padding="14px 16px">
           <div style={{ fontSize: 11.5, color: C.ink500, fontWeight: 600 }}>Avancement moyen</div>
           <div style={{ ...num(32), marginTop: 6 }}>{kpis.avg}%</div>
@@ -65,8 +65,8 @@ export function Dashboard() {
           {upcoming.map((r) => (
             <div
               key={r.id}
-              onClick={() => openProject(r.id)}
-              className="row-hover"
+              {...rowProps(() => openProject(r.id))}
+              className="row-hover row-focus"
               style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", borderRadius: 4 }}
             >
               <div style={{ textAlign: "center", minWidth: 42 }}>
@@ -83,8 +83,8 @@ export function Dashboard() {
           ))}
           {staleCount > 0 ? (
             <div
-              onClick={goLate}
-              className="row-hover"
+              {...rowProps(goLate)}
+              className="row-hover row-focus"
               style={{ display: "flex", gap: 8, alignItems: "center", padding: "9px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", color: "#B4532E", fontSize: 12, fontWeight: 600, borderRadius: 4 }}
             >
               <FlagIcon size={14} />
@@ -99,8 +99,8 @@ export function Dashboard() {
           {alerts.map((a) => (
             <div
               key={a.id}
-              onClick={() => openProject(a.id)}
-              className="row-hover"
+              {...rowProps(() => openProject(a.id))}
+              className="row-hover row-focus"
               style={{ display: "flex", gap: 11, alignItems: "center", padding: "8px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", borderRadius: 4 }}
             >
               <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: a.statusColor }} />
@@ -117,12 +117,14 @@ export function Dashboard() {
   );
 }
 
-function Kpi({ title, value, sub, color }: { title: string; value: string | number; sub: string; color?: string }) {
+function Kpi({ title, value, sub, color, onClick }: { title: string; value: string | number; sub: string; color?: string; onClick?: () => void }) {
   return (
-    <Card padding="14px 16px">
-      <div style={{ fontSize: 11.5, color: C.ink500, fontWeight: 600 }}>{title}</div>
-      <div style={{ ...num(34), marginTop: 6, color }}>{value}</div>
-      <div style={{ fontSize: 11, color: C.ink400, marginTop: 6 }}>{sub}</div>
-    </Card>
+    <div {...(onClick ? { ...rowProps(onClick), className: "lift-hover row-focus" } : {})} style={onClick ? { borderRadius: 10, cursor: "pointer" } : undefined}>
+      <Card padding="14px 16px">
+        <div style={{ fontSize: 11.5, color: C.ink500, fontWeight: 600 }}>{title}</div>
+        <div style={{ ...num(34), marginTop: 6, color }}>{value}</div>
+        <div style={{ fontSize: 11, color: C.ink400, marginTop: 6 }}>{sub}</div>
+      </Card>
+    </div>
   );
 }

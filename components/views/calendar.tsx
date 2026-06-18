@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
-import { Button, IconButton, Modal, Segmented, Select, Toolbar } from "../ui";
+import { Button, IconButton, Modal, rowProps, Segmented, Select, Toolbar } from "../ui";
 import { buildMonthGrid, buildTaskEvents, eventsInRange, type TaskEvent } from "@/lib/derive";
 import { fmtFull, MONS_LONG, MONTHS_FULL, taskStartForEnd, toDate, WEEKDAYS, monthRange, weekRange } from "@/lib/format";
 import { useProjects, type CalMode } from "@/lib/store/projects-context";
@@ -130,10 +130,11 @@ function EventChip({ e, onOpen, dnd, compact }: { e: TaskEvent; onOpen: (id: num
       onDragStart={() => dnd.onStart(e)}
       onClick={(ev) => { ev.stopPropagation(); onOpen(e.projectId); }}
       title={`${e.projectName} — ${e.taskName} (${PHASES[e.phaseIndex]})`}
-      style={{ borderLeft: `3px solid ${e.color}`, background: C.canvas, borderRadius: 4, padding: "3px 6px", cursor: "grab", overflow: "hidden" }}
+      style={{ background: `${e.color}16`, borderRadius: 5, padding: "3px 7px", cursor: "grab", overflow: "hidden" }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: e.color, flexShrink: 0 }} />
+        <div style={{ flex: 1, fontSize: 11, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
         <span style={{ width: 5, height: 5, borderRadius: "50%", background: e.statusColor, flexShrink: 0 }} />
       </div>
       {!compact ? <div style={{ fontSize: 10.5, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.taskName}</div> : null}
@@ -228,8 +229,8 @@ function AgendaView({ year, month, events, onOpen }: { year: number; month: numb
           return (
             <div
               key={i}
-              onClick={() => onOpen(e.projectId)}
-              className="row-hover"
+              {...rowProps(() => onOpen(e.projectId))}
+              className="row-hover row-focus"
               style={{ display: "flex", gap: 14, alignItems: "center", padding: "10px 16px", borderTop: i ? `1px solid ${C.line}` : "none", cursor: "pointer" }}
             >
               <div style={{ textAlign: "center", minWidth: 44 }}>
