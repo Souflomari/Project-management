@@ -50,7 +50,7 @@ export function Header() {
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {item.key === "projets" ? (
           <div
-            className="ui-field"
+            className="ui-field header-search"
             style={{
               display: "flex",
               alignItems: "center",
@@ -76,7 +76,7 @@ export function Header() {
         ) : (
           <button
             onClick={openCommandPalette}
-            className="ui-field"
+            className="ui-field header-search"
             aria-label="Recherche rapide"
             style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.sm, padding: "0 10px 0 12px", height: 36, width: 240, color: C.ink400, cursor: "pointer", font: "inherit" }}
           >

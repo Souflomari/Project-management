@@ -90,7 +90,8 @@ export function ProjectsTable() {
         </div>
       ) : null}
 
-      <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden" }}>
+      <div className="table-scroll">
+      <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760 }}>
         <div
           style={{
             display: "grid",
@@ -172,6 +173,7 @@ export function ProjectsTable() {
             </div>
           </div>
         ) : null}
+      </div>
       </div>
     </>
   );

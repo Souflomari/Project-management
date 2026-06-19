@@ -64,7 +64,7 @@ export function Team() {
         Charge sur <strong style={{ color: C.ink500, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · répartition {teamMode === "semaine" ? "par jour" : "par semaine"} · la ligne = 100&#8239;% (pleine capacité)
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))", gap: 18 }}>
         {loads.map((t) => {
           const c = chargeColor(t.chargePct);
           const isRef = referenced.has(t.member.id);

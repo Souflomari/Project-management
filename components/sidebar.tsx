@@ -17,6 +17,7 @@ export function Sidebar() {
 
   return (
     <aside
+      className="app-sidebar"
       style={{
         width: 232,
         flexShrink: 0,
@@ -31,10 +32,11 @@ export function Sidebar() {
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 19, fontWeight: 600, fontFamily: FONT_DISPLAY, letterSpacing: "-.02em", color: C.ink900, padding: "2px 10px 0" }}>
-        <span>setec</span>
+        <span className="rail-hide">setec</span>
+        <span className="rail-only" style={{ fontFamily: FONT_DISPLAY }}>s</span>
         <span style={{ color: C.brandDot }}>.</span>
       </div>
-      <div style={{ fontSize: 11.5, color: C.ink500, fontWeight: 440, padding: "2px 10px 22px" }}>Direction technique</div>
+      <div className="rail-hide" style={{ fontSize: 11.5, color: C.ink500, fontWeight: 440, padding: "2px 10px 22px" }}>Direction technique</div>
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {NAV_ITEMS.map((item) => {
@@ -44,7 +46,8 @@ export function Sidebar() {
             <Link
               key={item.key}
               href={item.href}
-              className={active ? undefined : "nav-hover"}
+              title={item.label}
+              className={`app-nav-link${active ? "" : " nav-hover"}`}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -61,30 +64,30 @@ export function Sidebar() {
               <span style={{ color: active ? C.ink700 : C.ink500, display: "flex" }}>
                 <Icon />
               </span>
-              {item.label}
+              <span className="rail-hide">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* quiet live-week context */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 10px 0", color: C.ink500, fontSize: 12 }}>
+      <div className="rail-hide" style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 10px 0", color: C.ink500, fontSize: 12 }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.brandDot, flexShrink: 0 }} />
         Semaine {WEEK_SHORT}
       </div>
 
       <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, padding: "16px 10px 4px", borderTop: `1px solid ${C.line}` }}>
-        <div style={{ width: 30, height: 30, borderRadius: "50%", background: C.subtle, border: `1px solid ${C.line}`, color: C.ink700, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12 }}>
+        <div title="P. Dubois · Directrice de projets" style={{ width: 30, height: 30, borderRadius: "50%", background: C.subtle, border: `1px solid ${C.line}`, color: C.ink700, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
           PD
         </div>
-        <div style={{ minWidth: 0 }}>
+        <div className="rail-hide" style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 540, color: C.ink900 }}>P. Dubois</div>
           <div style={{ fontSize: 11.5, color: C.ink500 }}>Directrice de projets</div>
         </div>
       </div>
 
       {serverBacked ? (
-        <form action={signOutAction} style={{ padding: "4px 10px 0" }}>
+        <form action={signOutAction} className="rail-hide" style={{ padding: "4px 10px 0" }}>
           <button type="submit" className="nav-hover" style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: C.ink500, fontSize: 12, fontWeight: 450, padding: "6px 10px", borderRadius: R.sm }}>
             Se déconnecter
           </button>

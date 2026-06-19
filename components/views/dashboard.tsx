@@ -51,9 +51,9 @@ export function Dashboard() {
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr 1fr", gap: 14, marginBottom: 20 }}>
+      <div className="dash-top" style={{ marginBottom: 20 }}>
         {/* portfolio-health hero (spans both rows) */}
-        <div style={{ gridRow: "span 2" }}>
+        <div className="dash-hero">
           <Card padding="18px 20px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
             <div style={{ ...TX.overline, color: C.ink400 }}>Santé du portefeuille</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
@@ -104,7 +104,7 @@ export function Dashboard() {
         <Kpi title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} onClick={() => goProjects("all")} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, alignItems: "start" }}>
+      <div className="dash-bottom" style={{ alignItems: "start" }}>
         <Card padding="6px 20px 14px">
           <h2 style={{ ...TX.h2, margin: "14px 0 6px", display: "flex", alignItems: "baseline", gap: 8 }}>
             Prochains rendus <span style={{ ...num(13), color: C.ink400 }}>{upcoming.length}</span>
