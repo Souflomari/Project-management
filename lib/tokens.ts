@@ -87,13 +87,19 @@ export const R = { none: 0, xxs: 4, xs: 6, sm: 8, md: 10, lg: 14, xl: 18, xxl: 2
 /** 4px-based spacing scale. Use instead of ad-hoc inline magic numbers. */
 export const SP = { 0: 0, 1: 2, 2: 4, 3: 8, 4: 12, 5: 16, 6: 20, 7: 24, 8: 32, 9: 40, 10: 48, 11: 64 } as const;
 
-// Soft, low-contrast elevation. Surfaces mostly rest borderless-or-bordered with
-// no shadow; shadow appears on lift / overlays only.
+// Monotonic two-layer elevation: every tier pairs a tight contact shadow (low y,
+// low blur) with a soft key shadow (higher y, large blur, negative spread), one
+// constant top-light direction. The resting `sm` is now actually visible so cards
+// read as raised on the white field instead of painted-on. `overlay` is the
+// deepest tier reserved for modal / drawer / command-palette / toast — nothing
+// in-canvas (incl. hover) should reach it, so the elevation hierarchy stays legible.
 export const SH = {
-  sm: "0 1px 2px rgba(28,25,23,.04)",
-  md: "0 4px 16px -4px rgba(28,25,23,.10), 0 2px 4px -2px rgba(28,25,23,.06)",
-  lg: "0 16px 48px -12px rgba(28,25,23,.18), 0 4px 12px -4px rgba(28,25,23,.08)",
-  drawer: "-12px 0 40px -16px rgba(28,25,23,.18)",
+  xs: "0 1px 1px rgba(28,25,23,.04), 0 1px 2px -1px rgba(28,25,23,.05)",
+  sm: "0 1px 2px rgba(28,25,23,.05), 0 2px 6px -1px rgba(28,25,23,.06)",
+  md: "0 2px 4px -1px rgba(28,25,23,.06), 0 8px 20px -4px rgba(28,25,23,.10)",
+  lg: "0 4px 8px -2px rgba(28,25,23,.07), 0 16px 36px -8px rgba(28,25,23,.14)",
+  overlay: "0 8px 16px -6px rgba(28,25,23,.10), 0 28px 60px -16px rgba(28,25,23,.22)",
+  drawer: "-16px 0 48px -24px rgba(28,25,23,.22), -1px 0 1px rgba(28,25,23,.05)",
   // brand-green focus ring with a white gap — solid green clears the WCAG 2.4.11
   // ≥3:1 indicator-contrast bar (the prior .20-alpha wash was ~1.3:1, invisible).
   focus: "0 0 0 2px #FFFFFF, 0 0 0 4px #15803D",
@@ -143,7 +149,21 @@ export const EASE = {
   emphasized: "cubic-bezier(.05,.7,.1,1)", // expressive enter
   out: "cubic-bezier(.2,.7,.2,1)", // the existing pop curve — keep
 } as const;
-export const DUR = { fast: "120ms", base: "180ms", slow: "260ms" } as const;
+export const DUR = { fast: "120ms", base: "180ms", slow: "260ms", slower: "400ms" } as const;
+
+/** Spring presets for framer-motion (the house physics). One source so every
+ *  layout/hover/gesture animation shares feel instead of inline-tuned springs. */
+export const SPRING = {
+  snappy: { type: "spring", stiffness: 380, damping: 30 },
+  gentle: { type: "spring", stiffness: 220, damping: 26 },
+  bouncy: { type: "spring", stiffness: 500, damping: 28 },
+} as const;
+
+/** Stacking order — one governed ladder so overlays never collide ad-hoc. */
+export const Z = { base: 0, sticky: 30, drawer: 60, modal: 70, palette: 80, toast: 90 } as const;
+
+/** Comfortable reading measure for running text (comments, descriptions). */
+export const MEASURE = "66ch";
 
 // ── Elevation (tone-first) ───────────────────────────────────────────────────
 // M3 expresses elevation primarily as surface TONE; we add a whisper of shadow
