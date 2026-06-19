@@ -11,8 +11,7 @@ body {
 body {
   background: #ffffff;
   color: #1c1917;
-  font-family: var(--font-ui), system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-feature-settings: "cv11", "ss01";
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -132,8 +131,14 @@ textarea::placeholder {
   outline: none;
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.22);
 }
+.btn {
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s var(--ease-standard), box-shadow 0.12s;
+}
+.btn:hover {
+  transform: translateY(-1px);
+}
 .btn:active {
-  transform: translateY(0.5px);
+  transform: scale(0.96);
 }
 .btn-primary:hover {
   background: var(--c-solid-hover) !important;
@@ -292,15 +297,33 @@ select:focus-visible,
   }
 }
 
+/* ---- route transition ----
+   Every view fades + rises on navigation (app/(app)/template.tsx remounts per
+   route). No `forwards`: the transform clears when done, so it never breaks a
+   fixed-position modal opened later within the view. */
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-enter {
+  animation: pageIn 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
 /* ---- content enter motion ----
-   Lists, grids and cards rise in on mount instead of snapping into place.
-   `.enter-rise` animates a single element; `.enter-stagger > *` cascades its
-   direct children. Stagger is capped so long lists don't crawl in. Motion is
-   neutralised by the prefers-reduced-motion block above. */
+   Lists, grids and cards rise + settle in on mount instead of snapping into
+   place. `.enter-rise` animates a single element; `.enter-stagger > *` cascades
+   its direct children. Bolder than a hairline nudge so the motion actually
+   reads. Neutralised by the prefers-reduced-motion block above. */
 @keyframes riseIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(14px) scale(0.985);
   }
   to {
     opacity: 1;
@@ -308,20 +331,21 @@ select:focus-visible,
   }
 }
 .enter-rise {
-  animation: riseIn var(--dur-base) var(--ease-decel) both;
+  animation: riseIn 0.5s var(--ease-decel) both;
 }
 .enter-stagger > * {
-  animation: riseIn var(--dur-base) var(--ease-decel) both;
+  animation: riseIn 0.5s var(--ease-decel) both;
 }
-.enter-stagger > *:nth-child(1) { animation-delay: 0ms; }
-.enter-stagger > *:nth-child(2) { animation-delay: 30ms; }
-.enter-stagger > *:nth-child(3) { animation-delay: 60ms; }
-.enter-stagger > *:nth-child(4) { animation-delay: 90ms; }
-.enter-stagger > *:nth-child(5) { animation-delay: 120ms; }
-.enter-stagger > *:nth-child(6) { animation-delay: 150ms; }
-.enter-stagger > *:nth-child(7) { animation-delay: 175ms; }
-.enter-stagger > *:nth-child(8) { animation-delay: 200ms; }
-.enter-stagger > *:nth-child(n + 9) { animation-delay: 220ms; }
+.enter-stagger > *:nth-child(1) { animation-delay: 40ms; }
+.enter-stagger > *:nth-child(2) { animation-delay: 85ms; }
+.enter-stagger > *:nth-child(3) { animation-delay: 130ms; }
+.enter-stagger > *:nth-child(4) { animation-delay: 175ms; }
+.enter-stagger > *:nth-child(5) { animation-delay: 220ms; }
+.enter-stagger > *:nth-child(6) { animation-delay: 265ms; }
+.enter-stagger > *:nth-child(7) { animation-delay: 305ms; }
+.enter-stagger > *:nth-child(8) { animation-delay: 340ms; }
+.enter-stagger > *:nth-child(9) { animation-delay: 370ms; }
+.enter-stagger > *:nth-child(n + 10) { animation-delay: 395ms; }
 
 /* ---- card hover lift ----
    Cards on the unified white field gain depth on hover (a small rise + a softer

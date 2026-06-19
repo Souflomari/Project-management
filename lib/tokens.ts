@@ -2,11 +2,12 @@ import type { CSSProperties } from "react";
 
 import type { Status } from "./types";
 
-/** Body / UI text — Hanken Grotesk (clean, legible at dense sizes). Headings &
- *  figures — Space Grotesk (precise, technical face with mono-derived numerals). */
-export const FONT_UI = "var(--font-ui), system-ui, -apple-system, 'Segoe UI', sans-serif";
-export const FONT_DISPLAY = "var(--font-display), var(--font-ui), system-ui, -apple-system, sans-serif";
-export const FONT_NUM = FONT_DISPLAY;
+/** Geist for everything — one cohesive, premium grotesk. Hierarchy comes from
+ *  size + weight, not a second face. Geist has first-class tabular numerals, so
+ *  the display/number roles share the family. */
+export const FONT_UI = "var(--font-geist-sans), system-ui, -apple-system, 'Segoe UI', sans-serif";
+export const FONT_DISPLAY = FONT_UI;
+export const FONT_NUM = FONT_UI;
 
 // ───────────────────────────────────────────────── design tokens
 //
@@ -156,11 +157,11 @@ export const TX: Record<
   | "overline" | "eyebrow",
   CSSProperties
 > = {
-  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.06 },
-  display: { fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 600, letterSpacing: "-.018em", lineHeight: 1.12 },
-  h1: { fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.2 },
-  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, letterSpacing: "-.012em", lineHeight: 1.22 },
-  h2: { fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, letterSpacing: "-.01em", lineHeight: 1.3 },
+  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 600, letterSpacing: "-.027em", lineHeight: 1.05 },
+  display: { fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 600, letterSpacing: "-.024em", lineHeight: 1.1 },
+  h1: { fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.18 },
+  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, letterSpacing: "-.018em", lineHeight: 1.2 },
+  h2: { fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.28 },
   bodyLg: { fontSize: 15, fontWeight: 450, lineHeight: 1.55 },
   body: { fontSize: 14, fontWeight: 450, lineHeight: 1.55 },
   bodyStrong: { fontSize: 14, fontWeight: 560, lineHeight: 1.5 },
@@ -173,10 +174,10 @@ export const TX: Record<
   eyebrow: { fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", lineHeight: 1.3 },
 };
 
-/** Tabular numeric display (Space Grotesk). Its numerals are wide and even, so
- *  only a whisper of negative tracking — heavy tracking would cramp them. */
+/** Tabular numeric display (Geist). Geist's figures are even and well-spaced;
+ *  a slight negative tracking tightens large readouts without cramping. */
 export function num(size: number): CSSProperties {
-  return { fontFamily: FONT_NUM, fontWeight: 540, lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-.01em", fontSize: size };
+  return { fontFamily: FONT_NUM, fontWeight: 560, lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-.02em", fontSize: size };
 }
 
 export interface StatusMeta {

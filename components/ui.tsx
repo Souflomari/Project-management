@@ -4,6 +4,7 @@
 // so divergent inline styles stop being expressible across views.
 
 import { useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
+import { motion } from "motion/react";
 
 import { CaretDownIcon, CheckIcon, CloseIcon } from "./icons";
 import { C, ELEV, num, PHASE_COLORS, R, SH, SP, SURFACE, TX } from "@/lib/tokens";
@@ -348,14 +349,18 @@ export function Card({
 }) {
   // On the unified white field, cards read by a hairline border + a soft resting
   // shadow (depth comes from light, not tone). `elevation` deepens the shadow for
-  // hero/overlay surfaces. All cards lift on hover (`.card-lift`) so the surface
-  // feels physical and responsive.
+  // hero/overlay surfaces. Cards lift on hover with a spring (framer-motion) so
+  // the surface feels physical and responsive.
   const lift = elevation > 0 ? ELEV[elevation] : { background: C.surface, boxShadow: SH.sm };
   const border = elevation > 0 ? `1px solid ${C.lineStrong}` : `1px solid ${C.line}`;
   return (
-    <div className="card-lift" style={{ background: C.surface, border, borderRadius: radius, padding, ...lift, ...style }}>
+    <motion.div
+      whileHover={{ y: -4, boxShadow: SH.lg }}
+      transition={{ type: "spring", stiffness: 380, damping: 28 }}
+      style={{ background: C.surface, border, borderRadius: radius, padding, ...lift, ...style }}
+    >
       {children}
-    </div>
+    </motion.div>
   );
 }
 

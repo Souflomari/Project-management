@@ -1,26 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Hanken_Grotesk, Space_Grotesk } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 
 import "./globals.css";
 import { tokenCssVars } from "@/lib/tokens";
 
-// Self-hosted at build time (no runtime CDN dependency) — fonts always load.
-// UI/body: Hanken Grotesk — a clean, neutral grotesk that stays legible at the
-// dense small sizes the tables and gantt use. Display/figures: Space Grotesk —
-// a precise, technical face (mono-derived numerals) that gives the engineering
-// product a distinctive, confident voice. Both loaded as VARIABLE fonts so the
-// in-between weights in the type scale render for real.
-const fontUi = Hanken_Grotesk({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-ui",
-});
-
-const fontDisplay = Space_Grotesk({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-display",
-});
+// Geist — Vercel's product typeface: a clean, modern, neutral grotesk built for
+// dense UIs, with excellent tabular numerals. Used for both UI/body and the
+// display/figure roles (hierarchy carried by size + weight, not a second face),
+// for a cohesive, premium, non-quirky voice. Self-hosted via the `geist` package
+// (defines the --font-geist-sans variable that the token layer points at).
 
 export const metadata: Metadata = {
   title: {
@@ -47,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={`${fontUi.variable} ${fontDisplay.variable}`}>
+    <html lang="fr" className={GeistSans.variable}>
       <head>
         {/* design-token bridge: projects lib/tokens onto :root custom properties */}
         <style dangerouslySetInnerHTML={{ __html: tokenCssVars() }} />
