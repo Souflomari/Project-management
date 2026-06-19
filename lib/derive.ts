@@ -241,6 +241,15 @@ export interface GanttRow {
   id: number;
   name: string;
   responsable: string;
+  client: string;
+  discipline: string;
+  responsableInitials: string;
+  responsableColor: string;
+  responsableRole: string;
+  statusColor: string;
+  statusBg: string;
+  statusLabel: string;
+  phaseLabel: string;
   progress: number;
   taskCount: number;
   left: number;
@@ -304,6 +313,15 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
       id: p.id,
       name: p.name,
       responsable: p.responsable.name,
+      client: p.client,
+      discipline: p.discipline,
+      responsableInitials: p.responsable.initials,
+      responsableColor: p.responsable.color,
+      responsableRole: p.responsable.role,
+      statusColor: p.statusColor,
+      statusBg: p.statusBg,
+      statusLabel: p.statusLabel,
+      phaseLabel: p.phaseLabel,
       progress: p.progress,
       taskCount: p.subtasks.length,
       left: g.left,

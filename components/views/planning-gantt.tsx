@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
 import { ChevronRightIcon } from "../icons";
-import { Avatar, Button, Segmented } from "../ui";
+import { Avatar, Button, Segmented, StatusPill } from "../ui";
 import { buildGantt, type GanttBar, type GanttRow } from "@/lib/derive";
 import { fmtShort, shiftISO, toDate, workingDaysBetween } from "@/lib/format";
 import type { SubtaskPatch } from "@/lib/data/repository";
@@ -12,8 +12,9 @@ import { useProjects } from "@/lib/store/projects-context";
 import { toast } from "@/lib/toast";
 import { C, FONT_NUM, R, SH, TX } from "@/lib/tokens";
 
-const LEFT_W = 250;
-const SUB_ROW_H = 28;
+const LEFT_W = 324;
+const PROJ_ROW_H = 48;
+const SUB_ROW_H = 30;
 
 function Legend() {
   return (
@@ -23,8 +24,8 @@ function Legend() {
         avancement
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, borderRadius: 2, background: `${C.ink700}1f`, border: `1px solid ${C.ink700}55` }} />
-        durée
+        <span style={{ width: 16, height: 9, borderRadius: 2, background: `${C.ink700}14`, border: `1px solid ${C.ink700}40` }} />
+        durée planifiée
       </span>
     </span>
   );
@@ -198,20 +199,22 @@ export function PlanningGantt() {
                         borderRight: `1px solid ${C.line}`,
                         minWidth: 0,
                         display: "flex",
-                        gap: 8,
+                        gap: 9,
                         alignItems: "center",
                         zIndex: 1,
                       }}
                     >
                       <span style={{ color: C.ink400, display: "flex", flexShrink: 0, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .12s" }}><ChevronRightIcon size={14} /></span>
+                      <Avatar initials={g.responsableInitials} color={g.responsableColor} size={28} fontSize={11} title={`${g.responsable} · ${g.responsableRole}`} />
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ ...TX.bodyStrong, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</div>
-                        <div style={{ ...TX.nano, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {g.responsable} · {g.taskCount} tâches
+                        <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</div>
+                        <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {g.client} · {g.discipline}
                         </div>
                       </div>
+                      <StatusPill color={g.statusColor} bg={g.statusBg} label={g.statusLabel} filled />
                     </div>
-                    <div style={{ flex: 1, position: "relative", height: 34, ...weekGrid }}>
+                    <div style={{ flex: 1, position: "relative", height: PROJ_ROW_H, ...weekGrid }}>
                       <GridLines months={months} />
                       <TodayLine left={todayLeft} />
                       <ProjectBar g={g} spanDays={spanDays} onCommit={updateProject} />
@@ -232,7 +235,7 @@ export function PlanningGantt() {
                             style={{
                               width: LEFT_W,
                               flexShrink: 0,
-                              padding: "0 14px 0 32px",
+                              padding: "0 14px 0 37px",
                               position: "sticky",
                               left: 0,
                               background: C.canvas,
@@ -363,13 +366,13 @@ function ProjectBar({ g, spanDays, onCommit }: { g: GanttRow; spanDays: number; 
       onPointerUp={onUp}
       title={`${g.name} — glisser pour déplacer · bord droit pour l'échéance`}
       style={{
-        position: "absolute", top: 9, height: 16, borderRadius: R.xxs, left: `${left}%`, width: `${width}%`, minWidth: 10,
-        background: `${g.color}1f`, border: `1px solid ${g.color}66`, overflow: "visible",
+        position: "absolute", top: (PROJ_ROW_H - 18) / 2, height: 18, borderRadius: R.xs, left: `${left}%`, width: `${width}%`, minWidth: 12,
+        background: `${g.color}14`, border: `1px solid ${g.color}40`, overflow: "visible",
         cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined, zIndex: drag ? 5 : undefined,
       }}
     >
-      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.85, borderRadius: `${R.xxs}px 0 0 ${R.xxs}px` }} />
-      <span style={{ position: "absolute", right: 5, top: 1, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 600, color: g.fill > 55 ? "#fff" : C.ink700 }}>
+      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.9, borderRadius: `${R.xs}px 0 0 ${R.xs}px` }} />
+      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 10.5, fontWeight: 600, color: g.fill > 55 ? "#fff" : C.ink700 }}>
         {g.progress}%
       </span>
       {drag ? <DatePill text={drag.mode === "move" ? `${fmtShort(pStart)} → ${fmtShort(pEnd)}` : fmtShort(pEnd)} /> : null}
@@ -440,7 +443,7 @@ function SubtaskBar({ projectId, s, spanDays, onCommit }: { projectId: number; s
       onPointerUp={onUp}
       title={`${s.name} — glisser pour déplacer · bord droit pour la durée`}
       style={{
-        position: "absolute", top: SUB_ROW_H / 2 - 6, height: 12, borderRadius: R.xxs,
+        position: "absolute", top: SUB_ROW_H / 2 - 6, height: 12, borderRadius: R.xs,
         left: `${left}%`, width: `${width}%`, minWidth: 8, background: s.color, opacity: s.done ? 0.5 : 0.95,
         cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined, zIndex: drag ? 5 : undefined,
       }}
