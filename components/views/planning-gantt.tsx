@@ -124,29 +124,28 @@ export function PlanningGantt() {
           style={{
             background: C.surface,
             border: `1px solid ${C.line}`,
-            borderRadius: R.sm,
+            borderRadius: R.lg,
             overflow: "auto",
             maxHeight: "calc(100vh - 215px)",
           }}
         >
           <div style={{ minWidth: LEFT_W + timelineW }}>
             {/* month header (sticky) */}
-            <div style={{ display: "flex", borderBottom: `1px solid ${C.lineStrong}`, position: "sticky", top: 0, background: C.subtle, zIndex: 4 }}>
+            <div style={{ display: "flex", borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: C.subtle, zIndex: 4 }}>
               <div
                 style={{
                   width: LEFT_W,
                   flexShrink: 0,
-                  padding: "7px 14px",
-                  fontSize: 10,
-                  letterSpacing: ".07em",
-                  textTransform: "uppercase",
-                  color: C.ink500,
-                  fontWeight: 700,
+                  padding: "8px 14px",
+                  ...TX.overline,
+                  color: C.ink400,
                   position: "sticky",
                   left: 0,
                   background: C.subtle,
-                  borderRight: `1px solid ${C.lineStrong}`,
+                  borderRight: `1px solid ${C.line}`,
                   zIndex: 1,
+                  display: "flex",
+                  alignItems: "center",
                 }}
               >
                 Projet · responsable
@@ -186,7 +185,7 @@ export function PlanningGantt() {
                   <div
                     onClick={clickGuard(() => toggle(g.id))}
                     className="row-hover"
-                    style={{ display: "flex", borderTop: `1px solid ${C.subtle}`, cursor: "pointer", background: isOpen ? C.subtle : C.surface }}
+                    style={{ display: "flex", borderTop: `1px solid ${C.line}`, cursor: "pointer", background: isOpen ? C.subtle : C.surface }}
                   >
                     <div
                       style={{
@@ -196,7 +195,7 @@ export function PlanningGantt() {
                         position: "sticky",
                         left: 0,
                         background: isOpen ? C.subtle : C.surface,
-                        borderRight: `1px solid ${C.subtle}`,
+                        borderRight: `1px solid ${C.line}`,
                         minWidth: 0,
                         display: "flex",
                         gap: 8,
@@ -237,7 +236,7 @@ export function PlanningGantt() {
                               position: "sticky",
                               left: 0,
                               background: C.canvas,
-                              borderRight: `1px solid ${C.subtle}`,
+                              borderRight: `1px solid ${C.line}`,
                               minWidth: 0,
                               display: "flex",
                               alignItems: "center",
@@ -267,9 +266,9 @@ export function PlanningGantt() {
         </div>
 
         {/* horizontal scroll cues */}
-        <div style={{ position: "absolute", top: 1, right: 1, bottom: 1, width: 36, pointerEvents: "none", background: "linear-gradient(to right, rgba(255,255,255,0), #fff)", borderRadius: "0 6px 6px 0" }} />
+        <div style={{ position: "absolute", top: 1, right: 1, bottom: 1, width: 36, pointerEvents: "none", background: `linear-gradient(to right, rgba(255,255,255,0), ${C.surface})`, borderRadius: `0 ${R.lg - 1}px ${R.lg - 1}px 0` }} />
         {scrollLeft > 4 ? (
-          <div style={{ position: "absolute", top: 1, left: LEFT_W + 1, bottom: 1, width: 28, pointerEvents: "none", background: "linear-gradient(to left, rgba(255,255,255,0), #fff)" }} />
+          <div style={{ position: "absolute", top: 1, left: LEFT_W + 1, bottom: 1, width: 28, pointerEvents: "none", background: `linear-gradient(to left, rgba(255,255,255,0), ${C.surface})` }} />
         ) : null}
       </div>
     </>
