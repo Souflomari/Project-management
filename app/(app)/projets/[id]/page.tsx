@@ -12,7 +12,7 @@ import {
   ProjectTasks,
 } from "@/components/project-detail";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, R, SH, TX } from "@/lib/tokens";
+import { C, R, TX } from "@/lib/tokens";
 
 // Main-column tabs (the right rail — properties + EVM — is always visible).
 const TABS = [
@@ -93,7 +93,7 @@ export default function ProjectPage() {
                   tabIndex={active ? 0 : -1}
                   onClick={() => selectTab(t.key)}
                   onKeyDown={(e) => onTabKey(e, i)}
-                  className="soft-hover"
+                  className="btn"
                   style={{
                     ...TX.bodyStrong,
                     fontSize: 13.5,
@@ -124,7 +124,9 @@ export default function ProjectPage() {
             grouped by whitespace and divided by a single hairline rule rather
             than two competing bordered+shadowed boxes (box-in-box → calm list). */}
         <aside>
-          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.sm, padding: "20px 20px 22px" }}>
+          {/* Static rail reads by a single hairline on the white field — no
+              resting shadow (data-ink: depth is reserved for genuine lift). */}
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, padding: "20px 20px 22px" }}>
             <RailSection title="Propriétés">
               <ProjectProperties p={p} />
             </RailSection>

@@ -277,15 +277,17 @@ export function chargeColor(pct: number): string {
   }
 }
 
-/** Heatmap cell colour by load % — minimalism: a single-hue green intensity ramp
- *  (neutral → green) while within capacity, then ONE red for over-capacity. No
- *  sage→terracotta multi-warmth. */
+/** Heatmap cell colour by load % — Von Restorff: keep within-capacity cells
+ *  QUIET (a low-chroma neutral→soft-green intensity, so a healthy team reads as
+ *  calm, not a green field) and let ONLY the genuine over-capacity weeks carry a
+ *  muted clay alert that actually pops. The cell's % figure carries the precise
+ *  load; colour is reinforcement for the exception, not decoration on every cell. */
 export function heatColor(pct: number): string {
-  if (pct <= 0) return "#F1F0ED";
-  if (pct < 50) return "#E6EFE8";
-  if (pct < 85) return "#CBDDCF";
-  if (pct <= 100) return "#A9C8AF"; // full but within capacity
-  return "#C56B53"; // over capacity → single muted red (matches chargeColor over/crit)
+  if (pct <= 0) return "#F4F3F1"; // empty — neutral well
+  if (pct < 50) return "#ECEDEA"; // light load — near-neutral
+  if (pct < 85) return "#DDE5DC"; // moderate — faint green-grey
+  if (pct <= 100) return "#C4D4C5"; // at capacity — the clearest (still soft) green
+  return "#CC7E68"; // over capacity → ONE muted clay (matches chargeColor over/crit)
 }
 
 // ── CSS-variable bridge ──────────────────────────────────────────────────────

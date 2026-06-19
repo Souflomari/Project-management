@@ -21,18 +21,20 @@ const MAX_LEFT_W = 560;
 
 const DAY = 86_400_000;
 
-// Calm bar fill: a single ink/neutral tint for every task bar. Assignee identity
-// is already carried by the avatar in the left cell, so the bar itself does not
-// need per-person colour — that only turns the timeline into a rainbow. Colour is
-// reserved for the two states that carry meaning: critical path and done.
-const BAR_INK = C.ink700; // resting bar fill (mono, calm)
-const BAR_TRACK = C.subtle; // unfilled remainder of the bar
+// Unified colour system: GREEN (C.brand) is the SINGLE accent — brand + progress
+// + active/healthy. Everything else is warm neutral (tracks, structure). Assignee
+// identity is carried by the left-cell avatar, so bars stay mono: a light neutral
+// track with a green progress fill. No per-person rainbow, no near-black fill.
+const BAR_TRACK = C.subtle; // unfilled remainder / resting track (light neutral)
+const PROGRESS = C.brand; // green progress fill (the one accent = active/positive)
+const DONE_FILL = C.ink300; // "done" recedes to a receded neutral (+ check + hatch)
 
-// Critical-path treatment: ONE restrained ink accent (near-black), NOT a
-// saturated indigo and NOT danger red (red already means "late"). A slightly
-// darker fill + a quiet 1px ink ring reads as "structurally critical" without
-// competing with the late semantics or shouting on the timeline.
-const CP_ACCENT = C.ink900;
+// Critical-path treatment: criticality is STRUCTURAL, carried by ONE restrained
+// ink hairline ring — never by a black fill or a saturated colour. The fill stays
+// green/neutral per the rules above (green = active); the ring marks "on the
+// critical path" without competing with the green-means-progress language or the
+// red-means-late semantics.
+const CP_RING = C.ink900;
 
 type Zoom = "fit" | "trimestre" | "mois" | "semaine" | "jour";
 type ColKey = "debut" | "fin" | "duree" | "marge" | "avancement";
@@ -155,16 +157,19 @@ function Legend() {
   const swatch = { width: 14, height: 8, borderRadius: 2, flexShrink: 0 } as const;
   return (
     <span style={{ ...TX.nano, color: C.ink500, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      {/* avancement = the green progress fill on its light neutral track (mirrors a bar). */}
       <span style={item}>
-        <span style={{ ...swatch, background: BAR_INK }} />
+        <span style={{ ...swatch, background: BAR_TRACK, border: `1px solid ${C.line}`, overflow: "hidden", position: "relative" }}>
+          <span style={{ position: "absolute", inset: 0, width: "60%", background: PROGRESS }} />
+        </span>
         avancement
       </span>
+      {/* chemin critique = a neutral bar carried by the ONE ink hairline ring (no fill colour). */}
       <span style={item}>
-        {/* CP = the one restrained ink ring; legend mirrors the bar exactly (no
-            redundant double-ink). */}
-        <span style={{ ...swatch, background: CP_ACCENT }} />
+        <span style={{ ...swatch, background: BAR_TRACK, border: `1.5px solid ${CP_RING}` }} />
         chemin critique
       </span>
+      {/* marge = the dashed ghost extension (mirrors the float ghost exactly). */}
       <span style={item}>
         <span style={{ ...swatch, background: `repeating-linear-gradient(90deg, ${C.ink350}55 0 3px, transparent 3px 6px)`, border: `1px dashed ${C.ink350}` }} />
         marge
@@ -342,7 +347,7 @@ export function PlanningGantt() {
                   onMouseLeave={() => setColsOpen(false)}
                 >
                   {ALL_COLS.map((c) => (
-                    <label key={c.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", cursor: "pointer", ...TX.caption, color: C.ink700, borderRadius: R.xs }}>
+                    <label key={c.key} className="soft-hover" style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", cursor: "pointer", ...TX.caption, color: C.ink700, borderRadius: R.xs }}>
                       <input type="checkbox" checked={cols.has(c.key)} onChange={() => toggleCol(c.key)} />
                       {c.label}
                     </label>
@@ -513,7 +518,7 @@ function ProjectLeftCell({ g, isOpen, leftW, cols, cpCount }: { g: GanttRow; isO
             // Collapsed CP hint — quiet tinted chip (no second hard border); the
             // bar's ring is the primary CP signal, this just surfaces it on a
             // folded row.
-            <span title={`${cpCount} tâche(s) sur le chemin critique`} style={{ ...TX.nano, fontWeight: 600, color: CP_ACCENT, background: C.subtle, borderRadius: R.xxs, padding: "0 5px", lineHeight: "15px", flexShrink: 0 }}>CC</span>
+            <span title={`${cpCount} tâche(s) sur le chemin critique`} style={{ ...TX.nano, fontWeight: 600, color: C.ink700, background: C.subtle, boxShadow: `inset 0 0 0 1px ${CP_RING}`, borderRadius: R.xxs, padding: "0 5px", lineHeight: "15px", flexShrink: 0 }}>CC</span>
           ) : null}
         </div>
         <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -777,20 +782,22 @@ function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: Gantt
       animate={drag ? false : { left: `${left}%`, width: `${width}%` }}
       transition={SPRING.snappy}
       style={{
-        // Calm neutral track + ink progress fill. Status is carried by the pill in
-        // the left cell, so the bar itself stays mono. Critical projects get ONE
-        // restrained ink ring — no saturated tint, no second border colour.
+        // Light neutral track + GREEN progress fill (the one accent). Status is
+        // carried by the pill in the left cell, so the bar stays mono otherwise.
+        // Critical projects get ONE restrained ink hairline ring (the border) —
+        // no black fill, no saturated tint; the ring carries criticality.
         position: "absolute", top: (PROJ_ROW_H - 20) / 2, height: 20, borderRadius: R.xs,
         ...(drag ? { left: `${left}%`, width: `${width}%` } : {}),
         minWidth: 12, background: BAR_TRACK,
-        border: cp ? `1.5px solid ${CP_ACCENT}` : `1px solid ${C.line}`, overflow: "visible",
+        border: cp ? `1.5px solid ${CP_RING}` : `1px solid ${C.line}`, overflow: "visible",
         cursor: drag ? "grabbing" : "grab", touchAction: "none",
         boxShadow: drag ? SH.md : undefined, zIndex: drag ? 5 : 1,
         outline: focused ? `2px solid ${C.brand}` : "none", outlineOffset: 1,
       }}
     >
-      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: cp ? CP_ACCENT : BAR_INK, borderRadius: `${R.xs}px 0 0 ${R.xs}px` }} />
-      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 10.5, fontWeight: 600, color: g.fill > 55 ? C.surface : C.ink700 }}>
+      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: PROGRESS, borderRadius: `${R.xs}px 0 0 ${R.xs}px` }} />
+      {/* % label: white on the green fill when filled enough to sit on it, ink otherwise. */}
+      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 10.5, fontWeight: 600, color: g.fill > 82 ? C.surface : C.ink700 }}>
         {g.progress} %
       </span>
       {drag ? <DatePill text={drag.mode === "move" ? `${fmtShort(pStart)} → ${fmtShort(pEnd)}` : fmtShort(pEnd)} /> : null}
@@ -855,12 +862,12 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
   const pStart = shiftISO(s.start, drag?.mode === "move" ? drag.dxDays : 0);
   const pDays = Math.max(1, workingDaysBetween(s.start, shiftISO(s.end, drag?.mode === "resize" ? drag.dxDays : 0)));
 
-  // Mono bar fill: assignee identity lives in the left-cell avatar, so the bar is
-  // a single calm ink — no per-person rainbow. Colour is reserved for the two
-  // states that carry meaning: critical (darker ink + ONE quiet ring) and done
-  // (receded neutral + hatch). NOT danger red — that means "late".
+  // Bar fill follows the unified language: active/not-done = GREEN (the one
+  // accent); done = a RECEDED neutral so it sits back (kept legible by the check
+  // + hatch). NO near-black fill. Criticality is NOT a fill — it's the one ink
+  // hairline ring applied below. NOT danger red — that means "late".
   const critical = s.onCriticalPath && !s.done;
-  const barFill = s.done ? C.ink300 : critical ? CP_ACCENT : BAR_INK;
+  const barFill = s.done ? DONE_FILL : PROGRESS;
   const critTitle = s.onCriticalPath ? " · chemin critique (marge nulle)" : s.float > 0 ? ` · marge ${s.float} j` : "";
   const labelOutside = (left + width) * (timelineW / 100) + 8; // px from timeline start for the trailing name
   const showLabel = pxPerDay >= 4 && !drag;
@@ -907,9 +914,13 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
           position: "absolute", top: SUB_ROW_H / 2 - 8, height: 16, borderRadius: R.xs,
           ...(drag ? { left: `${left}%`, width: `${width}%` } : {}),
           minWidth: 8, background: barFill, opacity: s.done ? 0.7 : 1,
-          // done = diagonal hatch overlay (non-opacity cue); critical = ONE quiet ink ring.
+          // done = diagonal hatch overlay (non-opacity cue, so done recedes without
+          // relying on opacity alone); critical = ONE ink hairline ring as a border
+          // (NOT a box-shadow — that's reserved for the .gantt-bar:hover ring, which
+          // would otherwise be overridden by an inline shadow on critical bars).
           backgroundImage: s.done ? `repeating-linear-gradient(45deg, ${C.surface}99 0 2px, transparent 2px 5px)` : undefined,
-          boxShadow: drag ? SH.md : critical ? `0 0 0 1px ${CP_ACCENT}` : undefined,
+          border: critical ? `1.5px solid ${CP_RING}` : undefined,
+          boxShadow: drag ? SH.md : undefined,
           cursor: drag ? "grabbing" : "grab", touchAction: "none", zIndex: drag ? 5 : critical ? 3 : 1,
           outline: focused ? `2px solid ${C.brand}` : "none", outlineOffset: 1,
         }}
@@ -930,7 +941,7 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
           aria-hidden
           style={{
             position: "absolute", top: SUB_ROW_H / 2, transform: "translateY(-50%)", left: labelOutside,
-            ...TX.nano, color: critical ? CP_ACCENT : C.ink500, fontWeight: critical ? 600 : 500,
+            ...TX.nano, color: critical ? C.ink900 : C.ink500, fontWeight: critical ? 600 : 500,
             whiteSpace: "nowrap", pointerEvents: "none", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis",
           }}
         >

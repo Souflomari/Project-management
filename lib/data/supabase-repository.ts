@@ -195,7 +195,7 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
       const trimmed = text.trim();
       if (!trimmed) return fetchProject(id);
       const { error } = await sb.from("comments").insert({
-        project_id: id, author: "Mehrnaz", initials: "ME", color: "#2F4A63", text: trimmed, when_label: "à l'instant",
+        project_id: id, author: "Mehrnaz", initials: "ME", color: "#4F5A63", text: trimmed, when_label: "à l'instant",
       });
       if (error) throw new Error(error.message);
       return fetchProject(id);

@@ -907,15 +907,16 @@ export function StatusPill({
 
 export function ProgressBar({
   pct,
-  color = C.ink700,
+  color = C.brand,
   track = C.subtle,
   height = 7,
   label,
 }: {
   pct: number;
-  /** Fill colour. Defaults to neutral ink — a meter is monochrome unless the
-   *  caller passes a SEMANTIC colour (danger/brand) to mean something. Never
-   *  decorative. */
+  /** Fill colour. Defaults to the brand green — the app's ONE accent, and the
+   *  single governed meaning of a progress meter ("how far along / how healthy").
+   *  Override only with a SEMANTIC colour (e.g. C.danger when behind schedule);
+   *  never a decorative neutral. */
   color?: string;
   track?: string;
   height?: number;

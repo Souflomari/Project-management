@@ -172,25 +172,24 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* status mix — a single hairline-tracked bar; the legend carries the
-                counts so the bar itself stays decoration-free. */}
-            <div style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 24, background: SURFACE.container }}>
+            {/* status mix — a single hairline-tracked bar. Decorative (aria-hidden):
+                the labelled legend below carries the same counts AND the click
+                target, so the bar isn't a second, tiny (6px) redundant hit area
+                (Fitts/Hick) — it just visualises the proportions. */}
+            <div aria-hidden style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 24, background: SURFACE.container }}>
               {dist.map((s) =>
                 s.count > 0 ? (
-                  <button
+                  <div
                     key={s.status}
-                    onClick={() => goProjects(s.status)}
-                    title={`${s.label} · ${s.count} — filtrer`}
-                    aria-label={`Filtrer : ${s.label}`}
                     className="anim-bar"
-                    style={{ width: `${(s.count / distTotal) * 100}%`, minWidth: 6, ["--fill" as string]: `${(s.count / distTotal) * 100}%`, background: s.color, border: "none", padding: 0, cursor: "pointer" }}
+                    style={{ width: `${(s.count / distTotal) * 100}%`, minWidth: 6, ["--fill" as string]: `${(s.count / distTotal) * 100}%`, background: s.color }}
                   />
                 ) : null,
               )}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 12 }}>
               {dist.map((s) => (
-                <button key={s.status} onClick={() => goProjects(s.status)} className="soft-hover" style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
+                <button key={s.status} onClick={() => goProjects(s.status)} title={`${s.label} · ${s.count} — filtrer`} aria-label={`Filtrer : ${s.label}`} className="soft-hover row-focus" style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
                   <span style={{ width: 8, height: 8, borderRadius: R.xs, background: s.color, flexShrink: 0 }} />
                   {s.label}{" "}
                   <span style={{ ...num(13), color: s.status === "à jour" ? C.brand : C.ink900 }}>
@@ -206,7 +205,9 @@ export function Dashboard() {
                 <span style={{ ...num(15), color: C.ink900 }}>{pct(Math.round(avgAnim))}</span>
               </div>
               <div style={{ marginTop: 10, paddingRight: 30 }}>
-                <Sparkline values={history.map((h) => h.avg)} height={42} gradient endLabel={pct(kpis.avg)} />
+                {/* progress trend → the one accent (green): "avancement" is the
+                    healthy/positive meter of the unified colour system. */}
+                <Sparkline values={history.map((h) => h.avg)} color={C.brand} height={42} gradient endLabel={pct(kpis.avg)} />
               </div>
               <div style={{ ...TX.nano, color: C.ink400, marginTop: 4 }}>8 dernières semaines</div>
             </div>
@@ -493,7 +494,10 @@ function Kpi({ title, value, sub, subColor, dot, delta, onClick, className }: { 
 /** Team charge / capacity snapshot for the next 4 weeks — the missing workload
  *  pillar. A single calm→amber→terracotta bar + an over-capacity call-out. */
 function WorkloadTile({ avgCharge, band, overloaded, members, peakName, peakPct, onClick }: { avgCharge: number; band: "low" | "ok" | "high" | "over"; overloaded: number; members: number; peakName: string; peakPct: number; onClick: () => void }) {
-  const color = band === "over" ? "#C2683E" : band === "high" ? "#B45309" : C.brand;
+  // Load = capacity meter: follow the shared chargeColor system (green within
+  // capacity, ONE amber when high, ONE danger-red over) so the bar agrees with
+  // the Équipe heatmap instead of inventing a one-off terracotta.
+  const color = band === "over" ? C.danger : band === "high" ? "#B45309" : C.brand;
   const shown = Math.round(avgCharge);
   // Borderless panel matching the lower row's Panel treatment — grouped by
   // whitespace, not a box; the bar carries the signal.
@@ -530,16 +534,16 @@ function PhaseStrip({ className, columns, total, onPhase }: { className?: string
   return (
     <section className={className} style={{ padding: "2px 6px" }}>
       <div style={{ ...TX.overline, color: C.ink500 }}>Répartition par phase</div>
-      <div style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 12, background: SURFACE.container }}>
+      {/* decorative proportion bar (aria-hidden): the labelled legend below is the
+          click target — no second tiny 6px hit area duplicating it. Muted slate
+          PHASE_COLORS (light→dark sequence), never saturated fills. */}
+      <div aria-hidden style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 12, background: SURFACE.container }}>
         {columns.map((c) =>
           c.count > 0 ? (
-            <button
+            <div
               key={c.phaseIndex}
-              onClick={() => onPhase(c.phaseIndex)}
-              title={`${c.full} · ${c.count} — filtrer`}
-              aria-label={`Filtrer : ${c.full}`}
               className="anim-bar"
-              style={{ width: `${(c.count / denom) * 100}%`, minWidth: 6, ["--fill" as string]: `${(c.count / denom) * 100}%`, background: PHASE_COLORS[c.phaseIndex], border: "none", padding: 0, cursor: "pointer" }}
+              style={{ width: `${(c.count / denom) * 100}%`, minWidth: 6, ["--fill" as string]: `${(c.count / denom) * 100}%`, background: PHASE_COLORS[c.phaseIndex] }}
             />
           ) : null,
         )}
@@ -547,7 +551,7 @@ function PhaseStrip({ className, columns, total, onPhase }: { className?: string
       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 12 }}>
         {columns.map((c) =>
           c.count > 0 ? (
-            <button key={c.phaseIndex} onClick={() => onPhase(c.phaseIndex)} className="soft-hover" title={c.full} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
+            <button key={c.phaseIndex} onClick={() => onPhase(c.phaseIndex)} className="soft-hover row-focus" title={`${c.full} · ${c.count} — filtrer`} aria-label={`Filtrer : ${c.full}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
               <span style={{ width: 8, height: 8, borderRadius: R.xs, background: PHASE_COLORS[c.phaseIndex], flexShrink: 0 }} />
               {c.label} <span style={{ ...num(13), color: C.ink900 }}>{c.count}</span>
             </button>

@@ -302,12 +302,13 @@ function renderCell(key: ColKey, p: DerivedProject, ctx: CellCtx): ReactNode {
         </div>
       );
     case "progress":
-      // Mono meter: a thin neutral fill on the subtle track, the % in neutral
-      // ink. Status is read from the Statut column / dot, not duplicated as a
-      // coloured bar here.
+      // GREEN meter: the avancement reads in the app's ONE accent (brand green) —
+      // "how far along / how healthy" is the single governed meaning of a progress
+      // bar. Status (semantic alerts) is carried by the Statut dot, not duplicated
+      // here, so the green stays the consistent positive signal across the app.
       return (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ProgressBar pct={p.progress} color={C.ink600} label={`Avancement de ${p.name}`} />
+          <ProgressBar pct={p.progress} color={C.brand} label={`Avancement de ${p.name}`} />
           <span style={{ ...num(13), width: 38, textAlign: "right", color: C.ink700 }}>{p.progress}&#8239;%</span>
         </div>
       );
@@ -512,7 +513,14 @@ export function ProjectsTable() {
             {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
           </Select>
           <Button size="sm" variant="secondary" onClick={() => { bulkAdvancePhase(selectedIds); clearSelected(); }}>Avancer la phase</Button>
-          <button onClick={clearSelected} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "rgba(255,255,255,.7)", ...TX.bodyStrong, cursor: "pointer", padding: "4px 6px" }}>Désélectionner</button>
+          <button
+            onClick={clearSelected}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,.7)"; }}
+            onFocus={(e) => { e.currentTarget.style.color = "#fff"; }}
+            onBlur={(e) => { e.currentTarget.style.color = "rgba(255,255,255,.7)"; }}
+            style={{ marginLeft: "auto", background: "transparent", border: "none", color: "rgba(255,255,255,.7)", ...TX.bodyStrong, cursor: "pointer", padding: "4px 6px", borderRadius: R.xs, transition: "color .12s" }}
+          >Désélectionner</button>
         </div>
       ) : null}
 
@@ -667,6 +675,7 @@ function GroupHeader({
       type="button"
       onClick={onToggle}
       aria-expanded={!collapsed}
+      className="soft-hover"
       style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 18px", borderTop: `1px solid ${C.line}`, background: C.subtle, border: "none", borderTopColor: C.line, cursor: "pointer", font: "inherit", textAlign: "left" }}
     >
       <span style={{ display: "inline-flex", transform: collapsed ? "rotate(-90deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard)", color: C.ink500 }}>
@@ -826,7 +835,7 @@ function MobileCards({
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                       <PhaseCell p={p} setPhase={cellCtx.setPhase} />
-                      <div style={{ flex: 1 }}><ProgressBar pct={p.progress} color={C.ink600} label={`Avancement de ${p.name}`} /></div>
+                      <div style={{ flex: 1 }}><ProgressBar pct={p.progress} color={C.brand} label={`Avancement de ${p.name}`} /></div>
                       <span style={{ ...num(13), color: C.ink700 }}>{p.progress}&#8239;%</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, ...TX.caption, color: C.ink500 }}>

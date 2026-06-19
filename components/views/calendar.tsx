@@ -331,7 +331,7 @@ function MiniMonthTitle({ label, anchorISO }: { label: string; anchorISO: string
     <div ref={wrapRef} style={{ position: "relative" }}>
       <button
         type="button"
-        className="btn row-focus"
+        className="btn row-hover row-focus"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -443,7 +443,9 @@ function MiniMonth({ anchorISO, onPick }: { anchorISO: string; onPick: (iso: str
             <button
               key={i}
               type="button"
-              className="btn"
+              // Non-today days take the hover wash; today keeps its green fill (a
+              // wash would erase the accent), so every picker day still reacts.
+              className={today ? "btn" : "btn row-hover"}
               onClick={() => onPick(iso)}
               aria-current={today ? "date" : undefined}
               style={{
@@ -502,7 +504,10 @@ function ProjectFacet({
     <div ref={wrapRef} style={{ position: "relative" }}>
       <button
         type="button"
-        className="btn"
+        // btn-secondary supplies the designed hover/active (wash + border lift) so
+        // the trigger reacts like every other secondary control (it's the same
+        // white-surface look as the "Aujourd'hui" button), not just a 1px nudge.
+        className="btn btn-secondary"
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -544,7 +549,7 @@ function ProjectFacet({
         >
           <button
             type="button"
-            className="btn row-focus"
+            className="btn row-hover row-focus"
             onClick={onClear}
             style={facetRowStyle(count === 0)}
             role="option"
@@ -559,7 +564,7 @@ function ProjectFacet({
               <button
                 key={p.id}
                 type="button"
-                className="btn row-focus"
+                className="btn row-hover row-focus"
                 role="option"
                 aria-selected={sel}
                 onClick={() => onToggle(p.id)}
@@ -628,7 +633,9 @@ function PhaseLegend({
           <button
             key={ph}
             type="button"
-            className="btn row-focus"
+            // row-hover adds the visible brand-tinted hover wash (a 1px .btn lift
+            // alone was too faint on these transparent chips); row-focus = ring.
+            className="btn row-hover row-focus"
             aria-pressed={explicit}
             title={`${ph} · ${PHASES_FULL[i]}${explicit ? " (filtre actif)" : ""}`}
             onClick={() => onToggle(i)}
@@ -654,9 +661,9 @@ function PhaseLegend({
       {selected.size ? (
         <button
           type="button"
-          className="btn row-focus"
+          className="btn row-hover row-focus"
           onClick={onClear}
-          style={{ border: "none", background: "transparent", cursor: "pointer", ...TX.nano, color: C.brandText, padding: "3px 6px" }}
+          style={{ border: "none", background: "transparent", cursor: "pointer", ...TX.nano, color: C.brandText, padding: "3px 6px", borderRadius: R.sm }}
         >
           Réinitialiser
         </button>
@@ -748,11 +755,15 @@ function SpanBar({
   const { startCol, endCol } = segColumns(seg, weekStartISO);
   const overdue = isOverdue(span);
   const dragging = dnd.dragId === span.subtaskId;
-  const [hover, setHover] = useState(false);
 
   return (
     <div
       role="gridcell"
+      // `.cal-chip` carries the complete pointer affordance (hover wash + grab,
+      // and grabbing on :active) so EVERY chip reacts identically — replacing the
+      // hand-rolled hover state that only some surfaces wired up. `.row-focus`
+      // adds the designed keyboard focus ring (the bar is tab-stop + drag target).
+      className="cal-chip row-focus"
       onPointerDown={(ev) => {
         if (ev.button != null && ev.button !== 0) return;
         ev.stopPropagation();
@@ -764,8 +775,6 @@ function SpanBar({
         dnd.onUp(ev, onOpen);
       }}
       onPointerCancel={dnd.onCancel}
-      onPointerEnter={() => setHover(true)}
-      onPointerLeave={() => setHover(false)}
       tabIndex={0}
       aria-label={`${span.taskName} — ${span.projectName}, ${PHASES_FULL[span.phaseIndex]}, échéance ${fmtFull(span.deadline)}${overdue ? ", en retard" : ""}`}
       title={`${span.projectName} — ${span.taskName} · ${PHASES[span.phaseIndex]} · ${fmtFull(span.deadline)}`}
@@ -791,8 +800,9 @@ function SpanBar({
         padding: "0 7px",
         borderRadius: seg.isStart && seg.isEnd ? R.xs : seg.isStart ? "6px 2px 2px 6px" : seg.isEnd ? "2px 6px 6px 2px" : 2,
         // Quiet neutral chip — no decorative phase colour. Identity is the letter
-        // badge; the bar carries name + (when overdue) the one status cue.
-        background: hover ? SURFACE.containerHigh : C.subtle,
+        // badge; the bar carries name + (when overdue) the one status cue. Hover
+        // is the `.cal-chip` wash, so the resting fill is the neutral well.
+        background: C.subtle,
         // A solid hairline all round; a continued segment loses its leading edge so
         // the eye reads it as flowing from the prior week (no noisy dashed border).
         border: `1px solid ${C.line}`,
@@ -804,7 +814,8 @@ function SpanBar({
         touchAction: "pan-y",
         overflow: "hidden",
         opacity: dragging ? 0.4 : span.done ? 0.55 : 1,
-        transition: "background var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)",
+        // `.cal-chip` transitions background + shadow; add opacity for the drag/done fade.
+        transition: "opacity var(--dur-fast) var(--ease-standard)",
       }}
     >
       {/* Phase letter carries identity — a single quiet neutral badge (no colour). */}
@@ -1035,7 +1046,7 @@ function DayOverflowRow({
           <div key={iso} style={{ position: "relative" }}>
             <button
               type="button"
-              className="btn row-focus"
+              className="btn row-hover row-focus"
               onClick={() => setPopISO((p) => (p === iso ? null : iso))}
               aria-haspopup="dialog"
               aria-expanded={popISO === iso}
@@ -1105,7 +1116,7 @@ function DayPopover({
           <button
             key={s.subtaskId}
             type="button"
-            className="btn row-focus"
+            className="btn row-hover row-focus"
             onClick={() => {
               onOpen(s.projectId);
               onClose();

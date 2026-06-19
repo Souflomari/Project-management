@@ -326,7 +326,7 @@ export function Kanban() {
           hint="Aucun projet ne correspond aux filtres actifs. Ajustez les filtres ou créez un projet."
           icon={<KanbanIconGlyph />}
           action={
-            <button onClick={openAdd} className="btn" style={addBtnStyle(true)}>
+            <button onClick={openAdd} className="btn btn-primary" style={addBtnStyle(true)}>
               <PlusIcon size={14} /> Nouveau projet
             </button>
           }
@@ -354,7 +354,7 @@ export function Kanban() {
                   onClick={() => toggleCollapse(col.key)}
                   title={`${col.full} — déplier`}
                   aria-label={`${col.label} (${col.cards.length}) — déplier la colonne`}
-                  className="btn"
+                  className="btn soft-hover"
                   style={{
                     width: 46, flexShrink: 0, background: C.surface, borderRadius: R.lg,
                     border: `1px solid ${isOver ? C.brand : C.line}`,
@@ -414,13 +414,13 @@ export function Kanban() {
                       quiet (ghost) so the column header reads calm at rest */}
                   {groupBy === "phase" ? (
                     <div style={{ display: "flex", gap: SP[3] }}>
-                      <button onClick={openAdd} className="btn" title={`Nouveau projet en ${col.label}`} aria-label={`Nouveau projet en ${col.full}`} style={addBtnStyle(false)}>
+                      <button onClick={openAdd} className="btn btn-secondary" title={`Nouveau projet en ${col.label}`} aria-label={`Nouveau projet en ${col.full}`} style={addBtnStyle(false)}>
                         <PlusIcon size={12} /> Nouveau
                       </button>
                       {col.movePhase != null && col.movePhase < FINAL_PHASE_INDEX && col.cards.length > 0 ? (
                         <button
                           onClick={() => bulkAdvancePhase(col.cards.map((c) => c.id))}
-                          className="btn"
+                          className="btn btn-secondary"
                           title={`Avancer tout vers ${PHASES[col.movePhase + 1]}`}
                           aria-label={`Avancer toute la colonne ${col.full}`}
                           style={addBtnStyle(false)}
@@ -449,7 +449,7 @@ export function Kanban() {
                           role="button"
                           tabIndex={0}
                           aria-label={`${c.name} — ${c.client} · ${c.statusLabel} · ${c.progress}%`}
-                          className="lift-hover"
+                          className="lift-hover row-focus"
                           style={{
                             background: C.surface,
                             border: `1px solid ${isDragged ? C.lineStrong : C.line}`,
@@ -521,9 +521,9 @@ function CardBody({ c }: { c: DerivedProject }) {
         </div>
       </div>
 
-      {/* progress — mono fill, thin; the at-a-glance signal */}
+      {/* progress — green fill (the app's one accent), thin; the at-a-glance signal */}
       <div style={{ display: "flex", alignItems: "center", gap: SP[3], marginTop: SP[5] }} title={`Avancement ${c.progress}%`}>
-        <ProgressBar pct={c.progress} color={C.ink350} height={4} />
+        <ProgressBar pct={c.progress} height={4} />
         <span style={{ ...numTab, fontSize: 11.5, fontWeight: 600, color: C.ink500, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
       </div>
 

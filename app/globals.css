@@ -181,17 +181,30 @@ textarea::placeholder {
 .ui-field:focus-visible,
 .ui-field:focus-within {
   border-color: var(--c-brand) !important;
-  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.85);
+  /* Same white-gap green ring as .btn:focus-visible, so every focusable control
+     shares one designed focus treatment (was a gapless .85 wash here). */
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #15803d;
 }
 
-/* Global focus fallback for any interactive element that doesn't set its own. */
+/* Global focus fallback for any interactive element that doesn't set its own.
+   Covers ARIA widget roles (button/tab/option) and the bare Gantt scroll
+   container (.pan, a focusable div with no role) so keyboard focus is never
+   invisible — closes the gaps the surface agents flagged. */
 a:focus-visible,
 select:focus-visible,
 [role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="option"]:focus-visible,
+.pan:focus-visible,
 .sortable:focus-visible {
   outline: 2px solid var(--c-ink900);
   outline-offset: 2px;
   border-radius: 6px;
+}
+/* The Gantt scroller is large + rounded; keep its ring inside the border. */
+.pan:focus-visible {
+  outline-offset: -2px;
+  border-radius: var(--c-radius-lg, 14px);
 }
 
 /* ---- M3 state-layer model ----
@@ -347,21 +360,6 @@ select:focus-visible,
 .enter-stagger > *:nth-child(8) { animation-delay: 340ms; }
 .enter-stagger > *:nth-child(9) { animation-delay: 370ms; }
 .enter-stagger > *:nth-child(n + 10) { animation-delay: 395ms; }
-
-/* ---- card hover lift ----
-   Cards on the unified white field gain depth on hover (a small rise + a softer
-   shadow) so the surface feels physical and responsive, not painted-on. */
-.card-lift {
-  transition: transform var(--dur-base) var(--ease-standard),
-    box-shadow var(--dur-base) var(--ease-standard),
-    border-color var(--dur-base) var(--ease-standard);
-  will-change: transform;
-}
-.card-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px -12px rgba(28, 25, 23, 0.14), 0 4px 10px -4px rgba(28, 25, 23, 0.07);
-  border-color: var(--c-line-strong) !important;
-}
 
 /* ---- bar / meter fill ----
    Progress and meter bars grow from 0 to their value on mount via a CSS custom

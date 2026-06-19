@@ -58,11 +58,14 @@ function Peek({
     <>
       <motion.div
         onClick={onClose}
+        aria-hidden
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.18 }}
-        style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: Z.drawer }}
+        // cursor signals the backdrop is a click-to-close affordance (Escape also
+        // closes via the dialog focus-trap).
+        style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: Z.drawer, cursor: "pointer" }}
       />
       <motion.aside
         ref={asideRef as never}
@@ -138,7 +141,8 @@ function Peek({
             ) : (
               recentComments.map((cm, i) => (
                 <div key={i} style={{ display: "flex", gap: 9, marginBottom: i === recentComments.length - 1 ? 0 : 12 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: cm.color, marginTop: 7, flexShrink: 0 }} />
+                  {/* neutral marker — author identity is the name, not a decorative hue */}
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.ink300, marginTop: 7, flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ ...TX.caption }}>
                       <span style={{ fontWeight: 600, color: C.ink900 }}>{cm.author}</span>{" "}

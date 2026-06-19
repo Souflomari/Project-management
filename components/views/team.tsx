@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 
 import { CaretDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SearchIcon, TrashIcon } from "../icons";
 import { TeamMemberModal } from "../team-member-modal";
-import { Avatar, Button, Card, EmptyState, IconButton, Input, rowProps, Segmented, Select, Toolbar } from "../ui";
+import { Avatar, Button, Card, EmptyState, IconButton, Input, rowProps, Segmented, Select, Toolbar, Tooltip } from "../ui";
 import { buildTeamLoad, type HeatBucket, type TeamLoad } from "@/lib/derive";
 import { fmtEur, isToday, MONS_LONG, MONTHS_FULL, monthRange, REFERENCE_DATE, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
-import { C, DUR, EASE, heatColor, loadTier, num, R, SP, SURFACE, TX } from "@/lib/tokens";
+import { C, chargeColor, DUR, EASE, heatColor, loadTier, num, R, SP, SURFACE, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const MODE_OPTS: { value: TeamMode; label: string }[] = [
@@ -227,7 +227,7 @@ export function Team() {
         </Select>
         <button
           type="button"
-          className="btn row-focus"
+          className="btn soft-hover row-focus"
           onClick={() => setGroupByDiscipline((v) => !v)}
           aria-pressed={groupByDiscipline}
           style={{
@@ -299,9 +299,13 @@ function MemberCard({
   const m = load.member;
   const tier = loadTier(chargePct);
   const over = tier === "over" || tier === "crit";
-  // Minimalism: the charge headline stays neutral ink and only turns red when the
-  // member is OVER capacity — colour signals the one state that needs attention.
-  const headColor = over ? C.danger : C.ink900;
+  const high = tier === "high";
+  // Minimalism / Von Restorff: the charge headline stays NEUTRAL ink while the
+  // member is comfortably within capacity (a calm grid where nothing shouts), and
+  // only borrows a semantic hue from chargeColor() for the states that need
+  // attention — one amber as load approaches the ceiling (≥85 %), one red over
+  // capacity. Painting every healthy card green would re-introduce the rainbow.
+  const headColor = over || high ? chargeColor(chargePct) : C.ink900;
   // Over capacity, the raw % balloons — cap the headline at a credible ceiling
   // (v1 overload cap) and carry the real figure as concrete overflow days.
   const shown = over ? Math.min(chargePct, 130) : chargePct;
@@ -417,10 +421,10 @@ function MemberCard({
               type="button"
               onClick={() => setExpanded((v) => !v)}
               aria-expanded={expanded}
-              className="btn row-focus"
+              className="btn soft-hover row-focus"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-start",
-                marginTop: 2, padding: "4px 4px", background: "none", border: "none",
+                marginTop: 2, padding: "4px 6px", background: "none", border: "none",
                 cursor: "pointer", ...TX.nano, color: C.ink500, borderRadius: R.xxs,
               }}
             >
@@ -491,20 +495,29 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
           const overDays = Math.max(0, b.days - b.capacity);
           const lab = bucketLabel(b, mode);
           const delay = `${Math.min(i * 25, 200)}ms`;
+          const cellLabel = `${bucketLabel(b, mode, true)} : ${b.days} / ${b.capacity} j · ${b.pct} %${overDays > 0 ? ` · +${overDays} j au-delà` : ""}`;
           return (
-            <div key={i} style={{ flex: 1, minWidth: 0 }}>
+            <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+              {/* the Tooltip wrapper is inline-flex; the column + stretch lets the
+                  cell fill the bucket's full width without touching the primitive. */}
+              <Tooltip label={cellLabel}>
               <div
                 tabIndex={0}
                 role="img"
-                aria-label={`${bucketLabel(b, mode, true)} : ${b.days} sur ${b.capacity} jours, ${b.pct} %${overDays > 0 ? `, ${overDays} jour(s) au-delà de la capacité` : ""}`}
-                style={{ position: "relative", height: H, borderRadius: R.xs, background: SURFACE.containerHigh, boxShadow: inThisBucketToday ? `inset 0 0 0 1px ${C.ink700}` : `inset 0 0 0 1px ${C.line}`, overflow: "hidden", outlineOffset: 1 }}
+                aria-label={cellLabel}
+                className="lift-hover"
+                style={{ position: "relative", width: "100%", height: H, borderRadius: R.xs, background: SURFACE.containerHigh, border: `1px solid ${inThisBucketToday ? C.lineStrong : C.line}`, overflow: "hidden", outlineOffset: 1, cursor: "default" }}
               >
-                <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
+                <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.line}` }} />
                 {/* single monochrome in-capacity load fill — one calm gradient, not a rainbow of project segments */}
                 <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: mounted ? base : 0, background: heatColor(b.pct), transition: grow, transitionDelay: delay }} />
                 {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: mounted ? over : 0, background: heatColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)", transition: grow, transitionDelay: delay }} /> : null}
-                {overDays > 0 ? <span aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.surface, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
+                {overDays > 0 ? <span aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.ink900, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
+                {/* today marker: a small ink dot (non-colour cue — position + the
+                    bold weekday label below), so "today" is found without a heavy ring. */}
+                {inThisBucketToday ? <span aria-hidden style={{ position: "absolute", bottom: 3, left: "50%", transform: "translateX(-50%)", width: 3, height: 3, borderRadius: "50%", background: C.ink700 }} /> : null}
               </div>
+              </Tooltip>
               <div style={{ fontSize: 10, fontWeight: inThisBucketToday ? 700 : 450, color: inThisBucketToday ? C.ink900 : C.ink500, textAlign: "center", marginTop: 4 }}>{lab}</div>
             </div>
           );

@@ -294,7 +294,11 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
           borderRadius: R.sm,
         }}
       >
-        <div aria-hidden style={{ width: 30, height: 30, borderRadius: "50%", background: C.subtle, border: `1px solid ${C.line}`, color: C.ink700, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
+        {/* Persona avatar: a MUTED NEUTRAL disc with white initials — the same
+            calm, low-chroma treatment the rest of the app uses for avatars (no
+            saturated hue), so identity reads quietly and the one green accent is
+            never diluted. */}
+        <div aria-hidden style={{ width: 30, height: 30, borderRadius: "50%", background: "#4F5A63", color: C.surface, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
           {initials}
         </div>
         <div className="rail-hide" style={{ minWidth: 0, flex: 1 }}>
@@ -371,9 +375,11 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* quiet live-week context */}
+      {/* quiet live-week context — neutral dot: this is ambient metadata, not a
+          selection/positive signal, so it must not spend the one green accent
+          (Von Restorff: keep the accent reserved for what actually matters). */}
       <div className="rail-hide" style={{ display: "flex", alignItems: "center", gap: SP[3], margin: "16px 10px 0", color: C.ink500, ...TX.micro }}>
-        <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.brandDot, flexShrink: 0 }} />
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.ink350, flexShrink: 0 }} />
         Semaine {WEEK_SHORT}
       </div>
 

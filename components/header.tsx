@@ -134,7 +134,7 @@ export function Header() {
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {isListe ? (
           <div
-            className="ui-field header-search"
+            className="ui-field header-search lift-hover"
             style={{
               display: "flex",
               alignItems: "center",

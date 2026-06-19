@@ -3,17 +3,21 @@
 // derived from them. Swapping to Supabase replaces the repository, not this file.
 
 import { REFERENCE_DATE, shiftISO, taskEnd, taskStartForEnd, workingDaysBetween } from "../format";
+import { AVATAR_PALETTE } from "../tokens";
 import type { Project, Status, Subtask, TeamMember } from "../types";
 
 // costPerDay = loaded daily rate in € (charge journalière) — seniors/directors
 // command higher rates than engineers, in line with French engineering-firm TJM.
+// Avatar colour is drawn from the muted neutral AVATAR_PALETTE (by id) — members
+// are told apart by their initials; colour is a quiet secondary cue, NOT a
+// per-person saturated hue (which turned every avatar stack into a rainbow).
 export const TEAM: TeamMember[] = [
-  { id: 0, name: "Arthur", initials: "AR", color: "#136B33", role: "Responsable technique", costPerDay: 950 },
-  { id: 1, name: "Paul", initials: "PL", color: "#236877", role: "Ingénieur d’affaires", costPerDay: 880 },
-  { id: 2, name: "Arnaud", initials: "AD", color: "#37718A", role: "Ingénieur d’affaires", costPerDay: 720 },
-  { id: 3, name: "Ndeye", initials: "ND", color: "#9A4708", role: "Ingénieure d’affaires", costPerDay: 720 },
-  { id: 4, name: "Soufiane", initials: "SF", color: "#B5392E", role: "Ingénieur d’affaires", costPerDay: 650 },
-  { id: 5, name: "Fabio", initials: "FB", color: "#356A72", role: "Ingénieur d’affaires (externe)", costPerDay: 700 },
+  { id: 0, name: "Arthur", initials: "AR", color: AVATAR_PALETTE[0], role: "Responsable technique", costPerDay: 950 },
+  { id: 1, name: "Paul", initials: "PL", color: AVATAR_PALETTE[1], role: "Ingénieur d’affaires", costPerDay: 880 },
+  { id: 2, name: "Arnaud", initials: "AD", color: AVATAR_PALETTE[2], role: "Ingénieur d’affaires", costPerDay: 720 },
+  { id: 3, name: "Ndeye", initials: "ND", color: AVATAR_PALETTE[3], role: "Ingénieure d’affaires", costPerDay: 720 },
+  { id: 4, name: "Soufiane", initials: "SF", color: AVATAR_PALETTE[4], role: "Ingénieur d’affaires", costPerDay: 650 },
+  { id: 5, name: "Fabio", initials: "FB", color: AVATAR_PALETTE[5], role: "Ingénieur d’affaires (externe)", costPerDay: 700 },
 ];
 
 // [name, client, discipline, leadIdx, phaseIndex, progress, status, budget(k€), start, deadline, renduLabel, renduDate]

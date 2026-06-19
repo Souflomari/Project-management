@@ -347,7 +347,7 @@ export function CommandPalette() {
   const run = (i: number) => results[i]?.run();
 
   return (
-    <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(17,17,17,.32)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh", animation: "fadeIn .14s ease" }}>
+    <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh", animation: "fadeIn .14s ease" }}>
       <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Recherche rapide" style={{ width: 560, maxWidth: "92%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.lg, overflow: "hidden", animation: "popIn .18s cubic-bezier(.2,.7,.2,1)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: `1px solid ${C.line}`, color: C.ink400 }}>
           <SearchIcon size={16} />
@@ -361,11 +361,18 @@ export function CommandPalette() {
               else if (e.key === "Enter") { e.preventDefault(); run(active); }
             }}
             placeholder="Rechercher ou exécuter une action…"
+            role="combobox"
+            aria-expanded
+            aria-controls="cmdk-list"
+            aria-activedescendant={results.length ? `cmdk-row-${active}` : undefined}
             style={{ flex: 1, border: "none", padding: 0, fontSize: 15, outline: "none", color: C.ink900, fontFamily: "inherit", background: "transparent" }}
           />
         </div>
         <div
           ref={listRef}
+          id="cmdk-list"
+          role="listbox"
+          aria-label="Résultats"
           onMouseMove={() => { usingMouse.current = true; }}
           style={{ maxHeight: 400, overflowY: "auto", padding: 6 }}
         >
@@ -383,10 +390,17 @@ export function CommandPalette() {
                   return (
                   <button
                     key={it.id}
+                    id={`cmdk-row-${i}`}
                     data-row={i}
+                    role="option"
                     onMouseEnter={() => { if (usingMouse.current) setActive(i); }}
                     onClick={() => run(i)}
                     aria-selected={sel}
+                    // `.row-hover` gives a CSS pointer hover (the app's faint green
+                    // wash) so a row reads as live the instant it's pointed at —
+                    // independent of the keyboard-driven active descendant below.
+                    // `.row-focus` carries the designed focus ring for Tab users.
+                    className="row-hover row-focus"
                     style={{ position: "relative", width: "100%", minHeight: 40, display: "flex", alignItems: "center", gap: 11, textAlign: "left", padding: "8px 12px", borderRadius: R.sm, border: "none", cursor: "pointer", background: sel ? C.subtle : "transparent", transition: `background ${DUR.fast} ${EASE.standard}` }}
                   >
                     {/* Same selection atom as the sidebar: quiet container + one green

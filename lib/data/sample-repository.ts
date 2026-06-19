@@ -100,7 +100,7 @@ export const sampleRepository: ProjectRepository = {
     const comment = {
       author: "Mehrnaz",
       initials: "ME",
-      color: "#2F4A63",
+      color: "#4F5A63", // muted neutral, in line with AVATAR_PALETTE (no saturated persona hue)
       text: trimmed,
       when: "à l'instant",
     };

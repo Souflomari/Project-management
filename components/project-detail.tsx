@@ -242,7 +242,8 @@ export function PhaseStepper({ p, compact = false }: { p: DerivedProject; compac
                 onClick={() => setPhase(p.id, i)}
                 title={`Définir la phase : ${ph}`}
                 aria-label={`Définir la phase ${ph}`}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, flex: 1, background: "none", border: "none", cursor: "pointer", padding: "2px 0" }}
+                className="btn"
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, flex: 1, background: "none", border: "none", cursor: "pointer", padding: "2px 0", borderRadius: R.sm }}
               >
                 <span
                   aria-current={cur ? "step" : undefined}
@@ -488,7 +489,9 @@ export function ProjectTasks({ p }: { p: DerivedProject }) {
         )}
       </div>
 
-      <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: 12 }}>
+      {/* add-task: grouped by a single hairline + whitespace, not a filled box
+          (data-ink: one separator, not a competing card). */}
+      <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 16 }}>
         <div style={{ ...LABEL, marginBottom: 8 }}>Nouvelle tâche</div>
         <Input
           size="sm"
@@ -579,7 +582,7 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
                 role="option"
                 aria-selected={false}
                 onMouseDown={(e) => { e.preventDefault(); applyMention(tm.name); }}
-                className="soft-hover"
+                className="btn soft-hover"
                 style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", border: "none", background: "transparent", borderRadius: R.sm, padding: "6px 8px", cursor: "pointer", textAlign: "left" }}
               >
                 <Avatar initials={tm.initials} color={tm.color} size={22} fontSize={9} />
@@ -617,7 +620,8 @@ function CommentItem({ cm, teamFirstNames }: { cm: { author: string; initials: s
 
   return (
     <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-      <Avatar initials={cm.initials} color={cm.color} size={28} fontSize={10} title={cm.author} />
+      {/* neutral author avatar — identity is the name + initials, not a hue */}
+      <Avatar initials={cm.initials} color={C.ink400} size={28} fontSize={10} title={cm.author} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ ...TX.caption }}>
           <span style={{ fontWeight: 600, color: C.ink900 }}>{cm.author}</span>{" "}
@@ -740,7 +744,7 @@ function SubtaskRow({
                 style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 4px 1px 8px", color: C.ink700 }}
               >
                 {depNames.get(id) ?? `#${id}`}
-                <button onClick={() => removeDep(id)} aria-label="Retirer la dépendance" className="soft-hover" style={{ border: "none", background: "transparent", cursor: "pointer", color: C.ink500, lineHeight: 1, padding: 0, display: "flex", borderRadius: R.xs }}>
+                <button onClick={() => removeDep(id)} aria-label="Retirer la dépendance" className="btn soft-hover" style={{ border: "none", background: "transparent", cursor: "pointer", color: C.ink500, lineHeight: 1, padding: 0, display: "flex", borderRadius: R.xs }}>
                   <CloseIcon size={11} />
                 </button>
               </span>

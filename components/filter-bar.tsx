@@ -224,7 +224,7 @@ function FilterPopover({ facets, team }: { facets: FacetControls; team: { id: nu
             </FacetSection>
 
             {active ? (
-              <button type="button" onClick={() => facets.resetAll()} style={clearBtn}>Tout réinitialiser</button>
+              <button type="button" onClick={() => facets.resetAll()} className="soft-hover" style={clearBtn}>Tout réinitialiser</button>
             ) : null}
           </motion.div>
         ) : null}
@@ -332,14 +332,15 @@ export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNod
                 <button
                   onClick={() => applyView(v)}
                   title={`Appliquer « ${v.name} »`}
+                  className="soft-hover"
                   style={{ font: "inherit", fontSize: 12, fontWeight: 600, color: C.ink700, background: "transparent", border: "none", padding: "5px 4px 5px 8px", cursor: "pointer", borderRadius: R.xs }}
                 >
                   {v.name}
                 </button>
-                <button onClick={() => { setRenameTarget(v); setRenameName(v.name); }} title="Renommer" aria-label={`Renommer ${v.name}`} style={iconChip}>
+                <button onClick={() => { setRenameTarget(v); setRenameName(v.name); }} title="Renommer" aria-label={`Renommer ${v.name}`} className="soft-hover" style={iconChip}>
                   <EditPencil />
                 </button>
-                <button onClick={() => deleteView(v.id)} title="Supprimer" aria-label={`Supprimer ${v.name}`} style={iconChip}>
+                <button onClick={() => deleteView(v.id)} title="Supprimer" aria-label={`Supprimer ${v.name}`} className="soft-hover" style={iconChip}>
                   <CloseIcon size={11} />
                 </button>
               </span>
