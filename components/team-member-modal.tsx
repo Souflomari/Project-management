@@ -4,10 +4,10 @@ import { useState } from "react";
 
 import { Button, Input, Modal } from "./ui";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, TX } from "@/lib/tokens";
+import { AVATAR_PALETTE, C, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
-const PALETTE = ["#15803D", "#2C7A8C", "#4C8AA3", "#B45309", "#B5392E", "#3B7179", "#8A6F5C", "#2F4A63", "#6A6F7A", "#7A6FB0"];
+const PALETTE = AVATAR_PALETTE;
 
 const label: React.CSSProperties = { ...TX.overline, color: C.ink500, display: "block", margin: "0 0 6px" };
 

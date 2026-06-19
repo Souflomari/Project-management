@@ -12,6 +12,7 @@ import type {
 import { buildSampleProjects, buildSampleTeam } from "./sample-data";
 import type {
   NewProjectInput,
+  ProjectPatch,
   ProjectRepository,
   SubtaskPatch,
   TeamMemberPatch,
@@ -71,6 +72,16 @@ export const sampleRepository: ProjectRepository = {
     return clone(np);
   },
 
+  async updateProject(id, patch: ProjectPatch) {
+    const p = mustFind(id);
+    const clean: ProjectPatch = { ...patch };
+    if (clean.name !== undefined) clean.name = clean.name.trim() || p.name;
+    if (clean.client !== undefined) clean.client = clean.client.trim() || p.client;
+    if (clean.discipline !== undefined) clean.discipline = clean.discipline.trim() || p.discipline;
+    if (clean.budget !== undefined) clean.budget = Math.max(0, Math.round(clean.budget));
+    return replace({ ...p, ...clean });
+  },
+
   async setPhase(id, phaseIndex) {
     return replace({ ...mustFind(id), phaseIndex: Math.min(Math.max(0, phaseIndex), FINAL_PHASE_INDEX) });
   },
@@ -86,7 +97,7 @@ export const sampleRepository: ProjectRepository = {
     const comment = {
       author: "P. Dubois",
       initials: "PD",
-      color: "#1D4459",
+      color: "#2F4A63",
       text: trimmed,
       when: "à l'instant",
     };

@@ -101,7 +101,7 @@ export function IconButton({
         background: C.surface,
         borderRadius: R.sm,
         cursor: "pointer",
-        color: tone === "danger" ? "#C5362C" : C.ink500,
+        color: tone === "danger" ? C.danger : C.ink500,
         padding: 0,
         flexShrink: 0,
         transition: "background .12s, border-color .12s, color .12s",

@@ -196,7 +196,14 @@ export interface GanttBar {
   visible: boolean;
   /** Predecessor task ids (Finish-to-Start), for dependency arrows. */
   dependsOn: number[];
+  /** Raw schedule values so the view can drag-to-reschedule/resize. */
+  start: string;
+  end: string;
+  plannedDays: number;
 }
+
+/** Calendar-day span of the Gantt window — lets the view map px↔days. */
+export const GANTT_SPAN_DAYS = Math.round(GANTT_SPAN / 86_400_000);
 
 export interface GanttRow {
   id: number;
@@ -255,6 +262,9 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
           assigneeInitials: s.assignee.initials,
           visible: sg.visible,
           dependsOn: s.dependsOn,
+          start: s.start,
+          end: s.end,
+          plannedDays: s.plannedDays,
         };
       }),
     };

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 
+import { Button, Input } from "@/components/ui";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { C, R, SH } from "@/lib/tokens";
+import { C, R, SH, TX } from "@/lib/tokens";
 
 export default function LoginPage() {
   const configured = isSupabaseConfigured();
@@ -78,52 +79,28 @@ export default function LoginPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ marginTop: 24 }}>
-            <h1 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 4px" }}>Connexion</h1>
-            <p style={{ fontSize: 12.5, color: C.ink500, margin: "0 0 18px" }}>
+            <h1 style={{ ...TX.h2, margin: "0 0 4px" }}>Connexion</h1>
+            <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 18px" }}>
               Recevez un lien de connexion par e-mail.
             </p>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: C.ink500, marginBottom: 6 }}>
+            <label htmlFor="login-email" style={{ ...TX.overline, color: C.ink500, display: "block", marginBottom: 6 }}>
               Adresse e-mail
             </label>
-            <input
+            <Input
+              id="login-email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="prenom.nom@setec.fr"
-              style={{
-                width: "100%",
-                border: `1px solid ${C.line}`,
-                borderRadius: R.sm,
-                padding: "11px 12px",
-                font: "inherit",
-                fontSize: 13.5,
-                outline: "none",
-                marginBottom: 16,
-              }}
+              style={{ marginBottom: 16 }}
             />
             {error ? (
-              <p style={{ fontSize: 12, color: "#C5362C", margin: "0 0 12px" }}>{error}</p>
+              <p style={{ fontSize: 12, color: C.danger, margin: "0 0 12px" }}>{error}</p>
             ) : null}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: "100%",
-                border: "none",
-                cursor: loading ? "default" : "pointer",
-                background: C.brand,
-                color: "#fff",
-                font: "inherit",
-                fontWeight: 600,
-                fontSize: 14,
-                padding: "11px 0",
-                borderRadius: R.sm,
-                opacity: loading ? 0.6 : 1,
-              }}
-            >
+            <Button type="submit" disabled={loading} style={{ width: "100%" }}>
               {loading ? "Envoi…" : "Recevoir le lien"}
-            </button>
+            </Button>
           </form>
         )}
       </div>

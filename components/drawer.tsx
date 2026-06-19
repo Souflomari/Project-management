@@ -18,7 +18,9 @@ export function ProjectDrawer() {
     selected,
     team,
     closeDrawer,
+    updateProject,
     advancePhase,
+    setPhase,
     setStatus,
     addComment,
     commentDraft,
@@ -93,10 +95,19 @@ export function ProjectDrawer() {
               <CloseIcon size={15} />
             </IconButton>
           </div>
-          <h2 id="drawer-title" style={{ margin: "12px 0 4px", fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.2 }}>
-            {p.name}
+          <h2 id="drawer-title" style={{ margin: "10px 0 2px" }}>
+            <EditableText
+              value={p.name}
+              onSave={(v) => updateProject(p.id, { name: v })}
+              ariaLabel="Nom du projet"
+              style={{ fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.2, color: C.ink900 }}
+            />
           </h2>
-          <div style={{ ...TX.caption, color: C.ink500 }}>{p.client} · {p.discipline}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 2, ...TX.caption, color: C.ink500 }}>
+            <EditableText value={p.client} onSave={(v) => updateProject(p.id, { client: v })} ariaLabel="Maître d'ouvrage" style={{ color: C.ink500 }} />
+            <span style={{ color: C.ink400 }}>·</span>
+            <EditableText value={p.discipline} onSave={(v) => updateProject(p.id, { discipline: v })} ariaLabel="Discipline" style={{ color: C.ink500 }} />
+          </div>
         </div>
 
         <div style={{ padding: "20px 24px 36px" }}>
@@ -150,8 +161,14 @@ export function ProjectDrawer() {
                 const isDone = i < selected.phaseIndex;
                 const cur = i === selected.phaseIndex;
                 return (
-                  <div key={ph} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1 }}>
-                    <div
+                  <button
+                    key={ph}
+                    onClick={() => setPhase(selected.id, i)}
+                    title={`Définir la phase : ${ph}`}
+                    aria-label={`Définir la phase ${ph}`}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, background: "none", border: "none", cursor: "pointer", padding: "2px 0" }}
+                  >
+                    <span
                       aria-current={cur ? "step" : undefined}
                       style={{
                         width: 13, height: 13, borderRadius: "50%", position: "relative", zIndex: 1,
@@ -162,8 +179,8 @@ export function ProjectDrawer() {
                             : { background: C.surface, border: `3px solid ${C.line}` }),
                       }}
                     />
-                    <div style={{ ...TX.micro, color: cur ? C.ink900 : isDone ? C.ink700 : C.ink400, fontWeight: cur ? 600 : 500 }}>{ph}</div>
-                  </div>
+                    <span style={{ ...TX.micro, color: cur ? C.ink900 : isDone ? C.ink700 : C.ink400, fontWeight: cur ? 600 : 500 }}>{ph}</span>
+                  </button>
                 );
               })}
             </div>
@@ -218,23 +235,30 @@ export function ProjectDrawer() {
             </div>
           </div>
 
-          {/* team + deadline */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 26 }}>
-            <div>
-              <div style={{ ...LABEL, marginBottom: 9 }}>Équipe</div>
-              <div style={{ display: "flex", alignItems: "center", paddingLeft: 7 }}>
-                {p.members.map((m) => (
-                  <div key={m.id} style={{ marginLeft: -7 }}>
-                    <Avatar initials={m.initials} color={m.color} size={30} fontSize={10.5} ring title={`${m.name} · ${m.role}`} />
-                  </div>
-                ))}
+          {/* editable details */}
+          <div style={{ ...LABEL, marginBottom: 10 }}>Détails</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+            <Field label="Responsable">
+              <Select size="sm" aria-label="Responsable" value={selected.responsableId} onChange={(e) => updateProject(p.id, { responsableId: Number(e.target.value) })}>
+                {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
+              </Select>
+            </Field>
+            <Field label="Honoraires (k€)">
+              <Input size="sm" type="number" min={0} step={10} aria-label="Honoraires en milliers d'euros" value={selected.budget} onChange={(e) => updateProject(p.id, { budget: Number(e.target.value) })} />
+            </Field>
+            <Field label="Début">
+              <Input size="sm" type="date" aria-label="Date de début" value={selected.start} onChange={(e) => updateProject(p.id, { start: e.target.value })} />
+            </Field>
+            <Field label={`Échéance · ${p.deadlineDaysLabel}`}>
+              <Input size="sm" type="date" aria-label="Échéance finale" value={selected.deadline} onChange={(e) => updateProject(p.id, { deadline: e.target.value })} />
+            </Field>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", paddingLeft: 7, marginBottom: 26 }}>
+            {p.members.map((m) => (
+              <div key={m.id} style={{ marginLeft: -7 }}>
+                <Avatar initials={m.initials} color={m.color} size={28} fontSize={10} ring title={`${m.name} · ${m.role}`} />
               </div>
-            </div>
-            <div>
-              <div style={{ ...LABEL, marginBottom: 9 }}>Échéance finale</div>
-              <div style={{ ...TX.bodyStrong }}>{p.deadlineFull}</div>
-              <div style={{ ...TX.caption, color: C.ink500, marginTop: 2 }}>{p.deadlineDaysLabel}</div>
-            </div>
+            ))}
           </div>
 
           {/* comments */}
@@ -373,6 +397,35 @@ function SubtaskRow({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** Click-to-edit text that looks like static text until focused (Linear-style
+ *  inline edit). Saves on blur / Enter, reverts on Escape. */
+function EditableText({ value, onSave, ariaLabel, style }: { value: string; onSave: (v: string) => void; ariaLabel: string; style?: React.CSSProperties }) {
+  return (
+    <input
+      defaultValue={value}
+      key={value}
+      aria-label={ariaLabel}
+      className="inline-edit"
+      onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== value) onSave(v); else e.target.value = value; }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") { (e.currentTarget as HTMLInputElement).value = value; e.currentTarget.blur(); }
+      }}
+      style={{ font: "inherit", ...style, border: "1px solid transparent", background: "transparent", borderRadius: R.xs, padding: "1px 4px", margin: "-1px -4px", outline: "none", minWidth: 0, width: "auto", maxWidth: "100%" }}
+      size={Math.max(4, value.length)}
+    />
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: "block" }}>
+      <span style={{ ...TX.overline, color: C.ink500, display: "block", marginBottom: 5 }}>{label}</span>
+      {children}
+    </label>
   );
 }
 

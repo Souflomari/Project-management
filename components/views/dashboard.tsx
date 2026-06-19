@@ -12,8 +12,11 @@ import { C, num, R, STATUS_META, TX } from "@/lib/tokens";
 const STALE_DAYS = 90;
 
 export function Dashboard() {
-  const { allDerived, openProject, setFilter } = useProjects();
+  const { allDerived, openProject, setFilter, setCalMode } = useProjects();
   const router = useRouter();
+
+  const goProjects = (f: "all" | "en retard" | "à risque" | "à jour" | "terminé") => { setFilter(f); router.push("/projets"); };
+  const goWeek = () => { setCalMode("semaine"); router.push("/calendrier"); };
 
   const kpis = computeKpis(allDerived);
   const dist = statusDistribution(allDerived);
@@ -32,27 +35,34 @@ export function Dashboard() {
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14, marginBottom: 20 }}>
-        <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} />
-        <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} />
+        <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} onClick={() => goProjects("all")} />
+        <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} onClick={goWeek} />
         <Kpi title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} accent={kpis.late > 0 ? STATUS_META["en retard"].color : undefined} onClick={kpis.late > 0 ? goLate : undefined} />
         <Card padding="16px 18px">
-          <div style={{ ...TX.overline, color: C.ink400 }}>Avancement moyen</div>
-          <div style={{ ...num(34), marginTop: 10 }}>{kpis.avg}%</div>
-          <div style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 12, background: C.subtle }}>
+          <div style={{ ...TX.overline, color: C.ink400 }}>Répartition par statut</div>
+          <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 10, background: C.subtle }}>
             {dist.map((s) =>
-              s.count > 0 ? <div key={s.status} title={`${s.label} · ${s.count}`} style={{ width: `${(s.count / distTotal) * 100}%`, background: s.color }} /> : null,
+              s.count > 0 ? (
+                <button
+                  key={s.status}
+                  onClick={() => goProjects(s.status)}
+                  title={`${s.label} · ${s.count} — filtrer`}
+                  aria-label={`Filtrer : ${s.label}`}
+                  style={{ width: `${(s.count / distTotal) * 100}%`, background: s.color, border: "none", padding: 0, cursor: "pointer" }}
+                />
+              ) : null,
             )}
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 9 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 10 }}>
             {dist.map((s) => (
-              <span key={s.status} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: C.ink500 }}>
+              <button key={s.status} onClick={() => goProjects(s.status)} className="soft-hover" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: C.ink500, background: "none", border: "none", padding: "1px 3px", borderRadius: R.xs, cursor: "pointer" }}>
                 <span style={{ width: 7, height: 7, borderRadius: R.xs, background: s.color, flexShrink: 0 }} />
                 {s.label} <span style={{ ...num(11), color: C.ink700 }}>{s.count}</span>
-              </span>
+              </button>
             ))}
           </div>
         </Card>
-        <Kpi title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} />
+        <Kpi title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} onClick={() => goProjects("all")} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, alignItems: "start" }}>

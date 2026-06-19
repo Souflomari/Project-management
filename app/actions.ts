@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import type {
   NewProjectInput,
+  ProjectPatch,
   SubtaskPatch,
   TeamMemberPatch,
 } from "@/lib/data/repository";
@@ -39,6 +40,10 @@ export async function addCommentAction(id: number, text: string): Promise<Projec
 
 export async function createProjectAction(input: NewProjectInput): Promise<Project> {
   return (await authedRepository()).createProject(input);
+}
+
+export async function updateProjectAction(id: number, patch: ProjectPatch): Promise<Project> {
+  return (await authedRepository()).updateProject(id, patch);
 }
 
 export async function addSubtaskAction(projectId: number, input: NewSubtaskInput): Promise<Project> {

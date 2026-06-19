@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import type {
   NewProjectInput,
+  ProjectPatch,
   ProjectRepository,
   SubtaskPatch,
   TeamMemberPatch,
@@ -140,6 +141,20 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
       return fetchProject(inserted.id);
     },
 
+    async updateProject(id, patch: ProjectPatch) {
+      const row: Record<string, unknown> = {};
+      if (patch.name !== undefined) row.name = patch.name.trim();
+      if (patch.client !== undefined) row.client = patch.client.trim();
+      if (patch.discipline !== undefined) row.discipline = patch.discipline.trim();
+      if (patch.budget !== undefined) row.budget = Math.max(0, Math.round(patch.budget));
+      if (patch.deadline !== undefined) row.deadline = patch.deadline;
+      if (patch.start !== undefined) row.start = patch.start;
+      if (patch.responsableId !== undefined) row.responsable_id = patch.responsableId;
+      const { error } = await sb.from("projects").update(row).eq("id", id);
+      if (error) throw new Error(error.message);
+      return fetchProject(id);
+    },
+
     async setPhase(id, phaseIndex) {
       const { error } = await sb.from("projects").update({ phase_index: phaseIndex }).eq("id", id);
       if (error) throw new Error(error.message);
@@ -156,7 +171,7 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
       const trimmed = text.trim();
       if (!trimmed) return fetchProject(id);
       const { error } = await sb.from("comments").insert({
-        project_id: id, author: "P. Dubois", initials: "PD", color: "#1D4459", text: trimmed, when_label: "à l'instant",
+        project_id: id, author: "P. Dubois", initials: "PD", color: "#2F4A63", text: trimmed, when_label: "à l'instant",
       });
       if (error) throw new Error(error.message);
       return fetchProject(id);

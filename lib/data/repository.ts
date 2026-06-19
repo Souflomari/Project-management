@@ -18,6 +18,9 @@ export interface NewProjectInput {
 
 export type SubtaskPatch = Partial<Omit<Subtask, "id">>;
 export type TeamMemberPatch = Partial<NewTeamMemberInput>;
+export type ProjectPatch = Partial<
+  Pick<Project, "name" | "client" | "discipline" | "budget" | "deadline" | "start" | "responsableId">
+>;
 
 export interface ProjectRepository {
   listProjects(): Promise<Project[]>;
@@ -26,6 +29,7 @@ export interface ProjectRepository {
 
   // project mutations
   createProject(input: NewProjectInput): Promise<Project>;
+  updateProject(id: number, patch: ProjectPatch): Promise<Project>;
   setPhase(id: number, phaseIndex: number): Promise<Project>;
   setStatus(id: number, status: Status): Promise<Project>;
   addComment(id: number, text: string): Promise<Project>;

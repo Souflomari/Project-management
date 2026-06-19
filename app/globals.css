@@ -40,7 +40,7 @@ a {
 
 input::placeholder,
 textarea::placeholder {
-  color: #a8a29e;
+  color: #9b948f;
 }
 
 /* Interaction affordances (inline styles can't express :hover). */
@@ -69,6 +69,18 @@ textarea::placeholder {
 .nav-hover:hover {
   background: #f5f4f2 !important;
   color: #1c1917 !important;
+}
+/* inline click-to-edit text (drawer title, client, discipline) */
+.inline-edit {
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+  cursor: text;
+}
+.inline-edit:hover {
+  background: #f5f4f2 !important;
+}
+.inline-edit:focus {
+  background: #fff !important;
+  box-shadow: 0 0 0 2px rgba(28, 25, 23, 0.14);
 }
 .cal-chip {
   transition: box-shadow 0.12s ease, background 0.12s ease;

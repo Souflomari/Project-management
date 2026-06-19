@@ -14,6 +14,7 @@ import {
   addSubtaskAction,
   addTeamMemberAction,
   createProjectAction,
+  updateProjectAction,
   deleteSubtaskAction,
   deleteTeamMemberAction,
   setPhaseAction,
@@ -22,7 +23,7 @@ import {
   updateTeamMemberAction,
 } from "@/app/actions";
 import { sampleRepository } from "../data";
-import type { SubtaskPatch, TeamMemberPatch } from "../data/repository";
+import type { ProjectPatch, SubtaskPatch, TeamMemberPatch } from "../data/repository";
 import { buildFilters, deriveAll, type DerivedProject, type FilterDef } from "../derive";
 import { toISO, toDate } from "../format";
 import {
@@ -85,6 +86,7 @@ interface ProjectsContextValue {
   teamPrev: () => void;
   teamNext: () => void;
 
+  updateProject: (id: number, patch: ProjectPatch) => void;
   advancePhase: (id: number) => void;
   setPhase: (id: number, phaseIndex: number) => void;
   setStatus: (id: number, status: Status) => void;
@@ -154,6 +156,15 @@ export function ProjectsProvider({
     [serverBacked, applyUpdate],
   );
 
+  const updateProject = useCallback(
+    (id: number, patch: ProjectPatch) => {
+      // Optimistic: reflect the edit immediately, reconcile with the server result.
+      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+      (serverBacked ? updateProjectAction(id, patch) : sampleRepository.updateProject(id, patch)).then(applyUpdate);
+    },
+    [serverBacked, applyUpdate],
+  );
+
   const setPhase = useCallback(
     (id: number, phaseIndex: number) => {
       (serverBacked ? setPhaseAction(id, phaseIndex) : sampleRepository.setPhase(id, phaseIndex)).then(applyUpdate);
@@ -188,6 +199,7 @@ export function ProjectsProvider({
     const created = serverBacked ? await createProjectAction(input) : await sampleRepository.createProject(input);
     setProjects((prev) => [created, ...prev]);
     setShowAdd(false);
+    setSelectedId(created.id); // land straight in the new project's dossier
     return true;
   }, [serverBacked, newName, newClient, newResp]);
 
@@ -325,6 +337,7 @@ export function ProjectsProvider({
     setTeamMode,
     teamPrev,
     teamNext,
+    updateProject,
     advancePhase,
     setPhase,
     setStatus,

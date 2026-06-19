@@ -17,12 +17,12 @@ export const FONT_NUM = FONT_DISPLAY;
 
 export const C = {
   ink900: "#1C1917", // primary text — darkened for content contrast
-  ink800: "#292524", // strong body
+  ink800: "#2E2A27", // strong body (evened L* step from 900)
   ink700: "#44403C", // body
-  ink600: "#5A534E", // tertiary text (bridges the 700→500 gap; AA on white ≈ 6.6:1)
+  ink600: "#574F4A", // tertiary text (bridges the 700→500 gap)
   ink500: "#78716C", // secondary (receded) — AA floor for body text ≈ 4.7:1
-  ink400: "#A8A29E", // NON-TEXT only: hairlines, dots, disabled glyphs (sub-AA)
-  ink300: "#C4BFB9", // disabled text/control
+  ink400: "#9B948F", // muted text floor / placeholder (evened ramp)
+  ink300: "#BDB8B2", // disabled text/control
   line: "#EEECE9", // soft warm hairline (low contrast — structure, not noise)
   lineStrong: "#E3E0DB", // hover / modal border
   surface: "#FFFFFF",
@@ -31,13 +31,21 @@ export const C = {
   // near-black action surface (Vercel/Geist-style primary)
   solid: "#1C1917",
   solidHover: "#000000",
-  // green — brand mark + positive semantics only
+  // green — brand mark + positive semantics only (one governed hue)
   brand: "#15803D",
   brandHover: "#166534",
   brand50: "#EDF4EE",
-  brandText: "#15803D",
-  brandDot: "#16A34A",
+  brandText: "#136B35", // text on brand50 (AA)
+  brandDot: "#1E8E48", // small-element green — tonal sibling of brand, not neon
+  danger: "#B5392E", // single danger hue
 } as const;
+
+/** Curated assignee/avatar palette — one governed set used by the modal,
+ *  sample data, and repository so colours never diverge. */
+export const AVATAR_PALETTE = [
+  "#15803D", "#2C7A8C", "#4C8AA3", "#B45309", "#B5392E",
+  "#3B7179", "#8A6F5C", "#2F4A63", "#6A6F7A", "#6E6486",
+] as const;
 
 export const R = { xs: 6, sm: 8, md: 10, lg: 14, xl: 18, pill: 999 } as const;
 
@@ -85,10 +93,10 @@ export interface StatusMeta {
 
 /** Muted, warm status palette — legible dots, not traffic-light slabs. */
 export const STATUS_META: Record<Status, StatusMeta> = {
-  "à jour": { label: "À jour", color: "#15803D", bg: "#EDF4EE" },
-  "à risque": { label: "À risque", color: "#B45309", bg: "#FAF1E4" },
+  "à jour": { label: "À jour", color: "#136B35", bg: "#EDF4EE" },
+  "à risque": { label: "À risque", color: "#9A4708", bg: "#FAF1E4" },
   "en retard": { label: "En retard", color: "#B5392E", bg: "#FAEEEB" },
-  terminé: { label: "Terminé", color: "#78716C", bg: "#F5F4F2" },
+  terminé: { label: "Terminé", color: "#6B645F", bg: "#F5F4F2" },
 };
 
 export function ringColor(status: Status): string {

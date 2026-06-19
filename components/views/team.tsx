@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon } from "../icons";
 import { TeamMemberModal } from "../team-member-modal";
@@ -17,9 +18,12 @@ const MODE_OPTS: { value: TeamMode; label: string }[] = [
 ];
 
 export function Team() {
-  const { allDerived, team, teamMode, teamAnchor, setTeamMode, teamPrev, teamNext, deleteTeamMember, openProject } = useProjects();
+  const { allDerived, team, teamMode, teamAnchor, setTeamMode, teamPrev, teamNext, deleteTeamMember, openProject, setSearch } = useProjects();
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
+
+  const showProjectsOf = (m: TeamMember) => { setSearch(m.name); router.push("/projets"); };
 
   // Members referenced by a project (lead) or task (assignee) can't be deleted.
   const referenced = useMemo(() => {
@@ -66,11 +70,18 @@ export function Team() {
           return (
             <Card key={t.member.id}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <Avatar initials={t.member.initials} color={t.member.color} size={42} fontSize={15} title={`${t.member.name} · ${t.member.role}`} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: C.ink900 }}>{t.member.name}</div>
-                  <div style={{ ...TX.caption, color: C.ink500 }}>{t.member.role}</div>
-                </div>
+                <button
+                  {...rowProps(() => showProjectsOf(t.member))}
+                  className="soft-hover row-focus"
+                  title={`Voir les projets de ${t.member.name}`}
+                  style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, background: "none", border: "none", padding: "4px 6px", margin: "-4px -6px", borderRadius: R.sm, cursor: "pointer", textAlign: "left" }}
+                >
+                  <Avatar initials={t.member.initials} color={t.member.color} size={42} fontSize={15} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: C.ink900 }}>{t.member.name}</div>
+                    <div style={{ ...TX.caption, color: C.ink500 }}>{t.member.role}</div>
+                  </div>
+                </button>
                 <div style={{ display: "flex", gap: 5 }}>
                   <IconButton size={28} onClick={() => openEdit(t.member)} aria-label="Modifier"><EditIcon size={14} /></IconButton>
                   <IconButton

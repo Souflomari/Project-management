@@ -3,9 +3,11 @@
 import { useRef, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
-import { buildGantt, type GanttBar } from "@/lib/derive";
+import { buildGantt, GANTT_SPAN_DAYS, type GanttBar } from "@/lib/derive";
+import { shiftISO, workingDaysBetween } from "@/lib/format";
+import type { SubtaskPatch } from "@/lib/data/repository";
 import { useProjects } from "@/lib/store/projects-context";
-import { FONT_NUM } from "@/lib/tokens";
+import { FONT_NUM, SH } from "@/lib/tokens";
 
 const LEFT_W = 250;
 const SUB_ROW_H = 28;
@@ -27,7 +29,7 @@ function Legend() {
 }
 
 export function PlanningGantt() {
-  const { filtered, openProject } = useProjects();
+  const { filtered, openProject, updateSubtask } = useProjects();
   const { months, rows, todayLeft } = buildGantt(filtered);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -230,21 +232,7 @@ export function PlanningGantt() {
                           <div style={{ flex: 1, position: "relative" }}>
                             <GridLines months={months} />
                             <TodayLine left={todayLeft} />
-                            {s.visible ? (
-                              <div
-                                title={s.name}
-                                style={{
-                                  position: "absolute",
-                                  top: SUB_ROW_H / 2 - 5,
-                                  height: 10,
-                                  borderRadius: 4,
-                                  left: `${s.left}%`,
-                                  width: `${s.width}%`,
-                                  background: s.color,
-                                  opacity: s.done ? 0.5 : 0.95,
-                                }}
-                              />
-                            ) : null}
+                            <SubtaskBar projectId={g.id} s={s} onCommit={updateSubtask} />
                           </div>
                         </div>
                       ))}
@@ -304,6 +292,65 @@ function DependencyArrows({ subtasks }: { subtasks: GanttBar[] }) {
         </g>
       ))}
     </svg>
+  );
+}
+
+/** Draggable task bar: drag the body to move the start, drag the right edge to
+ *  resize the planned duration. Live %-preview while dragging, commit on release. */
+function SubtaskBar({ projectId, s, onCommit }: { projectId: number; s: GanttBar; onCommit: (projectId: number, subtaskId: number, patch: SubtaskPatch) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<{ mode: "move" | "resize"; startX: number; dxDays: number; dpx: number } | null>(null);
+  if (!s.visible) return null;
+
+  const pctPerDay = 100 / GANTT_SPAN_DAYS;
+
+  const begin = (mode: "move" | "resize") => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const timeline = ref.current?.parentElement;
+    const w = timeline?.getBoundingClientRect().width ?? 1;
+    ref.current?.setPointerCapture(e.pointerId);
+    setDrag({ mode, startX: e.clientX, dxDays: 0, dpx: GANTT_SPAN_DAYS / w });
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!drag) return;
+    setDrag({ ...drag, dxDays: Math.round((e.clientX - drag.startX) * drag.dpx) });
+  };
+  const onUp = () => {
+    if (!drag) return;
+    const { mode, dxDays } = drag;
+    setDrag(null);
+    if (dxDays === 0) return;
+    if (mode === "move") {
+      onCommit(projectId, s.id, { start: shiftISO(s.start, dxDays) });
+    } else {
+      const newEnd = shiftISO(s.end, dxDays);
+      onCommit(projectId, s.id, { plannedDays: Math.max(1, workingDaysBetween(s.start, newEnd)) });
+    }
+  };
+
+  const left = s.left + (drag?.mode === "move" ? drag.dxDays * pctPerDay : 0);
+  const width = Math.max(0.8, s.width + (drag?.mode === "resize" ? drag.dxDays * pctPerDay : 0));
+
+  return (
+    <div
+      ref={ref}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={begin("move")}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      title={`${s.name} — glisser pour déplacer · bord droit pour la durée`}
+      style={{
+        position: "absolute", top: SUB_ROW_H / 2 - 6, height: 12, borderRadius: 4,
+        left: `${left}%`, width: `${width}%`, background: s.color, opacity: s.done ? 0.5 : 0.95,
+        cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined,
+      }}
+    >
+      <div
+        onPointerDown={begin("resize")}
+        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 9, cursor: "ew-resize", borderRadius: "0 4px 4px 0" }}
+      />
+    </div>
   );
 }
 
