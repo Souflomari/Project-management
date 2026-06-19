@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
-import { buildGantt, GANTT_SPAN_DAYS, type GanttBar } from "@/lib/derive";
+import { buildGantt, type GanttBar, type GanttRow } from "@/lib/derive";
 import { shiftISO, workingDaysBetween } from "@/lib/format";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { useProjects } from "@/lib/store/projects-context";
@@ -29,8 +29,8 @@ function Legend() {
 }
 
 export function PlanningGantt() {
-  const { filtered, openProject, updateSubtask } = useProjects();
-  const { months, rows, todayLeft } = buildGantt(filtered);
+  const { filtered, openProject, updateSubtask, updateProject } = useProjects();
+  const { months, rows, todayLeft, spanDays } = buildGantt(filtered);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [scrollLeft, setScrollLeft] = useState(0);
 
@@ -173,26 +173,7 @@ export function PlanningGantt() {
                     <div style={{ flex: 1, position: "relative", height: 34 }}>
                       <GridLines months={months} />
                       <TodayLine left={todayLeft} />
-                      {g.width > 0 ? (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 9,
-                            height: 16,
-                            borderRadius: 4,
-                            left: `${g.left}%`,
-                            width: `${g.width}%`,
-                            background: `${g.color}1f`,
-                            border: `1px solid ${g.color}66`,
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.85 }} />
-                          <span style={{ position: "absolute", right: 5, top: 1, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 600, color: g.fill > 55 ? "#fff" : "#44403C" }}>
-                            {g.progress}%
-                          </span>
-                        </div>
-                      ) : null}
+                      <ProjectBar g={g} spanDays={spanDays} onCommit={updateProject} />
                     </div>
                   </div>
 
@@ -232,7 +213,7 @@ export function PlanningGantt() {
                           <div style={{ flex: 1, position: "relative" }}>
                             <GridLines months={months} />
                             <TodayLine left={todayLeft} />
-                            <SubtaskBar projectId={g.id} s={s} onCommit={updateSubtask} />
+                            <SubtaskBar projectId={g.id} s={s} spanDays={spanDays} onCommit={updateSubtask} />
                           </div>
                         </div>
                       ))}
@@ -295,14 +276,70 @@ function DependencyArrows({ subtasks }: { subtasks: GanttBar[] }) {
   );
 }
 
+/** Draggable project bar: drag the body to shift the whole project (start +
+ *  deadline together), drag the right edge to move the deadline. */
+function ProjectBar({ g, spanDays, onCommit }: { g: GanttRow; spanDays: number; onCommit: (id: number, patch: { start?: string; deadline?: string }) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<{ mode: "move" | "resize"; startX: number; dxDays: number; dpx: number } | null>(null);
+  if (g.width <= 0) return null;
+
+  const pctPerDay = 100 / spanDays;
+  const begin = (mode: "move" | "resize") => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const w = ref.current?.parentElement?.getBoundingClientRect().width ?? 1;
+    ref.current?.setPointerCapture(e.pointerId);
+    setDrag({ mode, startX: e.clientX, dxDays: 0, dpx: spanDays / w });
+  };
+  const onMove = (e: React.PointerEvent) => { if (drag) setDrag({ ...drag, dxDays: Math.round((e.clientX - drag.startX) * drag.dpx) }); };
+  const onUp = () => {
+    if (!drag) return;
+    const { mode, dxDays } = drag;
+    setDrag(null);
+    if (dxDays === 0) return;
+    if (mode === "move") {
+      onCommit(g.id, { start: shiftISO(g.start, dxDays), deadline: shiftISO(g.deadline, dxDays) });
+    } else {
+      // keep the deadline at least one day after the start
+      const minDeadline = shiftISO(g.start, 1);
+      const next = shiftISO(g.deadline, dxDays);
+      onCommit(g.id, { deadline: next < minDeadline ? minDeadline : next });
+    }
+  };
+  const left = g.left + (drag?.mode === "move" ? drag.dxDays * pctPerDay : 0);
+  const width = Math.max(0.6, g.width + (drag?.mode === "resize" ? drag.dxDays * pctPerDay : 0));
+
+  return (
+    <div
+      ref={ref}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={begin("move")}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      title={`${g.name} — glisser pour déplacer · bord droit pour l'échéance`}
+      style={{
+        position: "absolute", top: 9, height: 16, borderRadius: 4, left: `${left}%`, width: `${width}%`,
+        background: `${g.color}1f`, border: `1px solid ${g.color}66`, overflow: "hidden",
+        cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined,
+      }}
+    >
+      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.85 }} />
+      <span style={{ position: "absolute", right: 5, top: 1, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 600, color: g.fill > 55 ? "#fff" : "#44403C" }}>
+        {g.progress}%
+      </span>
+      <div onPointerDown={begin("resize")} style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 9, cursor: "ew-resize" }} />
+    </div>
+  );
+}
+
 /** Draggable task bar: drag the body to move the start, drag the right edge to
  *  resize the planned duration. Live %-preview while dragging, commit on release. */
-function SubtaskBar({ projectId, s, onCommit }: { projectId: number; s: GanttBar; onCommit: (projectId: number, subtaskId: number, patch: SubtaskPatch) => void }) {
+function SubtaskBar({ projectId, s, spanDays, onCommit }: { projectId: number; s: GanttBar; spanDays: number; onCommit: (projectId: number, subtaskId: number, patch: SubtaskPatch) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ mode: "move" | "resize"; startX: number; dxDays: number; dpx: number } | null>(null);
   if (!s.visible) return null;
 
-  const pctPerDay = 100 / GANTT_SPAN_DAYS;
+  const pctPerDay = 100 / spanDays;
 
   const begin = (mode: "move" | "resize") => (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -310,7 +347,7 @@ function SubtaskBar({ projectId, s, onCommit }: { projectId: number; s: GanttBar
     const timeline = ref.current?.parentElement;
     const w = timeline?.getBoundingClientRect().width ?? 1;
     ref.current?.setPointerCapture(e.pointerId);
-    setDrag({ mode, startX: e.clientX, dxDays: 0, dpx: GANTT_SPAN_DAYS / w });
+    setDrag({ mode, startX: e.clientX, dxDays: 0, dpx: spanDays / w });
   };
   const onMove = (e: React.PointerEvent) => {
     if (!drag) return;

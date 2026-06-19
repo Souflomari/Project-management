@@ -6,6 +6,8 @@ import { Header } from "./header";
 import { Sidebar } from "./sidebar";
 import { ProjectDrawer } from "./drawer";
 import { AddProjectModal } from "./add-project-modal";
+import { CommandPalette } from "./command-palette";
+import { Toaster } from "./toaster";
 import { C } from "@/lib/tokens";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -19,6 +21,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <ProjectDrawer />
       <AddProjectModal />
+      <CommandPalette />
+      <Toaster />
     </div>
   );
 }

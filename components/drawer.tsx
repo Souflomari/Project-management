@@ -113,7 +113,25 @@ export function ProjectDrawer() {
         <div style={{ padding: "20px 24px 36px" }}>
           {/* stats */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-            <Stat label="Honoraires" value={p.budgetFmt} />
+            <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
+              <div style={{ ...TX.overline, color: C.ink500 }}>Honoraires</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
+                <input
+                  key={selected.budget}
+                  defaultValue={selected.budget}
+                  type="number"
+                  min={0}
+                  step={10}
+                  aria-label="Honoraires en milliers d'euros"
+                  className="inline-edit"
+                  onBlur={(e) => { const v = Math.max(0, Math.round(Number(e.target.value) || 0)); if (v !== selected.budget) updateProject(p.id, { budget: v }); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                  style={{ width: 92, fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, letterSpacing: "-.02em", color: C.ink900, border: "1px solid transparent", background: "transparent", borderRadius: R.xs, padding: "0 3px", margin: "0 -3px", outline: "none" }}
+                />
+                <span style={{ ...TX.caption, color: C.ink500 }}>k€</span>
+              </div>
+              <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{p.budgetFmt}</div>
+            </div>
             <Stat label="Avancement" value={`${p.progress} %`} hint={`${doneCount} / ${p.subtasksD.length} tâches`}>
               <div style={{ marginTop: 8 }}><ProgressBar pct={p.progress} color={C.brand} height={5} /></div>
             </Stat>
@@ -237,21 +255,20 @@ export function ProjectDrawer() {
 
           {/* editable details */}
           <div style={{ ...LABEL, marginBottom: 10 }}>Détails</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div style={{ marginBottom: 16 }}>
             <Field label="Responsable">
               <Select size="sm" aria-label="Responsable" value={selected.responsableId} onChange={(e) => updateProject(p.id, { responsableId: Number(e.target.value) })}>
                 {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
               </Select>
             </Field>
-            <Field label="Honoraires (k€)">
-              <Input size="sm" type="number" min={0} step={10} aria-label="Honoraires en milliers d'euros" value={selected.budget} onChange={(e) => updateProject(p.id, { budget: Number(e.target.value) })} />
-            </Field>
-            <Field label="Début">
-              <Input size="sm" type="date" aria-label="Date de début" value={selected.start} onChange={(e) => updateProject(p.id, { start: e.target.value })} />
-            </Field>
-            <Field label={`Échéance · ${p.deadlineDaysLabel}`}>
-              <Input size="sm" type="date" aria-label="Échéance finale" value={selected.deadline} onChange={(e) => updateProject(p.id, { deadline: e.target.value })} />
-            </Field>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+              <Field label="Début">
+                <Input size="sm" type="date" aria-label="Date de début" value={selected.start} onChange={(e) => updateProject(p.id, { start: e.target.value })} />
+              </Field>
+              <Field label={`Échéance · ${p.deadlineDaysLabel}`}>
+                <Input size="sm" type="date" aria-label="Échéance finale" value={selected.deadline} onChange={(e) => updateProject(p.id, { deadline: e.target.value })} />
+              </Field>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", paddingLeft: 7, marginBottom: 26 }}>
             {p.members.map((m) => (

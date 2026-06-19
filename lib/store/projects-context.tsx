@@ -26,8 +26,11 @@ import { sampleRepository } from "../data";
 import type { ProjectPatch, SubtaskPatch, TeamMemberPatch } from "../data/repository";
 import { buildFilters, deriveAll, type DerivedProject, type FilterDef } from "../derive";
 import { toISO, toDate } from "../format";
+import { toast } from "../toast";
+import { STATUS_META } from "../tokens";
 import {
   FINAL_PHASE_INDEX,
+  PHASES,
   type NewSubtaskInput,
   type NewTeamMemberInput,
   type Project,
@@ -149,27 +152,33 @@ export function ProjectsProvider({
   }, []);
 
   // ---- project / task / team mutations (server actions vs sample repo) ----
+  const fail = useCallback(() => toast({ message: "Échec de l’enregistrement", variant: "error" }), []);
+
   const setStatus = useCallback(
     (id: number, status: Status) => {
-      (serverBacked ? setStatusAction(id, status) : sampleRepository.setStatus(id, status)).then(applyUpdate);
+      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p))); // optimistic
+      (serverBacked ? setStatusAction(id, status) : sampleRepository.setStatus(id, status)).then(applyUpdate).catch(fail);
+      toast({ message: `Statut : ${STATUS_META[status].label}`, variant: "success" });
     },
-    [serverBacked, applyUpdate],
+    [serverBacked, applyUpdate, fail],
   );
 
   const updateProject = useCallback(
     (id: number, patch: ProjectPatch) => {
       // Optimistic: reflect the edit immediately, reconcile with the server result.
       setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-      (serverBacked ? updateProjectAction(id, patch) : sampleRepository.updateProject(id, patch)).then(applyUpdate);
+      (serverBacked ? updateProjectAction(id, patch) : sampleRepository.updateProject(id, patch)).then(applyUpdate).catch(fail);
     },
-    [serverBacked, applyUpdate],
+    [serverBacked, applyUpdate, fail],
   );
 
   const setPhase = useCallback(
     (id: number, phaseIndex: number) => {
-      (serverBacked ? setPhaseAction(id, phaseIndex) : sampleRepository.setPhase(id, phaseIndex)).then(applyUpdate);
+      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, phaseIndex } : p))); // optimistic
+      (serverBacked ? setPhaseAction(id, phaseIndex) : sampleRepository.setPhase(id, phaseIndex)).then(applyUpdate).catch(fail);
+      toast({ message: `Phase : ${PHASES[phaseIndex]}`, variant: "success" });
     },
-    [serverBacked, applyUpdate],
+    [serverBacked, applyUpdate, fail],
   );
 
   const advancePhase = useCallback(
@@ -188,9 +197,10 @@ export function ProjectsProvider({
       (serverBacked ? addCommentAction(id, text) : sampleRepository.addComment(id, text)).then((u) => {
         applyUpdate(u);
         setCommentDraft("");
-      });
+        toast({ message: "Commentaire ajouté", variant: "success" });
+      }).catch(fail);
     },
-    [serverBacked, commentDraft, applyUpdate],
+    [serverBacked, commentDraft, applyUpdate, fail],
   );
 
   const submitAdd = useCallback(async () => {
@@ -200,6 +210,7 @@ export function ProjectsProvider({
     setProjects((prev) => [created, ...prev]);
     setShowAdd(false);
     setSelectedId(created.id); // land straight in the new project's dossier
+    toast({ message: "Projet créé", variant: "success" });
     return true;
   }, [serverBacked, newName, newClient, newResp]);
 
@@ -212,43 +223,61 @@ export function ProjectsProvider({
 
   const updateSubtask = useCallback(
     (projectId: number, subtaskId: number, patch: SubtaskPatch) => {
+      // optimistic
+      setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, subtasks: p.subtasks.map((s) => (s.id === subtaskId ? { ...s, ...patch } : s)) } : p)));
       (serverBacked
         ? updateSubtaskAction(projectId, subtaskId, patch)
         : sampleRepository.updateSubtask(projectId, subtaskId, patch)
-      ).then(applyUpdate);
+      ).then(applyUpdate).catch(fail);
     },
-    [serverBacked, applyUpdate],
+    [serverBacked, applyUpdate, fail],
   );
 
   const deleteSubtask = useCallback(
     (projectId: number, subtaskId: number) => {
+      const proj = projects.find((p) => p.id === projectId);
+      const s = proj?.subtasks.find((x) => x.id === subtaskId);
+      setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, subtasks: p.subtasks.filter((x) => x.id !== subtaskId) } : p))); // optimistic
       (serverBacked
         ? deleteSubtaskAction(projectId, subtaskId)
         : sampleRepository.deleteSubtask(projectId, subtaskId)
-      ).then(applyUpdate);
+      ).then(applyUpdate).catch(fail);
+      if (s) {
+        toast({
+          message: `« ${s.name} » supprimée`,
+          action: { label: "Annuler", onClick: () => addSubtask(projectId, { name: s.name, assigneeId: s.assigneeId, start: s.start, plannedDays: s.plannedDays, dependsOn: s.dependsOn }) },
+        });
+      }
     },
-    [serverBacked, applyUpdate],
+    [serverBacked, applyUpdate, fail, projects, addSubtask],
   );
 
   const addTeamMember = useCallback(
     (input: NewTeamMemberInput) => {
-      (serverBacked ? addTeamMemberAction(input) : sampleRepository.addTeamMember(input)).then(setTeam);
+      (serverBacked ? addTeamMemberAction(input) : sampleRepository.addTeamMember(input)).then(setTeam).catch(fail);
     },
-    [serverBacked],
+    [serverBacked, fail],
   );
 
   const updateTeamMember = useCallback(
     (id: number, patch: TeamMemberPatch) => {
-      (serverBacked ? updateTeamMemberAction(id, patch) : sampleRepository.updateTeamMember(id, patch)).then(setTeam);
+      (serverBacked ? updateTeamMemberAction(id, patch) : sampleRepository.updateTeamMember(id, patch)).then(setTeam).catch(fail);
     },
-    [serverBacked],
+    [serverBacked, fail],
   );
 
   const deleteTeamMember = useCallback(
     (id: number) => {
-      (serverBacked ? deleteTeamMemberAction(id) : sampleRepository.deleteTeamMember(id)).then(setTeam);
+      const m = team.find((x) => x.id === id);
+      (serverBacked ? deleteTeamMemberAction(id) : sampleRepository.deleteTeamMember(id)).then(setTeam).catch(fail);
+      if (m) {
+        toast({
+          message: `${m.name} retiré·e de l’équipe`,
+          action: { label: "Annuler", onClick: () => addTeamMember({ name: m.name, initials: m.initials, color: m.color, role: m.role }) },
+        });
+      }
     },
-    [serverBacked],
+    [serverBacked, fail, team, addTeamMember],
   );
 
   // ---- ui actions ----

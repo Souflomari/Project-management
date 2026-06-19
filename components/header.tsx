@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 import { PlusIcon, SearchIcon } from "./icons";
 import { Button } from "./ui";
+import { openCommandPalette } from "./command-palette";
 import { navItemForPath } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, R, TX } from "@/lib/tokens";
@@ -67,7 +68,18 @@ export function Header() {
               style={{ border: "none", background: "transparent", outline: "none", font: "inherit", fontSize: 14, color: C.ink900, width: "100%" }}
             />
           </div>
-        ) : null}
+        ) : (
+          <button
+            onClick={openCommandPalette}
+            className="ui-field"
+            aria-label="Recherche rapide"
+            style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.sm, padding: "0 10px 0 12px", height: 36, width: 240, color: C.ink400, cursor: "pointer", font: "inherit" }}
+          >
+            <SearchIcon />
+            <span style={{ fontSize: 14, flex: 1, textAlign: "left" }}>Rechercher…</span>
+            <kbd style={{ fontSize: 11, fontWeight: 600, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit" }}>⌘K</kbd>
+          </button>
+        )}
         <Button onClick={openAdd} icon={<PlusIcon size={15} />}>
           Nouveau projet
         </Button>

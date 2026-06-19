@@ -164,19 +164,9 @@ export function computeKpis(all: DerivedProject[]): Kpis {
 
 // ------------------------------------------------------------------- gantt
 
-const GANTT_START = toDate("2026-01-01").getTime();
-const GANTT_END = toDate("2027-06-30").getTime();
-const GANTT_SPAN = GANTT_END - GANTT_START;
-const pctOf = (ts: number) => ((ts - GANTT_START) / GANTT_SPAN) * 100;
-
-function barGeom(startIso: string, endIso: string): { left: number; width: number; visible: boolean } {
-  const s = Math.max(toDate(startIso).getTime(), GANTT_START);
-  const e = Math.min(toDate(endIso).getTime(), GANTT_END);
-  if (e < GANTT_START || s > GANTT_END) return { left: 0, width: 0, visible: false };
-  const left = pctOf(s);
-  const width = Math.max(0.8, ((e - s) / GANTT_SPAN) * 100);
-  return { left, width, visible: true };
-}
+const DAY_MS = 86_400_000;
+const MONTH_START = (ts: number) => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); };
+const NEXT_MONTH_START = (ts: number) => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime(); };
 
 export interface GanttMonth {
   label: string;
@@ -202,9 +192,6 @@ export interface GanttBar {
   plannedDays: number;
 }
 
-/** Calendar-day span of the Gantt window — lets the view map px↔days. */
-export const GANTT_SPAN_DAYS = Math.round(GANTT_SPAN / 86_400_000);
-
 export interface GanttRow {
   id: number;
   name: string;
@@ -215,6 +202,8 @@ export interface GanttRow {
   width: number;
   color: string;
   fill: number;
+  start: string;
+  deadline: string;
   subtasks: GanttBar[];
 }
 
@@ -222,24 +211,48 @@ export interface GanttData {
   months: GanttMonth[];
   rows: GanttRow[];
   todayLeft: number;
+  /** Calendar-day span of the (data-driven) window — lets the view map px↔days. */
+  spanDays: number;
 }
 
 export function buildGantt(filtered: DerivedProject[]): GanttData {
+  // Window spans the actual portfolio (+ today), snapped to whole months, with a
+  // little padding so bars don't kiss the edges — instead of a fixed 2026 frame
+  // that clamped every earlier project to January.
+  let minTs = REFERENCE_TS;
+  let maxTs = REFERENCE_TS;
+  for (const p of filtered) {
+    minTs = Math.min(minTs, toDate(p.start).getTime());
+    maxTs = Math.max(maxTs, toDate(p.deadline).getTime());
+    for (const s of p.subtasksD) {
+      minTs = Math.min(minTs, toDate(s.start).getTime());
+      maxTs = Math.max(maxTs, toDate(s.end).getTime());
+    }
+  }
+  const winStart = MONTH_START(minTs);
+  const winEnd = NEXT_MONTH_START(maxTs);
+  const span = Math.max(DAY_MS, winEnd - winStart);
+  const pctOf = (ts: number) => ((ts - winStart) / span) * 100;
+  const geom = (startIso: string, endIso: string) => {
+    const s = Math.max(toDate(startIso).getTime(), winStart);
+    const e = Math.min(toDate(endIso).getTime(), winEnd);
+    if (e < winStart || s > winEnd) return { left: 0, width: 0, visible: false };
+    return { left: pctOf(s), width: Math.max(0.6, ((e - s) / span) * 100), visible: true };
+  };
+
   const months: GanttMonth[] = [];
-  for (let i = 0; i < 18; i++) {
-    const y = 2026 + Math.floor(i / 12);
-    const mo = i % 12;
-    const ms = new Date(y, mo, 1).getTime();
-    const me = new Date(y, mo + 1, 1).getTime();
+  for (let cur = winStart; cur < winEnd; cur = NEXT_MONTH_START(cur)) {
+    const me = NEXT_MONTH_START(cur);
+    const mo = new Date(cur).getMonth();
     months.push({
-      label: MONS[mo] + (mo === 0 ? ` '${String(y).slice(2)}` : ""),
-      left: pctOf(ms),
-      width: ((me - ms) / GANTT_SPAN) * 100,
+      label: MONS[mo] + (mo === 0 ? ` '${String(new Date(cur).getFullYear()).slice(2)}` : ""),
+      left: pctOf(cur),
+      width: ((me - cur) / span) * 100,
     });
   }
 
   const rows: GanttRow[] = filtered.map((p) => {
-    const g = barGeom(p.start, p.deadline);
+    const g = geom(p.start, p.deadline);
     return {
       id: p.id,
       name: p.name,
@@ -250,8 +263,10 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
       width: g.width,
       color: p.ring,
       fill: p.progress,
+      start: p.start,
+      deadline: p.deadline,
       subtasks: p.subtasksD.map((s) => {
-        const sg = barGeom(s.start, s.end);
+        const sg = geom(s.start, s.end);
         return {
           id: s.id,
           name: s.name,
@@ -270,7 +285,7 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
     };
   });
 
-  return { months, rows, todayLeft: pctOf(REFERENCE_TS) };
+  return { months, rows, todayLeft: pctOf(REFERENCE_TS), spanDays: Math.round(span / DAY_MS) };
 }
 
 // ---------------------------------------------------------------- calendar
