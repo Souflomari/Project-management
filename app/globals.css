@@ -40,7 +40,7 @@ a {
 
 input::placeholder,
 textarea::placeholder {
-  color: #9b948f;
+  color: #6e6661;
 }
 
 /* Interaction affordances (inline styles can't express :hover). */

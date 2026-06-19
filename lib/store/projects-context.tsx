@@ -156,29 +156,36 @@ export function ProjectsProvider({
 
   const setStatus = useCallback(
     (id: number, status: Status) => {
+      const snapshot = projects;
       setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p))); // optimistic
-      (serverBacked ? setStatusAction(id, status) : sampleRepository.setStatus(id, status)).then(applyUpdate).catch(fail);
-      toast({ message: `Statut : ${STATUS_META[status].label}`, variant: "success" });
+      (serverBacked ? setStatusAction(id, status) : sampleRepository.setStatus(id, status))
+        .then((u) => { applyUpdate(u); toast({ message: `Statut : ${STATUS_META[status].label}`, variant: "success" }); })
+        .catch(() => { setProjects(snapshot); fail(); });
     },
-    [serverBacked, applyUpdate, fail],
+    [serverBacked, applyUpdate, fail, projects],
   );
 
   const updateProject = useCallback(
     (id: number, patch: ProjectPatch) => {
+      const snapshot = projects;
       // Optimistic: reflect the edit immediately, reconcile with the server result.
       setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-      (serverBacked ? updateProjectAction(id, patch) : sampleRepository.updateProject(id, patch)).then(applyUpdate).catch(fail);
+      (serverBacked ? updateProjectAction(id, patch) : sampleRepository.updateProject(id, patch))
+        .then(applyUpdate)
+        .catch(() => { setProjects(snapshot); fail(); });
     },
-    [serverBacked, applyUpdate, fail],
+    [serverBacked, applyUpdate, fail, projects],
   );
 
   const setPhase = useCallback(
     (id: number, phaseIndex: number) => {
+      const snapshot = projects;
       setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, phaseIndex } : p))); // optimistic
-      (serverBacked ? setPhaseAction(id, phaseIndex) : sampleRepository.setPhase(id, phaseIndex)).then(applyUpdate).catch(fail);
-      toast({ message: `Phase : ${PHASES[phaseIndex]}`, variant: "success" });
+      (serverBacked ? setPhaseAction(id, phaseIndex) : sampleRepository.setPhase(id, phaseIndex))
+        .then((u) => { applyUpdate(u); toast({ message: `Phase : ${PHASES[phaseIndex]}`, variant: "success" }); })
+        .catch(() => { setProjects(snapshot); fail(); });
     },
-    [serverBacked, applyUpdate, fail],
+    [serverBacked, applyUpdate, fail, projects],
   );
 
   const advancePhase = useCallback(
@@ -216,35 +223,38 @@ export function ProjectsProvider({
 
   const addSubtask = useCallback(
     (projectId: number, input: NewSubtaskInput) => {
-      (serverBacked ? addSubtaskAction(projectId, input) : sampleRepository.addSubtask(projectId, input)).then(applyUpdate);
+      (serverBacked ? addSubtaskAction(projectId, input) : sampleRepository.addSubtask(projectId, input)).then(applyUpdate).catch(fail);
     },
-    [serverBacked, applyUpdate],
+    [serverBacked, applyUpdate, fail],
   );
 
   const updateSubtask = useCallback(
     (projectId: number, subtaskId: number, patch: SubtaskPatch) => {
+      const snapshot = projects;
       // optimistic
       setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, subtasks: p.subtasks.map((s) => (s.id === subtaskId ? { ...s, ...patch } : s)) } : p)));
       (serverBacked
         ? updateSubtaskAction(projectId, subtaskId, patch)
         : sampleRepository.updateSubtask(projectId, subtaskId, patch)
-      ).then(applyUpdate).catch(fail);
+      ).then(applyUpdate).catch(() => { setProjects(snapshot); fail(); });
     },
-    [serverBacked, applyUpdate, fail],
+    [serverBacked, applyUpdate, fail, projects],
   );
 
   const deleteSubtask = useCallback(
     (projectId: number, subtaskId: number) => {
+      const snapshot = projects;
       const proj = projects.find((p) => p.id === projectId);
       const s = proj?.subtasks.find((x) => x.id === subtaskId);
       setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, subtasks: p.subtasks.filter((x) => x.id !== subtaskId) } : p))); // optimistic
       (serverBacked
         ? deleteSubtaskAction(projectId, subtaskId)
         : sampleRepository.deleteSubtask(projectId, subtaskId)
-      ).then(applyUpdate).catch(fail);
+      ).then(applyUpdate).catch(() => { setProjects(snapshot); fail(); });
       if (s) {
         toast({
           message: `« ${s.name} » supprimée`,
+          duration: 8000,
           action: { label: "Annuler", onClick: () => addSubtask(projectId, { name: s.name, assigneeId: s.assigneeId, start: s.start, plannedDays: s.plannedDays, dependsOn: s.dependsOn }) },
         });
       }
@@ -273,6 +283,7 @@ export function ProjectsProvider({
       if (m) {
         toast({
           message: `${m.name} retiré·e de l’équipe`,
+          duration: 8000,
           action: { label: "Annuler", onClick: () => addTeamMember({ name: m.name, initials: m.initials, color: m.color, role: m.role }) },
         });
       }

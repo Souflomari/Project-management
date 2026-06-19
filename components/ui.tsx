@@ -7,6 +7,7 @@ import { useEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type 
 
 import { CaretDownIcon, CloseIcon } from "./icons";
 import { C, R, SH, TX } from "@/lib/tokens";
+import { PHASES, PHASES_FULL } from "@/lib/types";
 
 /** Make a clickable row keyboard-operable (WCAG 2.1.1). Spread onto the row;
  *  add `className="row-hover row-focus"`. */
@@ -352,7 +353,7 @@ export function Avatar({
         alignItems: "center",
         justifyContent: "center",
         fontSize: fontSize ?? Math.round(size * 0.36),
-        fontWeight: 700,
+        fontWeight: 600,
         color: "#fff",
         background: color,
         flexShrink: 0,
@@ -366,17 +367,21 @@ export function Avatar({
 }
 
 export function PhaseBadge({ label }: { label: string }) {
+  const i = PHASES.indexOf(label as (typeof PHASES)[number]);
+  const full = i >= 0 ? PHASES_FULL[i] : undefined;
   return (
     <span
+      title={full ? `${label} · ${full}` : label}
       style={{
         fontSize: 11,
-        fontWeight: 700,
+        fontWeight: 600,
         letterSpacing: ".03em",
         fontVariantNumeric: "tabular-nums",
         color: C.ink500,
         border: `1px solid ${C.line}`,
         padding: "2px 6px",
         borderRadius: R.sm,
+        cursor: "default",
       }}
     >
       {label}

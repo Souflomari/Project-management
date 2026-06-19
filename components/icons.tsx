@@ -10,7 +10,9 @@ const base = (size: number) => ({
   viewBox: "0 0 24 24",
   fill: "none" as const,
   stroke: "currentColor",
-  strokeWidth: 2,
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
 });
 
 export function DashIcon({ size = 17 }: IconProps) {
@@ -81,7 +83,7 @@ export function EquipeIcon({ size = 17 }: IconProps) {
 
 export function SearchIcon({ size = 15 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round">
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.5" y2="16.5" />
     </svg>

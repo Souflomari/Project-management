@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { Button, Input, Modal } from "./ui";
 import { useProjects } from "@/lib/store/projects-context";
@@ -12,13 +13,20 @@ export function AddProjectModal() {
   const router = useRouter();
   const { showAdd, closeAdd, newName, newClient, newResp, setNewName, setNewClient, setNewResp, submitAdd, team } =
     useProjects();
+  const [busy, setBusy] = useState(false);
 
   if (!showAdd) return null;
-  const canSubmit = newName.trim().length > 0;
+  const canSubmit = newName.trim().length > 0 && !busy;
 
   async function handleSubmit() {
-    const created = await submitAdd();
-    if (created) router.push("/projets");
+    if (!canSubmit) return;
+    setBusy(true);
+    try {
+      const created = await submitAdd();
+      if (created) router.push("/projets");
+    } finally {
+      setBusy(false);
+    }
   }
 
   const onEnter = (e: React.KeyboardEvent) => {
@@ -33,8 +41,8 @@ export function AddProjectModal() {
       onClose={closeAdd}
       footer={
         <>
-          <Button variant="secondary" onClick={closeAdd}>Annuler</Button>
-          <Button onClick={handleSubmit} disabled={!canSubmit}>Créer le projet</Button>
+          <Button variant="secondary" onClick={closeAdd} disabled={busy}>Annuler</Button>
+          <Button onClick={handleSubmit} disabled={!canSubmit}>{busy ? "Création…" : "Créer le projet"}</Button>
         </>
       }
     >
