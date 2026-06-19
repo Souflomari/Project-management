@@ -33,7 +33,8 @@ export function Toaster() {
         return (
           <div
             key={t.id}
-            role="status"
+            role={t.variant === "error" ? "alert" : "status"}
+            aria-live={t.variant === "error" ? "assertive" : "polite"}
             style={{
               pointerEvents: "auto",
               display: "flex",

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-import { CheckIcon, CloseIcon, PlusIcon, TrashIcon } from "./icons";
-import { Avatar, Button, IconButton, Input, ProgressBar, Select } from "./ui";
+import { CloseIcon, PlusIcon, TrashIcon } from "./icons";
+import { Avatar, Button, Checkbox, IconButton, Input, ProgressBar, Select, useFocusTrap } from "./ui";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { deriveProject, type DerivedSubtask } from "@/lib/derive";
 import { fmtFull, REFERENCE_DATE } from "@/lib/format";
@@ -35,14 +35,7 @@ export function ProjectDrawer() {
   const [ntStart, setNtStart] = useState(REFERENCE_DATE);
   const [ntDays, setNtDays] = useState(5);
   const asideRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    asideRef.current?.focus();
-    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") closeDrawer(); };
-    window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); prev?.focus?.(); };
-  }, [closeDrawer]);
+  useFocusTrap(asideRef, closeDrawer);
 
   if (!selected) return null;
 
@@ -342,21 +335,12 @@ function SubtaskRow({
   return (
     <div style={{ padding: "10px 2px", borderTop: `1px solid ${C.line}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-        <button
-          role="checkbox"
-          aria-checked={subtask.done}
-          aria-label="Tâche terminée"
-          onClick={() => onUpdate(projectId, subtask.id, { done: !subtask.done })}
-          style={{
-            width: 18, height: 18, borderRadius: R.xs, display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0, color: "#fff", cursor: "pointer", padding: 0,
-            ...(subtask.done
-              ? { background: C.brand, border: `1px solid ${C.brand}` }
-              : { background: C.surface, border: `1.5px solid ${C.lineStrong}` }),
-          }}
-        >
-          {subtask.done ? <CheckIcon size={12} /> : null}
-        </button>
+        <Checkbox
+          tone="brand"
+          checked={subtask.done}
+          onChange={() => onUpdate(projectId, subtask.id, { done: !subtask.done })}
+          label="Tâche terminée"
+        />
         <input
           defaultValue={subtask.name}
           aria-label="Nom de la tâche"

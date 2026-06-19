@@ -147,6 +147,16 @@ textarea::placeholder {
 .btn-ghost:hover {
   background: var(--c-subtle) !important;
 }
+.btn-tonal:hover {
+  background: var(--surface-container-highest) !important;
+}
+.btn-outlined:hover {
+  background: var(--c-subtle) !important;
+  border-color: var(--c-line-strong) !important;
+}
+.btn-danger:hover {
+  background: #9f3227 !important;
+}
 .icon-btn:hover {
   background: var(--c-subtle) !important;
   border-color: var(--c-line-strong) !important;

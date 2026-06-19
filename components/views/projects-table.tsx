@@ -3,8 +3,8 @@
 import { useState } from "react";
 
 import { FilterBar } from "../filter-bar";
-import { CaretDownIcon, CheckIcon } from "../icons";
-import { Avatar, Button, PhaseBadge, ProgressBar, rowProps, Select, StatusPill } from "../ui";
+import { CaretDownIcon } from "../icons";
+import { Avatar, Button, Checkbox, PhaseBadge, ProgressBar, rowProps, Select, StatusPill } from "../ui";
 import type { DerivedProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, num, R, SH, TX } from "@/lib/tokens";
@@ -34,24 +34,6 @@ function compare(a: DerivedProject, b: DerivedProject, key: SortKey): number {
     case "resp": return a.responsable.name.localeCompare(b.responsable.name);
     case "status": return STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status);
   }
-}
-
-function Check({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
-  return (
-    <button
-      role="checkbox"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      style={{
-        width: 18, height: 18, borderRadius: R.xs, display: "flex", alignItems: "center", justifyContent: "center",
-        flexShrink: 0, cursor: "pointer", padding: 0, color: "#fff",
-        ...(checked ? { background: C.solid, border: `1px solid ${C.solid}` } : { background: C.surface, border: `1.5px solid ${C.lineStrong}` }),
-      }}
-    >
-      {checked ? <CheckIcon size={12} /> : null}
-    </button>
-  );
 }
 
 export function ProjectsTable() {
@@ -104,7 +86,7 @@ export function ProjectsTable() {
             alignItems: "center",
           }}
         >
-          <Check checked={allOn} onToggle={toggleAll} label="Tout sélectionner" />
+          <Checkbox checked={allOn} onChange={toggleAll} label="Tout sélectionner" />
           {HEADERS.map((h) => {
             const active = sort?.key === h.key;
             const right = h.key === "budget";
@@ -134,7 +116,7 @@ export function ProjectsTable() {
               className="row-hover row-focus"
               style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", minHeight: 58, padding: "10px 18px", borderTop: `1px solid ${C.line}`, cursor: "pointer", background: on ? C.brand50 : undefined }}
             >
-              <Check checked={on} onToggle={() => toggleOne(p.id)} label={`Sélectionner ${p.name}`} />
+              <Checkbox checked={on} onChange={() => toggleOne(p.id)} label={`Sélectionner ${p.name}`} />
 
               <div style={{ minWidth: 0 }}>
                 <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>

@@ -5,8 +5,8 @@
 
 import { useEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
 
-import { CaretDownIcon, CloseIcon } from "./icons";
-import { C, R, SH, TX } from "@/lib/tokens";
+import { CaretDownIcon, CheckIcon, CloseIcon } from "./icons";
+import { C, num, PHASE_COLORS, R, SH, TX } from "@/lib/tokens";
 import { PHASES, PHASES_FULL } from "@/lib/types";
 
 /** Make a clickable row keyboard-operable (WCAG 2.1.1). Spread onto the row;
@@ -25,9 +25,34 @@ export function rowProps(onActivate: () => void) {
   };
 }
 
+/** Trap Tab focus within `ref`, focus the first control on mount, restore focus
+ *  on unmount, and close on Escape. Shared by Modal and the project Drawer. */
+export function useFocusTrap(ref: { current: HTMLElement | null }, onClose: () => void) {
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    const node = ref.current;
+    const sel = "button,[href],input,select,textarea,[tabindex]:not([tabindex='-1'])";
+    (node?.querySelector<HTMLElement>("[autofocus]," + sel) ?? node)?.focus();
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") return onClose();
+      if (e.key !== "Tab" || !node) return;
+      const f = Array.from(node.querySelectorAll<HTMLElement>(sel)).filter(
+        (el) => !el.hasAttribute("disabled") && el.offsetParent !== null,
+      );
+      if (!f.length) return;
+      const first = f[0];
+      const last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); prev?.focus?.(); };
+  }, [ref, onClose]);
+}
+
 // ───────────────────────────────────────── Button
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
+type ButtonVariant = "primary" | "secondary" | "tonal" | "outlined" | "ghost" | "danger";
 
 export function Button({
   variant = "primary",
@@ -48,7 +73,10 @@ export function Button({
   const variants: Record<ButtonVariant, CSSProperties> = {
     primary: { background: C.solid, color: "#fff" },
     secondary: { background: C.surface, color: C.ink700, border: `1px solid ${C.lineStrong}` },
+    tonal: { background: C.subtle, color: C.ink900 },
+    outlined: { background: "transparent", color: C.ink700, border: `1px solid ${C.lineStrong}` },
     ghost: { background: "transparent", color: C.ink500 },
+    danger: { background: C.danger, color: "#fff" },
   };
   return (
     <button
@@ -111,6 +139,53 @@ export function IconButton({
       {...props}
     >
       {children}
+    </button>
+  );
+}
+
+/** Unified checkbox (was hand-rolled in the table and the drawer). `.btn` gives
+ *  it a focus-visible ring; the inset overlay expands the hit area past the 24px
+ *  minimum without changing the visual size. */
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+  tone = "ink",
+  size = 18,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  tone?: "ink" | "brand";
+  size?: number;
+}) {
+  const fill = tone === "brand" ? C.brand : C.solid;
+  return (
+    <button
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      className="btn"
+      onClick={(e) => { e.stopPropagation(); onChange(); }}
+      style={{
+        position: "relative",
+        width: size,
+        height: size,
+        borderRadius: R.xs,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        cursor: "pointer",
+        padding: 0,
+        color: "#fff",
+        ...(checked
+          ? { background: fill, border: `1px solid ${fill}` }
+          : { background: C.surface, border: `1.5px solid ${C.lineStrong}` }),
+      }}
+    >
+      <span aria-hidden style={{ position: "absolute", inset: -8 }} />
+      {checked ? <CheckIcon size={Math.round(size * 0.66)} /> : null}
     </button>
   );
 }
@@ -250,6 +325,40 @@ export function Toolbar({ children, style }: { children: ReactNode; style?: CSSP
   );
 }
 
+// ───────────────────────────────────────── SectionHeader (editorial framing)
+
+/** design.google-style section introduction: an uppercase eyebrow over a
+ *  prominent heading, optional count, description and trailing action. */
+export function SectionHeader({
+  eyebrow,
+  title,
+  count,
+  description,
+  action,
+  style,
+}: {
+  eyebrow?: string;
+  title: string;
+  count?: number;
+  description?: string;
+  action?: ReactNode;
+  style?: CSSProperties;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, margin: "0 0 16px", ...style }}>
+      <div style={{ minWidth: 0 }}>
+        {eyebrow ? <div style={{ ...TX.eyebrow, color: C.ink400, marginBottom: 6 }}>{eyebrow}</div> : null}
+        <h2 style={{ ...TX.sectionHd, margin: 0, color: C.ink900, display: "flex", alignItems: "baseline", gap: 10 }}>
+          {title}
+          {count != null ? <span style={{ ...num(15), color: C.ink400 }}>{count}</span> : null}
+        </h2>
+        {description ? <p style={{ ...TX.caption, color: C.ink500, margin: "6px 0 0", maxWidth: 560 }}>{description}</p> : null}
+      </div>
+      {action ? <div style={{ flexShrink: 0 }}>{action}</div> : null}
+    </div>
+  );
+}
+
 // ───────────────────────────────────────── EmptyState
 
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
@@ -279,23 +388,7 @@ export function Modal({
   footer?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    const node = ref.current;
-    const sel = "button,[href],input,select,textarea,[tabindex]:not([tabindex='-1'])";
-    (node?.querySelector<HTMLElement>("[autofocus]," + sel) ?? node)?.focus();
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") return onClose();
-      if (e.key !== "Tab" || !node) return;
-      const f = Array.from(node.querySelectorAll<HTMLElement>(sel)).filter((el) => !el.hasAttribute("disabled"));
-      if (!f.length) return;
-      const first = f[0], last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); prev?.focus?.(); };
-  }, [onClose]);
+  useFocusTrap(ref, onClose);
 
   return (
     <div
@@ -366,27 +459,51 @@ export function Avatar({
   );
 }
 
-export function PhaseBadge({ label }: { label: string }) {
-  const i = PHASES.indexOf(label as (typeof PHASES)[number]);
-  const full = i >= 0 ? PHASES_FULL[i] : undefined;
+/** Editorial metadata chip — uppercase, tracked, small (design.google idiom).
+ *  `tone`: outline (hairline), soft (tinted), or plain. Optional leading dot. */
+export function Chip({
+  label,
+  color = C.ink600,
+  tone = "outline",
+  dot = false,
+  title,
+}: {
+  label: string;
+  color?: string;
+  tone?: "outline" | "soft" | "plain";
+  dot?: boolean;
+  title?: string;
+}) {
+  const toneStyle: CSSProperties =
+    tone === "soft" ? { background: `${color}14` } : tone === "outline" ? { border: `1px solid ${C.line}` } : {};
   return (
     <span
-      title={full ? `${label} · ${full}` : label}
+      title={title}
       style={{
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: ".03em",
-        fontVariantNumeric: "tabular-nums",
-        color: C.ink500,
-        border: `1px solid ${C.line}`,
-        padding: "2px 6px",
-        borderRadius: R.sm,
-        cursor: "default",
+        ...TX.eyebrow,
+        fontSize: 10.5,
+        letterSpacing: ".05em",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "3px 8px",
+        borderRadius: R.xs,
+        whiteSpace: "nowrap",
+        color,
+        ...toneStyle,
       }}
     >
+      {dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} /> : null}
       {label}
     </span>
   );
+}
+
+export function PhaseBadge({ label }: { label: string }) {
+  const i = PHASES.indexOf(label as (typeof PHASES)[number]);
+  const full = i >= 0 ? PHASES_FULL[i] : undefined;
+  const color = i >= 0 ? PHASE_COLORS[i] : C.ink500;
+  return <Chip label={label} color={color} tone="soft" title={full ? `${label} · ${full}` : label} />;
 }
 
 export function StatusPill({

@@ -184,8 +184,13 @@ export function PlanningGantt() {
               return (
                 <div key={g.id}>
                   <div
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isOpen}
+                    aria-label={`${g.name} — ${isOpen ? "replier" : "déplier"} les tâches`}
                     onClick={clickGuard(() => toggle(g.id))}
-                    className="row-hover"
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(g.id); } }}
+                    className="row-hover row-focus"
                     style={{ display: "flex", borderTop: `1px solid ${C.line}`, cursor: "pointer", background: isOpen ? C.subtle : C.surface }}
                   >
                     <div
