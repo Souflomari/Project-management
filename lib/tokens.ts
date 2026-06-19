@@ -22,7 +22,7 @@ export const C = {
   ink700: "#44403C", // body
   ink600: "#574F4A", // tertiary text (bridges the 700→500 gap)
   ink500: "#78716C", // secondary (receded) — AA floor for body text ≈ 4.7:1
-  ink400: "#857E78", // muted label / eyebrow — darkened to ~3.6:1 (was #9B948F ≈ 2.9:1, failed AA)
+  ink400: "#6F6862", // muted label / eyebrow — 5.48:1 on white (was #857E78 ≈ 4.0:1, just under AA). Small 11–12px labels need ≥4.5:1; there is no lighter-than-ink500 grey that clears AA, so this tier sits at full legibility.
   ink300: "#BDB8B2", // disabled text/control
   line: "#EAE8E4", // hairline — visible on the unified white field without reading as noise
   lineStrong: "#DAD7D1", // hover / modal border / visible divider

@@ -152,7 +152,7 @@ export function ProjectPeekSummary({ p }: { p: DerivedProject }) {
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ ...TX.overline, color: C.ink600 }}>Prochain rendu</div>
-          <div style={{ ...TX.bodyStrong, color: C.ink900, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div title={p.renduLabel} style={{ ...TX.bodyStrong, color: C.ink900, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {p.renduLabel}
           </div>
         </div>
@@ -685,6 +685,7 @@ function SubtaskRow({
           }}
         >
           <span
+            title={subtask.name}
             style={{
               ...TX.bodyStrong, fontSize: 14, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               textDecoration: subtask.done ? "line-through" : "none",

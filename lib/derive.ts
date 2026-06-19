@@ -5,7 +5,6 @@
 import {
   daysFromToday,
   dueLabel,
-  dueLabelFull,
   fmtBudget,
   fmtFull,
   fmtShort,
@@ -208,7 +207,10 @@ export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
     renduDaysLabel: nextTask ? dueLabel(renduDays as number) : p.subtasks.length ? "Livré" : "—",
     renduDueColor: nextTask ? dueColor(renduDays as number, false) : "#A8A29E",
     deadlineFull: fmtFull(p.deadline),
-    deadlineDaysLabel: dueLabelFull(daysFromToday(p.deadline)),
+    // Compact "Dans X j" everywhere (was the prose dueLabelFull "Dans X jours"),
+    // so the countdown format is identical across Liste / Kanban / détail — an
+    // audit flagged the j/jours split as a consistency tell.
+    deadlineDaysLabel: dueLabel(daysFromToday(p.deadline)),
   };
 }
 

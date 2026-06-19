@@ -480,7 +480,9 @@ function Kpi({ title, value, sub, subColor, dot, delta, onClick, className }: { 
     >
       <div style={{ ...TX.overline, color: C.ink700 }}>{title}</div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
-        <span style={{ ...num(36), color: C.ink900 }}>{value}</span>
+        {/* Secondary KPIs sit a step below the hero gauge readout so the portfolio
+            health stays the single focal point (was num(36), competing with it). */}
+        <span style={{ ...num(30), color: C.ink900 }}>{value}</span>
         {delta !== undefined ? <Delta v={delta} /> : null}
       </div>
       <div style={{ ...TX.nano, color: subColor ?? C.ink400, marginTop: "auto", paddingTop: 7, display: "inline-flex", alignItems: "center", gap: 6 }}>

@@ -326,18 +326,21 @@ select:focus-visible,
   }
 }
 .page-enter {
-  animation: pageIn 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
+  animation: pageIn 0.24s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 /* ---- content enter motion ----
    Lists, grids and cards rise + settle in on mount instead of snapping into
    place. `.enter-rise` animates a single element; `.enter-stagger > *` cascades
-   its direct children. Bolder than a hairline nudge so the motion actually
-   reads. Neutralised by the prefers-reduced-motion block above. */
+   its direct children. Tuned FAST + a short cascade: an external audit flagged
+   the old 0.5s rise + 395ms stagger as leaving content sub-perceptible for
+   ~0.9s+ on every navigation. Now content is essentially readable within
+   ~0.3s while the motion still reads as polish (the first/critical child starts
+   at 25ms). Neutralised entirely by the prefers-reduced-motion block above. */
 @keyframes riseIn {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.985);
+    transform: translateY(9px) scale(0.99);
   }
   to {
     opacity: 1;
@@ -345,21 +348,21 @@ select:focus-visible,
   }
 }
 .enter-rise {
-  animation: riseIn 0.5s var(--ease-decel) both;
+  animation: riseIn 0.3s var(--ease-decel) both;
 }
 .enter-stagger > * {
-  animation: riseIn 0.5s var(--ease-decel) both;
+  animation: riseIn 0.3s var(--ease-decel) both;
 }
-.enter-stagger > *:nth-child(1) { animation-delay: 40ms; }
-.enter-stagger > *:nth-child(2) { animation-delay: 85ms; }
-.enter-stagger > *:nth-child(3) { animation-delay: 130ms; }
-.enter-stagger > *:nth-child(4) { animation-delay: 175ms; }
-.enter-stagger > *:nth-child(5) { animation-delay: 220ms; }
-.enter-stagger > *:nth-child(6) { animation-delay: 265ms; }
-.enter-stagger > *:nth-child(7) { animation-delay: 305ms; }
-.enter-stagger > *:nth-child(8) { animation-delay: 340ms; }
-.enter-stagger > *:nth-child(9) { animation-delay: 370ms; }
-.enter-stagger > *:nth-child(n + 10) { animation-delay: 395ms; }
+.enter-stagger > *:nth-child(1) { animation-delay: 25ms; }
+.enter-stagger > *:nth-child(2) { animation-delay: 50ms; }
+.enter-stagger > *:nth-child(3) { animation-delay: 70ms; }
+.enter-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.enter-stagger > *:nth-child(5) { animation-delay: 105ms; }
+.enter-stagger > *:nth-child(6) { animation-delay: 120ms; }
+.enter-stagger > *:nth-child(7) { animation-delay: 130ms; }
+.enter-stagger > *:nth-child(8) { animation-delay: 140ms; }
+.enter-stagger > *:nth-child(9) { animation-delay: 148ms; }
+.enter-stagger > *:nth-child(n + 10) { animation-delay: 155ms; }
 
 /* ---- bar / meter fill ----
    Progress and meter bars grow from 0 to their value on mount via a CSS custom
