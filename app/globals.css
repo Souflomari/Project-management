@@ -48,31 +48,33 @@ textarea::placeholder {
   color: #6e6661;
 }
 
-/* Interaction affordances (inline styles can't express :hover). */
+/* Interaction affordances (inline styles can't express :hover).
+   Hover is brand-tinted: a faint green wash (--c-hover) so pointing at anything
+   interactive reads as "live" in the Setec green. */
 .row-hover {
-  transition: background 0.12s ease;
+  transition: background 0.12s var(--ease-standard);
 }
 .row-hover:hover {
-  background: var(--c-subtle) !important;
+  background: var(--c-hover) !important;
 }
 .soft-hover {
-  transition: background 0.12s ease;
+  transition: background 0.12s var(--ease-standard);
 }
 .soft-hover:hover {
-  background: var(--c-subtle) !important;
+  background: var(--c-hover) !important;
 }
 .lift-hover {
   transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 .lift-hover:hover {
-  border-color: var(--c-line-strong) !important;
-  box-shadow: 0 4px 16px -4px rgba(28, 25, 23, 0.1), 0 2px 4px -2px rgba(28, 25, 23, 0.06);
+  border-color: var(--c-hover-border) !important;
+  box-shadow: 0 4px 16px -4px rgba(21, 128, 61, 0.12), 0 2px 4px -2px rgba(21, 128, 61, 0.08);
 }
 .nav-hover {
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s var(--ease-standard), color 0.12s var(--ease-standard);
 }
 .nav-hover:hover {
-  background: var(--c-subtle) !important;
+  background: var(--c-hover) !important;
   color: var(--c-ink900) !important;
 }
 /* inline click-to-edit text (drawer title, client, discipline) */
@@ -81,18 +83,18 @@ textarea::placeholder {
   cursor: text;
 }
 .inline-edit:hover {
-  background: var(--c-subtle) !important;
+  background: var(--c-hover) !important;
 }
 .inline-edit:focus {
   background: #fff !important;
-  box-shadow: 0 0 0 2px rgba(28, 25, 23, 0.14);
+  box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.2);
 }
 .cal-chip {
   transition: box-shadow 0.12s ease, background 0.12s ease;
 }
 .cal-chip:hover {
-  background: var(--surface-container-highest) !important;
-  box-shadow: 0 1px 2px rgba(28, 25, 23, 0.06);
+  background: var(--c-hover-strong) !important;
+  box-shadow: 0 1px 2px rgba(21, 128, 61, 0.1);
 }
 .cal-chip:active {
   cursor: grabbing;
@@ -103,7 +105,7 @@ textarea::placeholder {
   transition: color 0.12s ease;
 }
 .sortable:hover {
-  color: var(--c-ink900) !important;
+  color: var(--c-brand-text) !important;
 }
 .sortable:hover .sort-caret {
   opacity: 0.4 !important;
@@ -125,14 +127,11 @@ textarea::placeholder {
 
 /* primitives */
 .btn {
-  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.04s ease;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s var(--ease-standard), box-shadow 0.12s;
 }
 .btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.22);
-}
-.btn {
-  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s var(--ease-standard), box-shadow 0.12s;
 }
 .btn:hover {
   transform: translateY(-1px);
@@ -148,29 +147,31 @@ textarea::placeholder {
   filter: brightness(0.9);
 }
 .btn-secondary:hover {
-  background: var(--c-subtle) !important;
-  border-color: var(--c-line-strong) !important;
+  background: var(--c-hover) !important;
+  border-color: var(--c-hover-border) !important;
 }
 .btn-secondary:active,
 .icon-btn:active {
-  background: var(--surface-container-highest) !important;
+  background: var(--c-hover-strong) !important;
 }
 .btn-ghost:hover {
-  background: var(--c-subtle) !important;
+  background: var(--c-hover) !important;
+  color: var(--c-brand-text) !important;
 }
 .btn-tonal:hover {
-  background: var(--surface-container-highest) !important;
+  background: var(--c-hover-strong) !important;
 }
 .btn-outlined:hover {
-  background: var(--c-subtle) !important;
-  border-color: var(--c-line-strong) !important;
+  background: var(--c-hover) !important;
+  border-color: var(--c-hover-border) !important;
 }
 .btn-danger:hover {
   background: #9f3227 !important;
 }
 .icon-btn:hover {
-  background: var(--c-subtle) !important;
-  border-color: var(--c-line-strong) !important;
+  background: var(--c-hover) !important;
+  border-color: var(--c-hover-border) !important;
+  color: var(--c-brand) !important;
 }
 .icon-btn.icon-danger:hover {
   background: #faeeeb !important;

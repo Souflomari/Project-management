@@ -355,7 +355,7 @@ export function Card({
   const border = elevation > 0 ? `1px solid ${C.lineStrong}` : `1px solid ${C.line}`;
   return (
     <motion.div
-      whileHover={{ y: -4, boxShadow: SH.lg }}
+      whileHover={{ y: -4, boxShadow: SH.lg, borderColor: C.hoverBorder }}
       transition={{ type: "spring", stiffness: 380, damping: 28 }}
       style={{ background: C.surface, border, borderRadius: radius, padding, ...lift, ...style }}
     >

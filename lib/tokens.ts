@@ -28,7 +28,10 @@ export const C = {
   lineStrong: "#DAD7D1", // hover / modal border / visible divider
   surface: "#FFFFFF",
   canvas: "#FFFFFF", // unified white app background — depth now comes from borders + soft shadow, not tone
-  subtle: "#F4F3F1", // inset / track / hover / rail — a clean near-neutral well on white
+  subtle: "#F4F3F1", // inset / track / rail — a clean near-neutral well on white
+  hover: "#EFF6F1", // faint green wash for hover affordances (brand-tinted)
+  hoverBorder: "#C9E2D2", // green-tinted border on hover / lift
+  hoverStrong: "#E4F1E8", // stronger green hover (pressed / emphasised affordance)
   // near-black action surface (Vercel/Geist-style primary)
   solid: "#1C1917",
   solidHover: "#000000",
@@ -157,21 +160,21 @@ export const TX: Record<
   | "overline" | "eyebrow",
   CSSProperties
 > = {
-  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 600, letterSpacing: "-.027em", lineHeight: 1.05 },
-  display: { fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 600, letterSpacing: "-.024em", lineHeight: 1.1 },
-  h1: { fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.18 },
-  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, letterSpacing: "-.018em", lineHeight: 1.2 },
-  h2: { fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.28 },
-  bodyLg: { fontSize: 15, fontWeight: 450, lineHeight: 1.55 },
-  body: { fontSize: 14, fontWeight: 450, lineHeight: 1.55 },
-  bodyStrong: { fontSize: 14, fontWeight: 560, lineHeight: 1.5 },
-  caption: { fontSize: 13, fontWeight: 450, lineHeight: 1.5 },
-  micro: { fontSize: 12, fontWeight: 500, lineHeight: 1.4 },
-  nano: { fontSize: 11, fontWeight: 500, lineHeight: 1.35 },
+  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 600, letterSpacing: "-.027em", lineHeight: 1.05 },
+  display: { fontFamily: FONT_DISPLAY, fontSize: 35, fontWeight: 600, letterSpacing: "-.024em", lineHeight: 1.1 },
+  h1: { fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.18 },
+  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 600, letterSpacing: "-.018em", lineHeight: 1.2 },
+  h2: { fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.28 },
+  bodyLg: { fontSize: 16, fontWeight: 450, lineHeight: 1.55 },
+  body: { fontSize: 15, fontWeight: 450, lineHeight: 1.55 },
+  bodyStrong: { fontSize: 15, fontWeight: 560, lineHeight: 1.5 },
+  caption: { fontSize: 14, fontWeight: 450, lineHeight: 1.5 },
+  micro: { fontSize: 12.5, fontWeight: 500, lineHeight: 1.42 },
+  nano: { fontSize: 11.5, fontWeight: 500, lineHeight: 1.35 },
   // quiet sentence-case label (no uppercase, no heavy tracking)
-  overline: { fontSize: 12, fontWeight: 560, letterSpacing: "0", lineHeight: 1.35 },
+  overline: { fontSize: 12.5, fontWeight: 560, letterSpacing: "0", lineHeight: 1.35 },
   // category/metadata label — uppercase, tracked (use sparingly, ≤2-word tags)
-  eyebrow: { fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", lineHeight: 1.3 },
+  eyebrow: { fontSize: 11.5, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", lineHeight: 1.3 },
 };
 
 /** Tabular numeric display (Geist). Geist's figures are even and well-spaced;
