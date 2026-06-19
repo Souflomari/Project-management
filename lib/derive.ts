@@ -15,6 +15,7 @@ import {
   REFERENCE_TS,
   taskEnd,
   toDate,
+  toISO,
   weekdaysInRange,
   weeksInRange,
   workingDaysBetween,
@@ -213,6 +214,8 @@ export interface GanttData {
   todayLeft: number;
   /** Calendar-day span of the (data-driven) window — lets the view map px↔days. */
   spanDays: number;
+  /** ISO date of the window start (first of a month) — for week-grid alignment. */
+  windowStart: string;
 }
 
 export function buildGantt(filtered: DerivedProject[]): GanttData {
@@ -285,7 +288,7 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
     };
   });
 
-  return { months, rows, todayLeft: pctOf(REFERENCE_TS), spanDays: Math.round(span / DAY_MS) };
+  return { months, rows, todayLeft: pctOf(REFERENCE_TS), spanDays: Math.round(span / DAY_MS), windowStart: toISO(new Date(winStart)) };
 }
 
 // ---------------------------------------------------------------- calendar

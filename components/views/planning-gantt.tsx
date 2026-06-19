@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
+import { Segmented } from "../ui";
 import { buildGantt, type GanttBar, type GanttRow } from "@/lib/derive";
-import { shiftISO, workingDaysBetween } from "@/lib/format";
+import { shiftISO, toDate, workingDaysBetween } from "@/lib/format";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { useProjects } from "@/lib/store/projects-context";
 import { FONT_NUM, SH } from "@/lib/tokens";
@@ -30,9 +31,33 @@ function Legend() {
 
 export function PlanningGantt() {
   const { filtered, openProject, updateSubtask, updateProject } = useProjects();
-  const { months, rows, todayLeft, spanDays } = buildGantt(filtered);
+  const { months, rows, todayLeft, spanDays, windowStart } = buildGantt(filtered);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [zoom, setZoom] = useState<"trimestre" | "mois" | "semaine">("mois");
+
+  // px-per-day drives the timeline width so weeks become legible (and scrollable).
+  const pxPerDay = zoom === "trimestre" ? 2.6 : zoom === "semaine" ? 13 : 6;
+  const timelineW = Math.max(900, Math.round(spanDays * pxPerDay));
+  const weekPx = 7 * pxPerDay;
+  const wsDow = (toDate(windowStart).getDay() + 6) % 7; // 0 = Monday
+  const weekOffsetPx = ((7 - wsDow) % 7) * pxPerDay;
+  const showWeeks = pxPerDay >= 4;
+  // Week gridlines drawn as a single cheap CSS gradient (one Monday line per period).
+  const weekGrid: React.CSSProperties = showWeeks
+    ? { backgroundImage: `repeating-linear-gradient(90deg, rgba(28,25,23,.045) 0 1px, transparent 1px ${weekPx}px)`, backgroundPosition: `${weekOffsetPx}px 0` }
+    : {};
+
+  const scrollToToday = (smooth = true) => {
+    const sc = scroller.current;
+    if (!sc) return;
+    sc.scrollTo({ left: Math.max(0, LEFT_W + (todayLeft / 100) * timelineW - sc.clientWidth / 2), behavior: smooth ? "smooth" : "auto" });
+  };
+
+  // Land on "today" (where the active work is) on load and whenever the zoom
+  // changes — otherwise a wide timeline opens on empty early history.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { scrollToToday(false); }, [zoom]);
 
   // drag-to-pan
   const scroller = useRef<HTMLDivElement>(null);
@@ -68,7 +93,25 @@ export function PlanningGantt() {
 
   return (
     <>
-      <FilterBar trailing={<Legend />} />
+      <FilterBar
+        trailing={
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Legend />
+            <button onClick={() => scrollToToday()} className="btn btn-secondary" style={{ fontSize: 12, fontWeight: 540, color: "#44403C", background: "#fff", border: "1px solid #E3E0DB", borderRadius: 8, padding: "5px 11px", cursor: "pointer" }}>
+              Aujourd&apos;hui
+            </button>
+            <Segmented
+              value={zoom}
+              onChange={setZoom}
+              options={[
+                { value: "trimestre", label: "Trimestre" },
+                { value: "mois", label: "Mois" },
+                { value: "semaine", label: "Semaine" },
+              ]}
+            />
+          </div>
+        }
+      />
 
       <div style={{ position: "relative" }}>
         <div
@@ -87,7 +130,7 @@ export function PlanningGantt() {
             maxHeight: "calc(100vh - 215px)",
           }}
         >
-          <div style={{ minWidth: 1180 }}>
+          <div style={{ minWidth: LEFT_W + timelineW }}>
             {/* month header (sticky) */}
             <div style={{ display: "flex", borderBottom: "1px solid #E3E0DB", position: "sticky", top: 0, background: "#F5F4F2", zIndex: 4 }}>
               <div
@@ -109,7 +152,7 @@ export function PlanningGantt() {
               >
                 Projet · responsable
               </div>
-              <div style={{ flex: 1, position: "relative", height: 28 }}>
+              <div style={{ flex: 1, position: "relative", height: 28, ...weekGrid }}>
                 {months.map((m, i) => (
                   <div
                     key={i}
@@ -170,7 +213,7 @@ export function PlanningGantt() {
                         </div>
                       </div>
                     </div>
-                    <div style={{ flex: 1, position: "relative", height: 34 }}>
+                    <div style={{ flex: 1, position: "relative", height: 34, ...weekGrid }}>
                       <GridLines months={months} />
                       <TodayLine left={todayLeft} />
                       <ProjectBar g={g} spanDays={spanDays} onCommit={updateProject} />
@@ -210,7 +253,7 @@ export function PlanningGantt() {
                               {s.name}
                             </span>
                           </div>
-                          <div style={{ flex: 1, position: "relative" }}>
+                          <div style={{ flex: 1, position: "relative", ...weekGrid }}>
                             <GridLines months={months} />
                             <TodayLine left={todayLeft} />
                             <SubtaskBar projectId={g.id} s={s} spanDays={spanDays} onCommit={updateSubtask} />
