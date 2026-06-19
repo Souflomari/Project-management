@@ -162,7 +162,7 @@ export function PlanningGantt() {
                   flexShrink: 0,
                   padding: "8px 14px",
                   ...TX.eyebrow,
-                  color: C.ink400,
+                  color: C.ink500,
                   position: "sticky",
                   left: 0,
                   background: C.subtle,
@@ -232,7 +232,7 @@ export function PlanningGantt() {
                         zIndex: 1,
                       }}
                     >
-                      <span style={{ color: C.ink400, display: "flex", flexShrink: 0, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .12s" }}><ChevronRightIcon size={14} /></span>
+                      <span style={{ color: C.ink400, display: "flex", flexShrink: 0, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard)" }}><ChevronRightIcon size={14} /></span>
                       <Avatar initials={g.responsableInitials} color={g.responsableColor} size={28} fontSize={11} title={`${g.responsable} · ${g.responsableRole}`} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</div>
@@ -397,11 +397,12 @@ function ProjectBar({ g, spanDays, onCommit }: { g: GanttRow; spanDays: number; 
         position: "absolute", top: (PROJ_ROW_H - 18) / 2, height: 18, borderRadius: R.xs, left: `${left}%`, width: `${width}%`, minWidth: 12,
         background: `${g.color}14`, border: `1px solid ${g.color}40`, overflow: "visible",
         cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined, zIndex: drag ? 5 : undefined,
+        transition: "box-shadow var(--dur-fast) var(--ease-standard), filter var(--dur-fast) var(--ease-standard)",
       }}
     >
       <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.9, borderRadius: `${R.xs}px 0 0 ${R.xs}px` }} />
-      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 10.5, fontWeight: 600, color: g.fill > 55 ? "#fff" : C.ink700 }}>
-        {g.progress}%
+      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 10.5, fontWeight: 600, color: g.fill > 55 ? C.surface : C.ink700 }}>
+        {g.progress} %
       </span>
       {drag ? <DatePill text={drag.mode === "move" ? `${fmtShort(pStart)} → ${fmtShort(pEnd)}` : fmtShort(pEnd)} /> : null}
       <div onPointerDown={begin("resize")} style={{ position: "absolute", right: -3, top: 0, bottom: 0, width: 14, cursor: "ew-resize" }} />
@@ -412,7 +413,7 @@ function ProjectBar({ g, spanDays, onCommit }: { g: GanttRow; spanDays: number; 
 /** Floating date readout shown above a bar while dragging. */
 function DatePill({ text }: { text: string }) {
   return (
-    <span style={{ position: "absolute", bottom: "calc(100% + 4px)", left: "50%", transform: "translateX(-50%)", ...TX.nano, fontWeight: 600, color: "#fff", background: C.ink900, borderRadius: R.xs, padding: "2px 7px", whiteSpace: "nowrap", pointerEvents: "none", boxShadow: SH.sm }}>
+    <span style={{ position: "absolute", bottom: "calc(100% + 4px)", left: "50%", transform: "translateX(-50%)", ...TX.nano, fontWeight: 600, color: C.surface, background: C.ink900, borderRadius: R.xs, padding: "2px 7px", whiteSpace: "nowrap", pointerEvents: "none", boxShadow: SH.sm }}>
       {text}
     </span>
   );
@@ -496,6 +497,7 @@ function SubtaskBar({ projectId, s, spanDays, onCommit }: { projectId: number; s
           left: `${left}%`, width: `${width}%`, minWidth: 8, background: barColor, opacity: s.done ? 0.5 : 0.95,
           boxShadow: drag ? SH.md : critical ? `0 0 0 1.5px ${C.danger}` : undefined,
           cursor: drag ? "grabbing" : "grab", touchAction: "none", zIndex: drag ? 5 : critical ? 2 : undefined,
+          transition: "box-shadow var(--dur-fast) var(--ease-standard), filter var(--dur-fast) var(--ease-standard)",
         }}
       >
         {drag ? <DatePill text={drag.mode === "move" ? fmtShort(pStart) : `${pDays} j`} /> : null}
@@ -522,7 +524,7 @@ function TodayLine({ left, label }: { left: number; label?: boolean }) {
   return (
     <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: C.brand, left: `${left}%`, zIndex: 3, pointerEvents: "none" }}>
       {label ? (
-        <span style={{ position: "absolute", top: 4, left: 3, ...TX.nano, fontWeight: 600, color: "#fff", background: C.brand, borderRadius: R.xxs, padding: "0 4px", whiteSpace: "nowrap" }}>Auj.</span>
+        <span style={{ position: "absolute", top: 4, left: 3, ...TX.nano, fontWeight: 600, color: C.surface, background: C.brand, borderRadius: R.xxs, padding: "0 4px", whiteSpace: "nowrap" }}>Auj.</span>
       ) : null}
     </div>
   );

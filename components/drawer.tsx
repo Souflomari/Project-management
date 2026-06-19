@@ -11,7 +11,7 @@ import { deriveProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, R, SH, TX } from "@/lib/tokens";
 
-const SECTION: React.CSSProperties = { ...TX.eyebrow, color: C.ink500, marginBottom: 10 };
+const SECTION: React.CSSProperties = { ...TX.overline, color: C.ink700, marginBottom: 10 };
 
 export function ProjectDrawer() {
   const { selected, team, closeDrawer } = useProjects();
@@ -83,7 +83,7 @@ export function ProjectDrawer() {
           <ProjectIdentity p={p} titleId="drawer-title" />
         </div>
 
-        <div style={{ padding: "20px 24px 36px" }}>
+        <div className="enter-stagger" style={{ padding: "20px 24px 36px" }}>
           <ProjectOverview p={p} />
           <div style={{ marginTop: 28 }}>
             <ProjectTasks p={p} />

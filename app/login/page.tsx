@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { C, R, SH, SP, SURFACE, TX } from "@/lib/tokens";
+import { C, R, SH, SP, TX } from "@/lib/tokens";
 
 export default function LoginPage() {
   const configured = isSupabaseConfigured();
@@ -43,23 +43,13 @@ export default function LoginPage() {
     >
       <div
         style={{
-          // faint tonal panel framing the card for warmth (tone, not shadow)
-          background: SURFACE.containerLow,
-          border: `1px solid ${C.line}`,
-          borderRadius: R.xxl,
-          padding: SP[5],
-          width: 380 + SP[5] * 2,
-          maxWidth: "100%",
-        }}
-      >
-      <div
-        style={{
-          width: "100%",
+          // one confident, raised white card on the warm canvas
+          width: 380,
           maxWidth: "100%",
           background: C.surface,
-          border: `1px solid ${C.lineStrong}`,
-          borderRadius: R.lg,
-          padding: "30px 30px 26px",
+          border: `1px solid ${C.line}`,
+          borderRadius: R.xl,
+          padding: `${SP[8]}px ${SP[8]}px ${SP[7]}px`,
           boxShadow: SH.lg,
         }}
       >
@@ -67,34 +57,34 @@ export default function LoginPage() {
           <span>setec</span>
           <span style={{ color: C.brandDot }}>.</span>
         </div>
-        <div style={{ fontSize: 12, color: C.ink400, fontWeight: 450, marginTop: 2 }}>
+        <div style={{ ...TX.caption, color: C.ink500, marginTop: SP[1] }}>
           Pilotage des projets
         </div>
 
         {!configured ? (
-          <p style={{ fontSize: 13, color: C.ink500, lineHeight: 1.5, marginTop: 22 }}>
-            L&apos;authentification n&apos;est pas configurée. L&apos;application
-            fonctionne en données d&apos;exemple —{" "}
+          <p style={{ ...TX.caption, color: C.ink500, marginTop: SP[7] }}>
+            L’authentification n’est pas configurée. L’application
+            fonctionne en données d’exemple —{" "}
             <a href="/" style={{ color: C.brand, fontWeight: 600 }}>
               accéder au tableau de bord
             </a>
             .
           </p>
         ) : sent ? (
-          <div style={{ marginTop: 24 }}>
-            <h1 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 8px" }}>Vérifiez votre boîte mail</h1>
-            <p style={{ fontSize: 13, color: C.ink500, lineHeight: 1.5, margin: 0 }}>
+          <div style={{ marginTop: SP[7] }}>
+            <h1 style={{ ...TX.h2, margin: `0 0 ${SP[3]}px` }}>Vérifiez votre boîte mail</h1>
+            <p style={{ ...TX.caption, color: C.ink500, margin: 0 }}>
               Un lien de connexion a été envoyé à <strong>{email}</strong>. Cliquez
               dessus pour accéder à votre espace.
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} style={{ marginTop: 24 }}>
+          <form onSubmit={handleSubmit} style={{ marginTop: SP[7] }}>
             <h1 style={{ ...TX.h2, margin: "0 0 4px" }}>Connexion</h1>
-            <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 18px" }}>
+            <p style={{ ...TX.caption, color: C.ink500, margin: `0 0 ${SP[6]}px` }}>
               Recevez un lien de connexion par e-mail.
             </p>
-            <label htmlFor="login-email" style={{ ...TX.eyebrow, color: C.ink500, display: "block", marginBottom: 6 }}>
+            <label htmlFor="login-email" style={{ ...TX.overline, color: C.ink700, display: "block", marginBottom: SP[3] }}>
               Adresse e-mail
             </label>
             <Input
@@ -104,17 +94,16 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="prenom.nom@setec.fr"
-              style={{ marginBottom: 16 }}
+              style={{ marginBottom: SP[5] }}
             />
             {error ? (
-              <p style={{ fontSize: 12, color: C.danger, margin: "0 0 12px" }}>{error}</p>
+              <p style={{ ...TX.micro, color: C.danger, margin: `0 0 ${SP[4]}px` }}>{error}</p>
             ) : null}
             <Button type="submit" disabled={loading} style={{ width: "100%" }}>
               {loading ? "Envoi…" : "Recevoir le lien"}
             </Button>
           </form>
         )}
-      </div>
       </div>
     </div>
   );

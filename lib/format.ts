@@ -69,6 +69,29 @@ export function fmtFull(iso: string): string {
   return `${d.getDate()} ${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// French plural agreement: singular for 0 and 1, plural for ≥2.
+// `1 jour`, `2 jours`; `1 semaine`, `2 semaines`.
+function plural(n: number, singular: string): string {
+  return Math.abs(n) >= 2 ? `${singular}s` : singular;
+}
+
+/** A count followed by a unit, with a NNBSP and correct French pluralization,
+ *  e.g. `formatUnit(1, "jour")` → "1 jour", `formatUnit(3, "jour")` → "3 jours". */
+export function formatUnit(n: number, singular: string): string {
+  return `${n}${NNBSP}${plural(n, singular)}`;
+}
+
+/** A working-day count with the long "jour(s)" unit, e.g. 1 → "1 jour". */
+export function formatDays(n: number): string {
+  return formatUnit(n, "jour");
+}
+
+/** A percentage with the French NNBSP before "%", e.g. 42 → "42 %". The one
+ *  helper other code should converge on so "%" spacing is uniform. */
+export function pct(n: number): string {
+  return `${n}${NNBSP}%`;
+}
+
 // Compact contexts (cells, chips) use "j"; prose (dueLabelFull) uses "jours".
 export function dueLabel(days: number): string {
   if (days < 0) return `${-days}${NNBSP}j de retard`;
@@ -78,9 +101,9 @@ export function dueLabel(days: number): string {
 }
 
 export function dueLabelFull(days: number): string {
-  if (days < 0) return `${-days}${NNBSP}jours de retard`;
+  if (days < 0) return `${-days}${NNBSP}${plural(days, "jour")} de retard`;
   if (days === 0) return "Aujourd’hui";
-  return `Dans ${days}${NNBSP}jours`;
+  return `Dans ${days}${NNBSP}${plural(days, "jour")}`;
 }
 
 export function fmtBudget(k: number): string {

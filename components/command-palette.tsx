@@ -7,7 +7,7 @@ import { NAV_ICONS, SearchIcon } from "./icons";
 import { Avatar } from "./ui";
 import { NAV_ITEMS } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, R, SH, STATUS_META, TX } from "@/lib/tokens";
+import { C, DUR, EASE, R, SH, STATUS_META, TX } from "@/lib/tokens";
 import { STATUSES } from "@/lib/types";
 
 type Category = "Actions" | "Projets" | "Personnes" | "Vues";
@@ -34,6 +34,15 @@ const CAT_ORDER: Category[] = ["Actions", "Projets", "Personnes", "Vues"];
 const dot = (color: string) => (
   <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
 );
+
+/** Consistent keyboard-hint chip, matching the header launcher's kbd. */
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd style={{ ...TX.nano, color: C.ink600, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit", minWidth: "1.6ch", textAlign: "center", lineHeight: 1.4 }}>
+      {children}
+    </kbd>
+  );
+}
 
 /** True when focus is in a field the user is typing into — global single-key
  *  shortcuts must stay quiet there so typing is never hijacked. */
@@ -272,27 +281,34 @@ export function CommandPalette() {
           ) : (
             grouped.map((group) => (
               <div key={group.cat}>
-                <div style={{ ...TX.eyebrow, color: C.ink400, padding: "10px 12px 4px" }}>{group.cat}</div>
-                {group.items.map(({ cmd: it, index: i }) => (
+                <div style={{ ...TX.eyebrow, color: C.ink500, padding: "10px 12px 4px" }}>{group.cat}</div>
+                {group.items.map(({ cmd: it, index: i }) => {
+                  const sel = i === active;
+                  return (
                   <button
                     key={it.id}
                     onMouseEnter={() => setActive(i)}
                     onClick={() => run(i)}
-                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", padding: "9px 12px", borderRadius: R.sm, border: "none", cursor: "pointer", background: i === active ? C.subtle : "transparent" }}
+                    aria-selected={sel}
+                    style={{ position: "relative", width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", padding: "9px 12px", borderRadius: R.sm, border: "none", cursor: "pointer", background: sel ? C.brand50 : "transparent", transition: `background ${DUR.fast} ${EASE.standard}` }}
                   >
+                    <span aria-hidden style={{ position: "absolute", left: 3, top: "50%", transform: `translateY(-50%) scaleY(${sel ? 1 : 0})`, width: 3, height: 16, borderRadius: R.pill, background: C.brand, transition: `transform ${DUR.fast} ${EASE.out}` }} />
                     <span style={{ width: 20, display: "flex", justifyContent: "center", flexShrink: 0 }}>{it.leading}</span>
                     <span style={{ minWidth: 0, flex: 1 }}>
                       <span style={{ ...TX.bodyStrong, color: C.ink900, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</span>
                       {it.sub ? <span style={{ ...TX.micro, color: C.ink500, display: "block" }}>{it.sub}</span> : null}
                     </span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ))
           )}
         </div>
-        <div style={{ display: "flex", gap: 14, padding: "8px 14px", borderTop: `1px solid ${C.line}`, ...TX.micro, color: C.ink400 }}>
-          <span>↑ ↓ naviguer</span><span>↵ exécuter</span><span>échap fermer</span>
+        <div style={{ display: "flex", gap: 16, padding: "8px 14px", borderTop: `1px solid ${C.line}`, ...TX.micro, color: C.ink500 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Kbd>↑</Kbd><Kbd>↓</Kbd>naviguer</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Kbd>↵</Kbd>exécuter</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Kbd>échap</Kbd>fermer</span>
         </div>
       </div>
     </div>

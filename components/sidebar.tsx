@@ -8,7 +8,7 @@ import { signOutAction } from "@/app/actions";
 import { WEEK_SHORT } from "@/lib/format";
 import { SIDEBAR_ITEMS, sidebarKeyForPath } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, FONT_DISPLAY, R } from "@/lib/tokens";
+import { C, DUR, EASE, FONT_DISPLAY, R, SP, TX } from "@/lib/tokens";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -36,9 +36,9 @@ export function Sidebar() {
         <span className="rail-only" style={{ fontFamily: FONT_DISPLAY }}>s</span>
         <span style={{ color: C.brandDot }}>.</span>
       </div>
-      <div className="rail-hide" style={{ fontSize: 11.5, color: C.ink500, fontWeight: 440, padding: "2px 10px 22px" }}>Direction technique</div>
+      <div className="rail-hide" style={{ ...TX.caption, fontSize: 11.5, color: C.ink500, fontWeight: 440, padding: "2px 10px 22px" }}>Direction technique</div>
 
-      <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <nav style={{ display: "flex", flexDirection: "column", gap: SP[1] }}>
         {SIDEBAR_ITEMS.map((item) => {
           const active = item.key === activeKey;
           const Icon = NAV_ICONS[item.key];
@@ -47,8 +47,10 @@ export function Sidebar() {
               key={item.key}
               href={item.href}
               title={item.label}
+              aria-current={active ? "page" : undefined}
               className="app-nav-link state-layer"
               style={{
+                position: "relative",
                 display: "flex",
                 alignItems: "center",
                 gap: 11,
@@ -57,11 +59,27 @@ export function Sidebar() {
                 fontWeight: active ? 540 : 450,
                 padding: "9px 10px",
                 borderRadius: R.sm,
-                color: active ? C.ink900 : C.ink500,
-                background: active ? C.subtle : "transparent",
+                color: active ? C.brandText : C.ink500,
+                background: active ? C.brand50 : "transparent",
+                transition: `background ${DUR.base} ${EASE.standard}, color ${DUR.base} ${EASE.standard}`,
               }}
             >
-              <span style={{ color: active ? C.ink700 : C.ink500, display: "flex" }}>
+              {/* green left-indicator bar gives the brand colour a deliberate active role */}
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  left: 2,
+                  top: "50%",
+                  transform: `translateY(-50%) scaleY(${active ? 1 : 0})`,
+                  width: 3,
+                  height: 18,
+                  borderRadius: R.pill,
+                  background: C.brand,
+                  transition: `transform ${DUR.base} ${EASE.out}`,
+                }}
+              />
+              <span style={{ color: active ? C.brand : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
                 <Icon />
               </span>
               <span className="rail-hide">{item.label}</span>
@@ -71,7 +89,7 @@ export function Sidebar() {
       </nav>
 
       {/* quiet live-week context */}
-      <div className="rail-hide" style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 10px 0", color: C.ink500, fontSize: 12 }}>
+      <div className="rail-hide" style={{ display: "flex", alignItems: "center", gap: SP[3], margin: "16px 10px 0", color: C.ink500, ...TX.micro }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.brandDot, flexShrink: 0 }} />
         Semaine {WEEK_SHORT}
       </div>

@@ -9,12 +9,18 @@ body {
 }
 
 body {
-  background: #ffffff;
+  background: #faf9f7;
   color: #1c1917;
   font-family: var(--font-ui), system-ui, -apple-system, "Segoe UI", sans-serif;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Brand-tinted text selection — gives the governed green a presence beyond
+   semantics (it was effectively benched, leaving a grayscale identity). */
+::selection {
+  background: rgba(21, 128, 61, 0.16);
 }
 
 button {
@@ -285,6 +291,37 @@ select:focus-visible,
     opacity: 1;
   }
 }
+
+/* ---- content enter motion ----
+   Lists, grids and cards rise in on mount instead of snapping into place.
+   `.enter-rise` animates a single element; `.enter-stagger > *` cascades its
+   direct children. Stagger is capped so long lists don't crawl in. Motion is
+   neutralised by the prefers-reduced-motion block above. */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.enter-rise {
+  animation: riseIn var(--dur-base) var(--ease-decel) both;
+}
+.enter-stagger > * {
+  animation: riseIn var(--dur-base) var(--ease-decel) both;
+}
+.enter-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.enter-stagger > *:nth-child(2) { animation-delay: 30ms; }
+.enter-stagger > *:nth-child(3) { animation-delay: 60ms; }
+.enter-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.enter-stagger > *:nth-child(5) { animation-delay: 120ms; }
+.enter-stagger > *:nth-child(6) { animation-delay: 150ms; }
+.enter-stagger > *:nth-child(7) { animation-delay: 175ms; }
+.enter-stagger > *:nth-child(8) { animation-delay: 200ms; }
+.enter-stagger > *:nth-child(n + 9) { animation-delay: 220ms; }
 /* exit counterparts — overlays now animate out instead of blinking */
 @keyframes fadeOut {
   to {

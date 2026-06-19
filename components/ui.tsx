@@ -90,12 +90,12 @@ export function Button({
     md: { fontSize: 13, padding: "8px 14px" },
   };
   const variants: Record<ButtonVariant, CSSProperties> = {
-    primary: { background: C.solid, color: "#fff" },
+    primary: { background: C.solid, color: C.surface },
     secondary: { background: C.surface, color: C.ink700, border: `1px solid ${C.lineStrong}` },
     tonal: { background: C.subtle, color: C.ink900 },
     outlined: { background: "transparent", color: C.ink700, border: `1px solid ${C.lineStrong}` },
     ghost: { background: "transparent", color: C.ink500 },
-    danger: { background: C.danger, color: "#fff" },
+    danger: { background: C.danger, color: C.surface },
   };
   return (
     <button
@@ -109,12 +109,12 @@ export function Button({
         fontWeight: 600,
         border: "1px solid transparent",
         borderRadius: R.sm,
-        cursor: "pointer",
+        cursor: props.disabled ? "not-allowed" : "pointer",
         whiteSpace: "nowrap",
-        transition: "background .12s, border-color .12s",
+        transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)",
         ...sizes[size],
         ...variants[variant],
-        ...(props.disabled ? { opacity: 0.45, pointerEvents: "none" } : null),
+        ...(props.disabled ? { background: C.subtle, color: C.ink300, borderColor: C.line } : null),
         ...style,
       }}
       {...props}
@@ -148,11 +148,12 @@ export function IconButton({
         border: `1px solid ${C.line}`,
         background: C.surface,
         borderRadius: R.sm,
-        cursor: "pointer",
+        cursor: props.disabled ? "not-allowed" : "pointer",
         color: tone === "danger" ? C.danger : C.ink500,
         padding: 0,
         flexShrink: 0,
-        transition: "background .12s, border-color .12s, color .12s",
+        transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)",
+        ...(props.disabled ? { background: C.subtle, color: C.ink300, borderColor: C.line } : null),
         ...style,
       }}
       {...props}
@@ -197,7 +198,8 @@ export function Checkbox({
         flexShrink: 0,
         cursor: "pointer",
         padding: 0,
-        color: "#fff",
+        color: C.surface,
+        transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard)",
         ...(checked
           ? { background: fill, border: `1px solid ${fill}` }
           : { background: C.surface, border: `1.5px solid ${C.lineStrong}` }),
@@ -480,7 +482,7 @@ export function Modal({
   return (
     <div
       onClick={requestClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", animation: closing ? "fadeOut .16s ease forwards" : "fadeIn var(--dur-base) var(--ease-out)", padding: 20 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", animation: closing ? "fadeOut var(--dur-fast) var(--ease-accel) forwards" : "fadeIn var(--dur-base) var(--ease-out)", padding: 20 }}
     >
       <div
         ref={ref}
@@ -489,7 +491,7 @@ export function Modal({
         aria-labelledby="modal-title"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.lg, boxShadow: SH.lg, padding: 24, color: C.ink900, animation: closing ? "popOut .16s ease forwards" : "popIn var(--dur-base) var(--ease-out)", outline: "none" }}
+        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.lg, boxShadow: SH.lg, padding: 24, color: C.ink900, animation: closing ? "popOut var(--dur-fast) var(--ease-accel) forwards" : "popIn var(--dur-base) var(--ease-out)", outline: "none" }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: subtitle ? 4 : 16 }}>
           <h2 id="modal-title" style={{ ...TX.h2, margin: 0 }}>{title}</h2>
@@ -534,11 +536,11 @@ export function Avatar({
         justifyContent: "center",
         fontSize: fontSize ?? Math.round(size * 0.36),
         fontWeight: 600,
-        color: "#fff",
+        color: C.surface,
         background: color,
         flexShrink: 0,
         ...(title ? { cursor: "default" } : null),
-        ...(ring ? { border: "2px solid #fff" } : null),
+        ...(ring ? { border: `2px solid ${C.surface}` } : null),
       }}
     >
       {initials}
@@ -643,7 +645,7 @@ export function ProgressBar({
       aria-valuemax={100}
       style={{ flex: 1, height, background: track, borderRadius: R.pill, overflow: "hidden" }}
     >
-      <div style={{ height: "100%", width: `${clamped}%`, background: color, borderRadius: R.pill, transition: "width .3s ease" }} />
+      <div style={{ height: "100%", width: `${clamped}%`, background: color, borderRadius: R.pill, transition: "width var(--dur-slow) var(--ease-standard)" }} />
     </div>
   );
 }
@@ -676,11 +678,24 @@ export function Sparkline({
 
   if (values.length < 2) return null;
   const W = 100;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+  // Honest y-domain. A naive [min,max] domain magnifies a 1% wobble into a
+  // full-height swing. Anchor the floor at 0 for all-positive series (the
+  // common case here), so the line's slope reflects real magnitude. If the
+  // span is still vanishingly small relative to the peak, pad it so the trace
+  // reads as the near-flat line it actually is — not zoomed noise.
+  const peak = Math.max(Math.abs(dataMin), Math.abs(dataMax)) || 1;
+  let lo = dataMin >= 0 ? 0 : dataMin;
+  let hi = dataMax;
+  if (hi - lo < peak * 0.08) {
+    const pad = (peak * 0.08 - (hi - lo)) / 2;
+    lo -= pad;
+    hi += pad;
+  }
+  const range = hi - lo || 1;
   const x = (i: number) => (i / (values.length - 1)) * W;
-  const y = (v: number) => height - 3 - ((v - min) / range) * (height - 6);
+  const y = (v: number) => height - 3 - ((v - lo) / range) * (height - 6);
   const line = values.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ");
   const area = `0,${height} ${line} ${W},${height}`;
   const lastX = x(values.length - 1);
@@ -698,7 +713,7 @@ export function Sparkline({
         ) : null}
         {fill ? <polygon points={area} fill={gradient ? `url(#${gid})` : color} opacity={gradient ? 1 : 0.08} /> : null}
         <polyline points={line} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-        <circle cx={lastX} cy={lastY} r={2.4} fill={color} stroke="#fff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <circle cx={lastX} cy={lastY} r={2.4} fill={color} stroke={C.surface} strokeWidth={1} vectorEffect="non-scaling-stroke" />
       </svg>
       {endLabel ? (
         <span
@@ -711,7 +726,7 @@ export function Sparkline({
             ...num(13),
             fontSize: 12,
             color,
-            background: "#fff",
+            background: C.surface,
             padding: "0 2px",
             borderRadius: R.xxs,
             pointerEvents: "none",
@@ -759,6 +774,21 @@ export function Gauge({
   const dash = `${arcLen} ${circ}`;
   // rotate so the gap sits at the bottom: start at 90° + GAP
   const rot = 90 + GAP;
+  // Quarter ticks across the sweep (0 / 25 / 50 / 75 / 100%) so the arc reads as
+  // a measured value, not a decorative ring. Drawn in the SVG's local frame so
+  // they ride the same rotation as the track and sit just inside the arc.
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => {
+    const a = ((t * SWEEP) / 360) * 2 * Math.PI; // sweep starts at local 0° after rotation
+    const inner = r - thickness / 2 - 2.5;
+    const outer = r + thickness / 2 + 2.5;
+    return {
+      x1: cx + Math.cos(a) * inner,
+      y1: cy + Math.sin(a) * inner,
+      x2: cx + Math.cos(a) * outer,
+      y2: cy + Math.sin(a) * outer,
+      major: t === 0 || t === 1,
+    };
+  });
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", transform: `rotate(${rot}deg)` }}>
@@ -772,6 +802,19 @@ export function Gauge({
           strokeLinecap="round"
           strokeDasharray={dash}
         />
+        {ticks.map((t, i) => (
+          <line
+            key={i}
+            x1={t.x1}
+            y1={t.y1}
+            x2={t.x2}
+            y2={t.y2}
+            stroke={t.major ? C.lineStrong : C.line}
+            strokeWidth={t.major ? 1.25 : 1}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
         <circle
           cx={cx}
           cy={cy}
@@ -781,7 +824,7 @@ export function Gauge({
           strokeWidth={thickness}
           strokeLinecap="round"
           strokeDasharray={`${arcLen * pct} ${circ}`}
-          style={{ transition: "stroke-dasharray .6s cubic-bezier(.2,0,0,1), stroke .3s" }}
+          style={{ transition: "stroke-dasharray var(--dur-slow) var(--ease-standard), stroke var(--dur-fast) var(--ease-standard)" }}
         />
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>

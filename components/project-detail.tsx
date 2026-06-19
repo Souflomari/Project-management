@@ -12,10 +12,13 @@ import type { SubtaskPatch } from "@/lib/data/repository";
 import { buildBudget, type DerivedProject, type DerivedSubtask } from "@/lib/derive";
 import { fmtEur, fmtFull, REFERENCE_DATE } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, FONT_DISPLAY, num, R, STATUS_META, TX } from "@/lib/tokens";
+import { C, FONT_DISPLAY, num, R, SURFACE, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
 
-const LABEL: React.CSSProperties = { ...TX.eyebrow, color: C.ink500 };
+// Section headings read as quiet sentence-case overlines (editorial, not robotic
+// uppercase). Eyebrow (uppercase, tracked) is reserved for the few true category
+// tags — the stat-cell metadata labels below.
+const LABEL: React.CSSProperties = { ...TX.overline, color: C.ink700 };
 
 /** Editable name + maître d'ouvrage · discipline. `titleStyle` lets the page
  *  render a larger heading than the drawer. */
@@ -50,8 +53,8 @@ export function ProjectOverview({ p }: { p: DerivedProject }) {
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-        <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
-          <div style={{ ...TX.eyebrow, color: C.ink500 }}>Honoraires</div>
+        <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
+          <div style={{ ...TX.overline, color: C.ink600 }}>Honoraires</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
             <input
               key={p.budget}
@@ -71,11 +74,11 @@ export function ProjectOverview({ p }: { p: DerivedProject }) {
         </div>
         <Stat
           label="Avancement"
-          value={`${p.progress} %`}
+          value={`${p.progress} %`}
           hint={`${doneCount} / ${p.subtasksD.length} tâches`}
           title={`Avancement pondéré par la durée des tâches (jours terminés ÷ jours planifiés). Le décompte ${doneCount} / ${p.subtasksD.length} indique le nombre de tâches.`}
         >
-          <div style={{ ...TX.micro, color: C.ink400, marginTop: 3 }}>pondéré par durée</div>
+          <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>pondéré par durée</div>
           <div style={{ marginTop: 8 }}><ProgressBar pct={p.progress} color={C.brand} height={5} /></div>
         </Stat>
       </div>
@@ -109,7 +112,7 @@ export function ProjectOverview({ p }: { p: DerivedProject }) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div style={LABEL}>Phase d&apos;étude</div>
+        <div style={LABEL}>Phase d’étude</div>
         <Button size="sm" disabled={!canAdvance} onClick={() => advancePhase(p.id)}>Phase suivante</Button>
       </div>
       <div style={{ position: "relative", marginBottom: 26 }}>
@@ -186,21 +189,21 @@ export function ProjectBudget({ p }: { p: DerivedProject }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 9 }}>
-        <div style={LABEL}>Honoraires &amp; coûts</div>
+        <div style={LABEL}>Honoraires et coûts</div>
         <span style={{ ...TX.micro, color: b.overBudget ? C.danger : C.ink500 }}>
-          marge {b.marginPct >= 0 ? "+" : ""}{b.marginPct} %
+          marge {b.marginPct >= 0 ? "+" : ""}{b.marginPct} %
         </span>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
         <Stat label="Honoraires" value={fmtEur(b.feesEur)} />
-        <Stat label="Coût engagé" value={fmtEur(b.plannedCostEur)} hint={`${b.committedPct} % des honoraires`} />
-        <Stat label="Valeur acquise" value={fmtEur(b.earnedValueEur)} hint={`${b.spentPct} % du coût`} />
+        <Stat label="Coût engagé" value={fmtEur(b.plannedCostEur)} hint={`${b.committedPct} % des honoraires`} />
+        <Stat label="Valeur acquise" value={fmtEur(b.earnedValueEur)} hint={`${b.spentPct} % du coût`} />
       </div>
 
-      <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px", marginBottom: 24 }}>
+      <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px", marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={{ ...TX.eyebrow, color: C.ink500 }}>Consommation des honoraires</span>
+          <span style={{ ...TX.overline, color: C.ink600 }}>Consommation des honoraires</span>
           <span style={{ ...num(15), color: marginColor }}>
             {b.marginEur >= 0 ? "marge " : "dépassement "}{fmtEur(Math.abs(b.marginEur))}
           </span>
@@ -241,7 +244,7 @@ export function ProjectTasks({ p }: { p: DerivedProject }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={LABEL}>Tâches &amp; planning</div>
+        <div style={LABEL}>Tâches et planning</div>
         <span style={{ ...TX.micro, color: C.ink500 }}>{doneCount} / {p.subtasksD.length} · {p.doneDays} / {p.totalDays} j</span>
       </div>
 
@@ -257,7 +260,7 @@ export function ProjectTasks({ p }: { p: DerivedProject }) {
         )}
       </div>
 
-      <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: 12 }}>
+      <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: 12 }}>
         <div style={{ ...LABEL, marginBottom: 8 }}>Nouvelle tâche</div>
         <Input
           size="sm"
@@ -288,7 +291,7 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
   return (
     <>
       {p.comments.length === 0 ? (
-        <div style={{ ...TX.caption, color: C.ink500, marginBottom: 12 }}>Aucun commentaire pour l&apos;instant.</div>
+        <div style={{ ...TX.caption, color: C.ink500, marginBottom: 12 }}>Aucun commentaire pour l’instant.</div>
       ) : null}
       {p.comments.map((cm, i) => (
         <div key={i} style={{ display: "flex", gap: 10, marginBottom: 12 }}>
@@ -296,7 +299,7 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
           <div style={{ minWidth: 0 }}>
             <div style={{ ...TX.caption }}>
               <span style={{ fontWeight: 600, color: C.ink900 }}>{cm.author}</span>{" "}
-              <span style={{ color: C.ink400 }}>· {cm.when}</span>
+              <span style={{ color: C.ink500 }}>· {cm.when}</span>
             </div>
             <div style={{ ...TX.body, marginTop: 2 }}>{cm.text}</div>
           </div>
@@ -374,17 +377,17 @@ function SubtaskRow({
         <Input size="sm" type="date" aria-label="Date de début" value={subtask.start} onChange={(e) => onUpdate(projectId, subtask.id, { start: e.target.value })} style={{ width: 148 }} />
         <Input size="sm" type="number" min={1} aria-label="Jours planifiés" value={subtask.plannedDays} onChange={(e) => onUpdate(projectId, subtask.id, { plannedDays: Math.max(1, Number(e.target.value)) })} />
       </div>
-      <div style={{ ...TX.micro, color: C.ink400, marginTop: 4, paddingLeft: 27 }}>fin {fmtFull(subtask.end)}</div>
+      <div style={{ ...TX.micro, color: C.ink500, marginTop: 4, paddingLeft: 27 }}>fin {fmtFull(subtask.end)}</div>
 
       <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 7, paddingLeft: 27, flexWrap: "wrap" }}>
-        <span style={{ ...TX.micro, color: C.ink400 }}>↳ après</span>
+        <span style={{ ...TX.micro, color: C.ink500 }}>↳ après</span>
         {subtask.dependsOn.map((id) => (
           <span
             key={id}
-            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 4px 1px 8px", color: C.ink700 }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 4px 1px 8px", color: C.ink700 }}
           >
             {depNames.get(id) ?? `#${id}`}
-            <button onClick={() => removeDep(id)} aria-label="Retirer la dépendance" style={{ border: "none", background: "transparent", cursor: "pointer", color: C.ink400, lineHeight: 1, padding: 0, display: "flex" }}>
+            <button onClick={() => removeDep(id)} aria-label="Retirer la dépendance" className="soft-hover" style={{ border: "none", background: "transparent", cursor: "pointer", color: C.ink500, lineHeight: 1, padding: 0, display: "flex", borderRadius: R.xs }}>
               <CloseIcon size={11} />
             </button>
           </span>
@@ -394,7 +397,7 @@ function SubtaskRow({
             value=""
             aria-label="Ajouter une dépendance"
             onChange={(e) => e.target.value && addDep(Number(e.target.value))}
-            className="ui-field"
+            className="ui-field soft-hover"
             style={{ fontSize: 11, padding: "3px 6px", borderRadius: R.xs, border: `1px solid ${C.line}`, background: C.surface, color: C.ink500, maxWidth: 160, cursor: "pointer", outline: "none" }}
           >
             <option value="">+ dépendance…</option>
@@ -429,7 +432,7 @@ export function EditableText({ value, onSave, ariaLabel, style }: { value: strin
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: "block" }}>
-      <span style={{ ...TX.eyebrow, color: C.ink500, display: "block", marginBottom: 5 }}>{label}</span>
+      <span style={{ ...TX.overline, color: C.ink600, display: "block", marginBottom: 5 }}>{label}</span>
       {children}
     </label>
   );
@@ -437,8 +440,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Stat({ label, value, hint, title, children }: { label: string; value: string; hint?: string; title?: string; children?: React.ReactNode }) {
   return (
-    <div title={title} style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
-      <div style={{ ...TX.eyebrow, color: C.ink500 }}>{label}</div>
+    <div title={title} style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
+      <div style={{ ...TX.overline, color: C.ink600 }}>{label}</div>
       <div style={{ ...num(22), marginTop: 4, color: C.ink900 }}>{value}</div>
       {hint ? <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{hint}</div> : null}
       {children}

@@ -23,11 +23,11 @@ export const C = {
   ink500: "#78716C", // secondary (receded) — AA floor for body text ≈ 4.7:1
   ink400: "#857E78", // muted label / eyebrow — darkened to ~3.6:1 (was #9B948F ≈ 2.9:1, failed AA)
   ink300: "#BDB8B2", // disabled text/control
-  line: "#EEECE9", // soft warm hairline (low contrast — structure, not noise)
-  lineStrong: "#E3E0DB", // hover / modal border
+  line: "#E7E3DE", // warm hairline — bumped from #EEECE9 (~1.18:1) so structure registers on white cards
+  lineStrong: "#D9D4CC", // hover / modal border / visible divider (~1.45:1)
   surface: "#FFFFFF",
-  canvas: "#FFFFFF", // unified white app background (minimalist — cards read by border, not fill)
-  subtle: "#F5F4F2", // inset / track / hover / rail
+  canvas: "#FAF9F7", // warm off-white app background — white cards now sit ON it and read as raised (was pure white = flat)
+  subtle: "#F2F0ED", // inset / track / hover / rail — a step below the tinted canvas
   // near-black action surface (Vercel/Geist-style primary)
   solid: "#1C1917",
   solidHover: "#000000",
@@ -57,12 +57,12 @@ export const AVATAR_PALETTE = [
 // component asks for a role ("a container, one step up") instead of a raw hex —
 // and a future dark theme only has to remap these six values.
 export const SURFACE = {
-  base: "#FFFFFF", // app canvas (now white)
-  containerLowest: "#FFFFFF", // raised cards & dialogs (rest on the canvas)
+  base: "#FAF9F7", // warm off-white app canvas — white cards rest ON it and read as raised
+  containerLowest: "#FFFFFF", // raised cards & dialogs (pop white against the tinted canvas)
   containerLow: "#FCFBFA", // faintly raised overlays
-  container: "#F7F6F4", // default filled container / track
-  containerHigh: "#F5F4F2", // insets, rails, hover wells
-  containerHighest: "#EFEDEA", // deepest inset / pressed track
+  container: "#F2F0ED", // default filled container / track
+  containerHigh: "#ECE9E5", // insets, rails, hover wells
+  containerHighest: "#E5E2DD", // deepest inset / pressed track
 } as const;
 
 // ── M3 state-layer opacities ─────────────────────────────────────────────────

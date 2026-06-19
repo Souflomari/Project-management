@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
 import { Button, IconButton, Modal, rowProps, Segmented, Select, Toolbar } from "../ui";
 import { buildMonthGrid, buildTaskEvents, eventsInRange, type TaskEvent } from "@/lib/derive";
-import { fmtFull, isToday, MONS_LONG, MONTHS_FULL, shiftISO, taskStartForEnd, toDate, WEEKDAYS, monthRange, weekRange } from "@/lib/format";
+import { fmtFull, isToday, MONS_LONG, MONTHS_FULL, shiftISO, taskStartForEnd, toDate, monthRange, weekRange } from "@/lib/format";
 import { useProjects, type CalMode } from "@/lib/store/projects-context";
 import { C, num, PHASE_COLORS, TX } from "@/lib/tokens";
 import { PHASES } from "@/lib/types";
@@ -15,6 +15,11 @@ const MODE_OPTS: { value: CalMode; label: string }[] = [
   { value: "semaine", label: "Semaine" },
   { value: "agenda", label: "Agenda" },
 ];
+
+// Unambiguous, sentence-case weekday header abbreviations (vs "L M M J V S D",
+// where three are 'M'/'J' look-alikes). Index = Monday-first, matching WEEKDAYS.
+const WEEKDAYS_SHORT = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"];
+const WEEKDAYS_LONG = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
 interface PendingMove {
   event: TaskEvent;
@@ -129,7 +134,7 @@ export function CalendarView() {
             {ph}
           </span>
         ))}
-        <span style={{ ...TX.caption, color: C.ink400 }}>· glissez un rendu pour le replanifier</span>
+        <span style={{ ...TX.caption, color: C.ink500 }}>· glissez un rendu pour le replanifier</span>
       </div>
 
       {calMode === "agenda" ? (
@@ -158,7 +163,7 @@ export function CalendarView() {
         >
           <p style={{ ...TX.body, color: C.ink700, margin: 0 }}>
             Décaler <strong>{pending.event.taskName}</strong> ({pending.event.projectName}) au{" "}
-            <strong>{fmtFull(pending.date)}</strong> ? La durée planifiée ({pending.event.plannedDays} j) est conservée.
+            <strong>{fmtFull(pending.date)}</strong> ? La durée planifiée ({pending.event.plannedDays} j) est conservée.
           </p>
         </Modal>
       ) : null}
@@ -195,7 +200,7 @@ function EventChip({ e, onOpen, dnd, compact }: { e: TaskEvent; onOpen: (id: num
       aria-label={`${e.projectName} — ${e.taskName}`}
       onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onOpen(e.projectId); } }}
       className="cal-chip"
-      style={{ background: C.subtle, borderLeft: `3px solid ${e.color}`, borderRadius: 4, padding: "3px 7px", cursor: "grab", touchAction: "none", overflow: "hidden", minWidth: 0, maxWidth: "100%" }}
+      style={{ background: C.subtle, borderLeft: `3px solid ${e.color}`, borderRadius: 4, padding: "3px 7px", cursor: "grab", touchAction: "none", overflow: "hidden", minWidth: 0, maxWidth: "100%", transition: "box-shadow var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard)" }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
         <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
@@ -230,9 +235,21 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
     });
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640 }}>
+    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.subtle, borderBottom: `1px solid ${C.line}` }}>
-        {WEEKDAYS.map((w) => (<div key={w} style={{ padding: "9px 12px", ...TX.eyebrow, color: C.ink500 }}>{w}</div>))}
+        {WEEKDAYS_SHORT.map((w, i) => {
+          const weekend = i >= 5;
+          return (
+            <div
+              key={w}
+              title={WEEKDAYS_LONG[i]}
+              aria-label={WEEKDAYS_LONG[i]}
+              style={{ padding: "9px 12px", ...TX.overline, color: weekend ? C.ink400 : C.ink500 }}
+            >
+              {w}
+            </div>
+          );
+        })}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
         {cells.map((c, i) => {
@@ -253,7 +270,7 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
             <>
               {c.day !== null ? (
                 c.isToday ? (
-                  <div style={{ ...num(13), width: 22, height: 22, borderRadius: "50%", background: C.brand, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>{c.day}</div>
+                  <div style={{ ...num(13), width: 22, height: 22, borderRadius: "50%", background: C.brand, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>{c.day}</div>
                 ) : (
                   <div style={{ ...num(13), color: C.ink600, padding: "1px 2px" }}>{c.day}</div>
                 )
@@ -305,15 +322,15 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
     const d = new Date(startD);
     d.setDate(startD.getDate() + i);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return { iso, dow: WEEKDAYS[i], num: d.getDate(), isToday: isToday(iso), events: events.filter((e) => e.date === iso) };
+    return { iso, dow: WEEKDAYS_SHORT[i], dowLong: WEEKDAYS_LONG[i], weekend: i >= 5, num: d.getDate(), isToday: isToday(iso), events: events.filter((e) => e.date === iso) };
   });
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(7,1fr)", minWidth: 640 }}>
       {days.map((d) => (
-        <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320, minWidth: 0, overflow: "hidden" }}>
+        <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320, minWidth: 0, overflow: "hidden", background: d.weekend ? C.canvas : C.surface }}>
           <div style={{ padding: "9px 10px", background: d.isToday ? C.brand50 : C.subtle, borderBottom: `1px solid ${C.line}` }}>
-            <div style={{ ...TX.eyebrow, color: C.ink500 }}>{d.dow}</div>
+            <div title={d.dowLong} style={{ ...TX.overline, color: d.weekend ? C.ink400 : C.ink500 }}>{d.dow}</div>
             <div style={{ ...num(18), color: d.isToday ? C.brand : C.ink900 }}>{d.num}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 6, minWidth: 0 }}>
@@ -343,14 +360,14 @@ function AgendaView({ year, month, events, onOpen }: { year: number; month: numb
             >
               <div style={{ textAlign: "center", minWidth: 44 }}>
                 <div style={num(18)}>{d.getDate()}</div>
-                <div style={{ fontSize: 10.5, textTransform: "uppercase", color: C.ink400, letterSpacing: ".06em" }}>{WEEKDAYS[(d.getDay() + 6) % 7]}</div>
+                <div title={WEEKDAYS_LONG[(d.getDay() + 6) % 7]} style={{ ...TX.overline, color: C.ink500 }}>{WEEKDAYS_SHORT[(d.getDay() + 6) % 7]}</div>
               </div>
               <div style={{ width: 3, alignSelf: "stretch", borderRadius: 2, background: e.color }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ ...TX.bodyStrong, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
                 <div style={{ ...TX.caption, color: C.ink500 }}>{e.taskName}</div>
               </div>
-              <div title={e.assigneeInitials} style={{ width: 26, height: 26, borderRadius: "50%", background: e.assigneeColor, color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div title={e.assigneeInitials} style={{ width: 26, height: 26, borderRadius: "50%", background: e.assigneeColor, color: C.surface, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {e.assigneeInitials}
               </div>
             </div>

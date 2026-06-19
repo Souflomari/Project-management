@@ -54,12 +54,12 @@ export function Dashboard() {
 
   return (
     <>
-      <div className="bento">
+      <div className="bento enter-stagger">
         {/* portfolio-health hero — the 2x2 anchor tile, raised tone + larger
             radius so it commands the bento over the flat KPI tiles. */}
         <div className="b-hero">
           <Card elevation={1} radius={R.xxl} padding="22px 24px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-            <div style={{ ...TX.eyebrow, color: C.ink400 }}>Santé du portefeuille</div>
+            <div style={{ ...TX.overline, color: C.ink500 }}>Santé du portefeuille</div>
 
             {/* command-viz: radial health gauge on the governed load ramp */}
             <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14 }}>
@@ -77,7 +77,7 @@ export function Dashboard() {
                   <span style={{ ...TX.bodyStrong, color: C.ink900, fontSize: 16 }}>{healthLabel}</span>
                 </div>
                 <div style={{ ...TX.caption, color: C.ink500, marginTop: 6, maxWidth: 200 }}>
-                  Composite pondéré de l&apos;état des {distTotal} projet{distTotal > 1 ? "s" : ""} du portefeuille.
+                  Composite pondéré de l’état des {distTotal} projet{distTotal > 1 ? "s" : ""} du portefeuille.
                 </div>
               </div>
             </div>
@@ -110,7 +110,7 @@ export function Dashboard() {
                 <span style={{ ...num(15), color: C.ink900 }}>{kpis.avg}&#8239;%</span>
               </div>
               <div style={{ marginTop: 10, paddingRight: 30 }}>
-                <Sparkline values={history.map((h) => h.avg)} height={46} gradient endLabel={`${kpis.avg}%`} />
+                <Sparkline values={history.map((h) => h.avg)} height={46} gradient endLabel={`${kpis.avg} %`} />
               </div>
               <div style={{ ...TX.nano, color: C.ink400, marginTop: 4 }}>8 dernières semaines</div>
             </div>
@@ -143,7 +143,7 @@ export function Dashboard() {
             >
               <div style={{ textAlign: "center", minWidth: 42 }}>
                 <div style={num(20)}>{r.renduDay}</div>
-                <div style={{ fontSize: 11, textTransform: "uppercase", color: C.ink400, letterSpacing: ".06em", marginTop: 1 }}>{r.renduMon}</div>
+                <div style={{ ...TX.eyebrow, color: C.ink500, marginTop: 1 }}>{r.renduMon}</div>
               </div>
               <div style={{ width: 3, alignSelf: "stretch", borderRadius: 2, background: r.renduDueColor }} />
               <div style={{ minWidth: 0, flex: 1 }}>
@@ -200,12 +200,12 @@ export function Dashboard() {
 
 /** Week-over-week delta chip; neutral when flat. `goodUp` flips the colour sense. */
 function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: boolean }) {
-  if (!v) return <span style={{ ...TX.nano, color: C.ink400 }}>±0{unit ? ` ${unit}` : ""}</span>;
+  if (!v) return <span style={{ ...TX.nano, color: C.ink400 }}>±0{unit ? ` ${unit}` : ""}</span>;
   const up = v > 0;
   const good = up === goodUp;
   return (
     <span style={{ ...TX.nano, fontWeight: 600, color: good ? C.brand : STATUS_META["à risque"].color, display: "inline-flex", alignItems: "center", gap: 1 }}>
-      {up ? "↑" : "↓"}{Math.abs(v)}{unit ? ` ${unit}` : ""}
+      {up ? "↑" : "↓"}{Math.abs(v)}{unit ? ` ${unit}` : ""}
     </span>
   );
 }
@@ -216,7 +216,7 @@ function Kpi({ title, value, sub, color, accent, delta, onClick, className }: { 
   return (
     <div className={cls} {...(onClick ? rowProps(onClick) : {})} style={{ borderRadius: R.lg, ...(onClick ? { cursor: "pointer" } : {}) }}>
       <Card padding="16px 18px" style={{ height: "100%", ...(accent ? { borderTop: `2px solid ${accent}` } : {}) }}>
-        <div style={{ ...TX.eyebrow, color: C.ink400 }}>{title}</div>
+        <div style={{ ...TX.overline, color: C.ink500 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
           <span style={{ ...num(36), color: color ?? C.ink900 }}>{display}</span>
           {delta !== undefined ? <Delta v={delta} /> : null}
@@ -235,7 +235,7 @@ function PhaseStrip({ className, columns, total, onPhase }: { className?: string
     <div className={className}>
       <Card padding="14px 18px" style={{ height: "100%" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ ...TX.eyebrow, color: C.ink400 }}>Répartition par phase</div>
+          <div style={{ ...TX.overline, color: C.ink500 }}>Répartition par phase</div>
           <div style={{ ...TX.nano, color: C.ink400 }}>{total} projets</div>
         </div>
         <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 12, background: C.subtle }}>

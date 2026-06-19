@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { NAV_ICONS } from "./icons";
 import { SIDEBAR_ITEMS, sidebarKeyForPath } from "@/lib/nav";
-import { C, R, TX } from "@/lib/tokens";
+import { C, DUR, EASE, R, TX } from "@/lib/tokens";
 
 /**
  * Thumb-zone bottom tab bar for mobile (<=768px). Hidden above 768px via the
@@ -39,11 +39,12 @@ export function MobileNav() {
               minWidth: 0,
               minHeight: 48,
               borderRadius: R.md,
-              color: active ? C.ink900 : C.ink500,
+              color: active ? C.brandText : C.ink500,
               fontWeight: active ? 600 : 500,
+              transition: `color ${DUR.base} ${EASE.standard}`,
             }}
           >
-            <span style={{ display: "flex", color: active ? C.ink900 : C.ink500 }}>
+            <span style={{ display: "flex", color: active ? C.brand : C.ink500, transition: `color ${DUR.base} ${EASE.standard}` }}>
               <Icon size={21} />
             </span>
             <span style={{ ...TX.nano, fontWeight: "inherit", whiteSpace: "nowrap" }}>{item.label}</span>

@@ -9,7 +9,7 @@ import { Button } from "./ui";
 import { openCommandPalette } from "./command-palette";
 import { isWorkspacePath, navItemForPath, WORKSPACE_VIEWS } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, R, SH, TX } from "@/lib/tokens";
+import { C, DUR, EASE, R, SH, TX } from "@/lib/tokens";
 
 /** Segmented links switching the lens of the Projets workspace. */
 function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
@@ -31,7 +31,7 @@ function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
               background: active ? C.surface : "transparent",
               color: active ? C.ink900 : C.ink500,
               boxShadow: active ? SH.sm : "none",
-              transition: "background .12s, color .12s",
+              transition: `background ${DUR.fast} ${EASE.standard}, color ${DUR.fast} ${EASE.standard}, box-shadow ${DUR.fast} ${EASE.standard}`,
               whiteSpace: "nowrap",
             }}
           >
@@ -97,7 +97,7 @@ export function Header() {
       <div className="header-lead" style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
         <h1 style={{ ...TX.h1, margin: 0, whiteSpace: "nowrap" }}>{title}</h1>
         {inWorkspace ? <WorkspaceSwitcher activeKey={item.key} /> : null}
-        {isListe ? <span className="header-search" style={{ ...TX.caption, color: C.ink400, whiteSpace: "nowrap" }}>{count}</span> : null}
+        {isListe ? <span className="header-search" style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap" }}>{count}</span> : null}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -130,13 +130,13 @@ export function Header() {
         ) : (
           <button
             onClick={openCommandPalette}
-            className="ui-field header-search"
+            className="ui-field header-search lift-hover"
             aria-label="Recherche rapide"
-            style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.sm, padding: "0 10px 0 12px", height: 36, width: 240, color: C.ink400, cursor: "pointer", font: "inherit" }}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.sm, padding: "0 10px 0 12px", height: 36, width: 240, color: C.ink500, cursor: "pointer", font: "inherit" }}
           >
             <SearchIcon />
             <span style={{ fontSize: 14, flex: 1, textAlign: "left" }}>Rechercher…</span>
-            <kbd style={{ fontSize: 11, fontWeight: 600, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit", minWidth: "3ch", textAlign: "center", visibility: kbd ? "visible" : "hidden" }}>{kbd ?? " "}</kbd>
+            <kbd style={{ ...TX.nano, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit", minWidth: "3ch", textAlign: "center", visibility: kbd ? "visible" : "hidden" }}>{kbd ?? " "}</kbd>
           </button>
         )}
         <Button onClick={openAdd} icon={<PlusIcon size={15} />} aria-label="Nouveau projet">

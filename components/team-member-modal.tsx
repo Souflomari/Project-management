@@ -4,12 +4,13 @@ import { useState } from "react";
 
 import { Button, Input, Modal } from "./ui";
 import { useProjects } from "@/lib/store/projects-context";
-import { AVATAR_PALETTE, C, TX } from "@/lib/tokens";
+import { AVATAR_PALETTE, C, DUR, EASE, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const PALETTE = AVATAR_PALETTE;
 
-const label: React.CSSProperties = { ...TX.eyebrow, color: C.ink500, display: "block", margin: "0 0 6px" };
+// Form field labels read as quiet sentence-case overlines, not robotic uppercase.
+const label: React.CSSProperties = { ...TX.overline, color: C.ink600, display: "block", margin: "0 0 6px" };
 
 function initialsFrom(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -62,10 +63,10 @@ export function TeamMemberModal({ member, onClose }: { member: TeamMember | null
       }
     >
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16 }}>
-        <div style={{ width: 46, height: 46, borderRadius: "50%", background: color, color: "#fff", fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div style={{ width: 46, height: 46, borderRadius: "50%", background: color, color: C.surface, fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: `background ${DUR.base} ${EASE.standard}` }}>
           {finalInitials}
         </div>
-        <div style={{ ...TX.caption, color: C.ink500 }}>Aperçu de l&apos;avatar</div>
+        <div style={{ ...TX.caption, color: C.ink500 }}>Aperçu de l’avatar</div>
       </div>
 
       <label style={label}>Nom</label>
@@ -89,7 +90,13 @@ export function TeamMemberModal({ member, onClose }: { member: TeamMember | null
             key={c}
             onClick={() => setColor(c)}
             className="btn"
-            style={{ width: 26, height: 26, borderRadius: "50%", background: c, cursor: "pointer", border: color === c ? `2px solid ${C.ink900}` : "2px solid transparent" }}
+            aria-label={`Couleur ${c}`}
+            aria-pressed={color === c}
+            style={{
+              width: 26, height: 26, borderRadius: "50%", background: c, cursor: "pointer",
+              border: color === c ? `2px solid ${C.ink900}` : `2px solid transparent`,
+              transition: `border-color ${DUR.fast} ${EASE.standard}, transform ${DUR.fast} ${EASE.standard}`,
+            }}
           />
         ))}
       </div>

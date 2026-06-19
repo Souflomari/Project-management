@@ -73,8 +73,8 @@ export function ProjectsTable() {
       <FilterBar showViews />
 
       {selectedIds.length > 0 ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px 9px 16px", marginBottom: 12, background: C.ink900, color: "#fff", borderRadius: R.md, boxShadow: SH.md, flexWrap: "wrap" }}>
-          <span style={{ ...TX.bodyStrong, color: "#fff" }}>{selectedIds.length} sélectionné{selectedIds.length > 1 ? "s" : ""}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px 9px 16px", marginBottom: 12, background: C.ink900, color: C.surface, borderRadius: R.md, boxShadow: SH.md, flexWrap: "wrap" }}>
+          <span style={{ ...TX.bodyStrong, color: C.surface }}>{selectedIds.length} sélectionné{selectedIds.length > 1 ? "s" : ""}</span>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,.16)" }} />
           <Select size="sm" value="" aria-label="Changer le statut" onChange={(e) => { if (e.target.value) { bulkSetStatus(selectedIds, e.target.value as Status); clearSel(); } }} style={{ width: 150 }}>
             <option value="">Changer le statut…</option>
@@ -85,12 +85,12 @@ export function ProjectsTable() {
             {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
           </Select>
           <Button size="sm" variant="secondary" onClick={() => { bulkAdvancePhase(selectedIds); clearSel(); }}>Avancer la phase</Button>
-          <button onClick={clearSel} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "rgba(255,255,255,.7)", fontSize: 13, fontWeight: 540, cursor: "pointer", padding: "4px 6px" }}>Désélectionner</button>
+          <button onClick={clearSel} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "rgba(255,255,255,.7)", ...TX.bodyStrong, cursor: "pointer", padding: "4px 6px", transition: "color var(--dur-fast) var(--ease-standard)" }}>Désélectionner</button>
         </div>
       ) : null}
 
       <div className="table-scroll">
-      <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760 }}>
+      <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760 }}>
         <div
           style={{
             display: "grid",
@@ -98,8 +98,8 @@ export function ProjectsTable() {
             gap: 12,
             padding: "11px 18px",
             borderBottom: `1px solid ${C.line}`,
-            ...TX.eyebrow,
-            color: C.ink400,
+            ...TX.overline,
+            color: C.ink500,
             alignItems: "center",
           }}
         >
@@ -113,10 +113,10 @@ export function ProjectsTable() {
                 className="sortable"
                 onClick={() => toggleSort(h.key)}
                 aria-sort={active ? (sort!.dir === 1 ? "ascending" : "descending") : "none"}
-                style={{ display: "flex", alignItems: "center", justifyContent: right ? "flex-end" : "flex-start", gap: 3, color: active ? C.ink700 : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.eyebrow }}
+                style={{ display: "flex", alignItems: "center", justifyContent: right ? "flex-end" : "flex-start", gap: 3, color: active ? C.ink800 : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.overline, transition: "color var(--dur-fast) var(--ease-standard)" }}
               >
                 {h.label}
-                <span className="sort-caret" style={{ display: "inline-flex", opacity: active ? 1 : 0, transform: active && sort!.dir === -1 ? "rotate(180deg)" : "none", transition: "transform .12s, opacity .12s" }}>
+                <span className="sort-caret" style={{ display: "inline-flex", opacity: active ? 1 : 0, transform: active && sort!.dir === -1 ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)" }}>
                   <CaretDownIcon size={11} />
                 </span>
               </button>
@@ -151,7 +151,7 @@ export function ProjectsTable() {
               <div><PhaseBadge label={p.phaseLabel} /></div>
 
               <div style={{ minWidth: 0 }}>
-                <div style={{ ...TX.caption, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.renduLabel}</div>
+                <div style={{ ...TX.caption, fontWeight: 540, color: C.ink800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.renduLabel}</div>
                 <div style={{ ...TX.caption, color: C.ink500 }}>
                   {p.renduFmt} · <span style={{ color: p.renduDueColor, fontWeight: 600 }}>{p.renduDaysLabel}</span>
                 </div>

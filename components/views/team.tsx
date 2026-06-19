@@ -9,7 +9,7 @@ import { Avatar, Button, Card, EmptyState, IconButton, rowProps, Segmented, Tool
 import { buildTeamLoad, type HeatBucket } from "@/lib/derive";
 import { isToday, MONS_LONG, MONTHS_FULL, monthRange, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
-import { C, chargeColor, num, R, SP, SURFACE, TX } from "@/lib/tokens";
+import { C, chargeColor, loadTier, num, R, SP, SURFACE, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const MODE_OPTS: { value: TeamMode; label: string }[] = [
@@ -56,18 +56,18 @@ export function Team() {
         <IconButton onClick={teamPrev} aria-label="Précédent"><ChevronLeftIcon /></IconButton>
         <h2 style={{ ...num(18), minWidth: 150 }}>{periodLabel}</h2>
         <IconButton onClick={teamNext} aria-label="Suivant"><ChevronRightIcon /></IconButton>
-        <Button variant="secondary" size="sm" onClick={teamToday}>Aujourd&apos;hui</Button>
+        <Button variant="secondary" size="sm" onClick={teamToday}>Aujourd’hui</Button>
         <Segmented value={teamMode} options={MODE_OPTS} onChange={setTeamMode} />
         <div style={{ marginLeft: "auto" }}>
           <Button onClick={openAdd} icon={<PlusIcon size={15} />}>Nouveau membre</Button>
         </div>
       </Toolbar>
 
-      <p style={{ ...TX.caption, color: C.ink400, margin: "0 0 20px" }}>
-        Charge sur <strong style={{ color: C.ink500, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · répartition {teamMode === "semaine" ? "par jour" : "par semaine"} · la ligne = 100&#8239;% (pleine capacité)
+      <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 20px" }}>
+        Charge sur <strong style={{ color: C.ink700, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · répartition {teamMode === "semaine" ? "par jour" : "par semaine"} · la ligne = 100&#8239;% (pleine capacité)
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))", gap: 18 }}>
+      <div className="enter-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))", gap: 18 }}>
         {loads.map((t) => {
           const c = chargeColor(t.chargePct);
           const isRef = referenced.has(t.member.id);
@@ -93,8 +93,7 @@ export function Team() {
                     tone="danger"
                     disabled={isRef}
                     onClick={() => !isRef && deleteTeamMember(t.member.id)}
-                    title={isRef ? "Membre affecté à des projets — réaffectez d'abord" : "Supprimer"}
-                    style={isRef ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+                    title={isRef ? "Membre affecté à des projets — réaffectez d’abord" : "Supprimer"}
                   >
                     <TrashIcon size={14} />
                   </IconButton>
@@ -103,8 +102,24 @@ export function Team() {
 
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ ...num(26), color: c }}>{t.chargePct}&#8239;%</span>
-                  <span style={{ ...TX.caption, color: C.ink500 }}>{t.periodDays} / {t.capacity} j{t.chargePct > 100 ? ` · ${t.periodDays - t.capacity} j en trop` : ""}</span>
+                  {(() => {
+                    const tier = loadTier(t.chargePct);
+                    const over = tier === "over" || tier === "crit";
+                    // Over capacity, the raw % balloons (a member can read 290 %+).
+                    // Cap the headline at a credible ceiling and carry the real
+                    // figure as concrete overflow days ("+N j"), so the card reads
+                    // "booked past capacity", not "broken counter".
+                    const shown = over ? Math.min(t.chargePct, 130) : t.chargePct;
+                    return (
+                      <>
+                        <span style={{ ...num(26), color: c }}>{shown}&#8239;%{over ? " +" : ""}</span>
+                        <span style={{ ...TX.caption, color: C.ink500 }}>
+                          {t.periodDays} / {t.capacity} j
+                          {over ? <span style={{ color: c, fontWeight: 540 }}> · +{t.periodDays - t.capacity}&#8239;j de surcapacité</span> : ""}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
                 <span style={{ ...TX.caption, color: C.ink500 }}>{t.projectsActive} projet{t.projectsActive > 1 ? "s" : ""}</span>
               </div>
@@ -115,7 +130,7 @@ export function Team() {
 
               {t.tasks.length === 0 ? (
                 <div style={{ marginTop: SP[4] }}>
-                  <EmptyState compact title="Aucune tâche planifiée" hint="Rien d'affecté à ce membre sur la période." />
+                  <EmptyState compact title="Aucune tâche planifiée" hint="Rien d’affecté à ce membre sur la période." />
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: SP[4] }}>
@@ -124,13 +139,13 @@ export function Team() {
                       key={i}
                       {...rowProps(() => openProject(task.projectId))}
                       className="row-hover row-focus"
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", ...TX.caption, padding: "2px 4px", borderRadius: 4 }}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", ...TX.caption, padding: "2px 4px", borderRadius: R.xxs }}
                     >
                       <div style={{ minWidth: 0 }}>
-                        <span style={{ fontWeight: 600, color: task.done ? C.ink400 : C.ink900 }}>{task.taskName}</span>
-                        <span style={{ color: C.ink400 }}> · {task.projectName}</span>
+                        <span style={{ fontWeight: 600, color: task.done ? C.ink500 : C.ink900 }}>{task.taskName}</span>
+                        <span style={{ color: C.ink500 }}> · {task.projectName}</span>
                       </div>
-                      <span style={{ ...num(12), color: C.ink700, whiteSpace: "nowrap" }}>{task.daysInPeriod} j</span>
+                      <span style={{ ...num(12), color: C.ink700, whiteSpace: "nowrap" }}>{task.daysInPeriod}&#8239;j</span>
                     </div>
                   ))}
                 </div>
@@ -160,18 +175,22 @@ function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
       {buckets.map((b, i) => {
         const d = toDate(b.start);
         const today = mode === "semaine" && isToday(b.start);
+        // Fill never exceeds the 100 % track; overflow becomes a capped cap above
+        // the line whose *height saturates* (more red ≠ taller bar), so a 290 %
+        // cell reads as "firmly over" without overshooting the track.
         const base = (Math.min(b.pct, 100) / 100) * FULL;
         const over = b.pct > 100 ? Math.min((b.pct - 100) / 40, 1) * OVER : 0;
+        const overDays = Math.max(0, b.days - b.capacity);
         const lab = mode === "semaine" ? WD[(d.getDay() + 6) % 7] : String(d.getDate());
         return (
-          <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${d.getDate()} ${MONTHS_FULL[d.getMonth()]} · ${b.days} / ${b.capacity} j · ${b.pct}%`}>
+          <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${d.getDate()} ${MONTHS_FULL[d.getMonth()]} · ${b.days} / ${b.capacity} j · ${b.pct} %`}>
             <div style={{ position: "relative", height: H, borderRadius: R.xs, background: SURFACE.containerHigh, boxShadow: `inset 0 0 0 1px ${C.line}`, overflow: "hidden" }}>
               <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: base, background: chargeColor(b.pct) }} />
-              {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: over, background: "#B5532E" }} /> : null}
-              {b.pct > 100 ? <span style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9.5, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#fff" }}>{b.pct}%</span> : null}
+              {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: over, background: chargeColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)" }} /> : null}
+              {overDays > 0 ? <span style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.surface }}>+{overDays}&#8239;j</span> : null}
             </div>
-            <div style={{ fontSize: 10, fontWeight: today ? 700 : 450, color: today ? C.ink900 : C.ink400, textAlign: "center", marginTop: 4 }}>{lab}</div>
+            <div style={{ fontSize: 10, fontWeight: today ? 700 : 450, color: today ? C.ink900 : C.ink500, textAlign: "center", marginTop: 4 }}>{lab}</div>
           </div>
         );
       })}

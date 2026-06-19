@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Inter_Tight } from "next/font/google";
 
 import "./globals.css";
@@ -20,9 +20,22 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  title: "Setec · Pilotage des projets",
+  title: {
+    default: "Setec · Pilotage des projets",
+    template: "%s · Setec",
+  },
   description:
     "Pilotage du portefeuille de projets d'ingénierie — Direction technique Setec.",
+  applicationName: "Setec Pilotage",
+  appleWebApp: { capable: true, title: "Setec", statusBarStyle: "default" },
+};
+
+// Browser chrome tint: matches the warm canvas in light, near-black in dark.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAF9F7" },
+    { media: "(prefers-color-scheme: dark)", color: "#1C1917" },
+  ],
 };
 
 export default function RootLayout({
