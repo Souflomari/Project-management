@@ -59,8 +59,10 @@ function wipTier(count: number, limit: number): WipTier {
   if (count >= limit) return "warn"; // exactly at the ceiling
   return "ok";
 }
+// Within-limit is the quiet default: neutral ink, no fill, mono meter. Colour is
+// reserved for the only states that need attention — at (amber) / over (red).
 const WIP_STYLE: Record<WipTier, { color: string; bg: string; meter: string }> = {
-  ok: { color: C.brandText, bg: C.brand50, meter: C.brand },
+  ok: { color: C.ink500, bg: "transparent", meter: C.ink350 },
   warn: { color: STATUS_META["à risque"].color, bg: STATUS_META["à risque"].bg, meter: STATUS_META["à risque"].color },
   over: { color: STATUS_META["en retard"].color, bg: STATUS_META["en retard"].bg, meter: STATUS_META["en retard"].color },
 };
@@ -396,7 +398,7 @@ export function Kanban() {
                     <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
                       <span
                         title={tier === "over" ? `Limite dépassée (${col.cards.length}/${col.limit})` : tier === "warn" ? `Limite atteinte (${col.cards.length}/${col.limit})` : `Dans la limite (${col.cards.length}/${col.limit})`}
-                        style={{ ...numTab, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: wip.color, background: wip.bg, borderRadius: R.xs, padding: "1px 8px", transition: "color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard)" }}
+                        style={{ ...numTab, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: wip.color, background: wip.bg, borderRadius: R.xs, padding: tier === "ok" ? "1px 2px" : "1px 8px", transition: "color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard)" }}
                       >
                         {tier === "over" ? <AlertTriangleIcon size={11} /> : null}
                         {col.cards.length} / {col.limit}
@@ -430,7 +432,7 @@ export function Kanban() {
                 </div>
 
                 {/* cards */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "2px 8px 10px", overflowY: "auto" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "2px 8px 12px", overflowY: "auto" }}>
                   <AnimatePresence initial={false}>
                     {col.cards.map((c) => {
                       const isDragged = draggingId === c.id;
@@ -492,52 +494,49 @@ export function Kanban() {
 }
 
 // ── card body ────────────────────────────────────────────────────────────────
-// Shared by the live card and the drag ghost. Surfaces the contractual deadline +
-// overdue slip, budget, schedule-aware progress tint, an explicit late badge, and
-// a stacked team avatar group.
+// Shared by the live card and the drag ghost. MINIMALISM: the project NAME is the
+// single focal point. Status is a small coloured dot (carries meaning, doesn't
+// shout); client / deadline / budget / progress / rendu are all demoted to quiet
+// ink. Colour is reserved for the one thing that needs attention — an overdue
+// deadline — so a calm card stays mono.
 function CardBody({ c }: { c: DerivedProject }) {
-  const late = c.status === "en retard";
-  // schedule-aware tint: green when on track, ring colour otherwise.
-  const progColor = c.status === "à jour" ? C.brand : c.ring;
+  const overdue = c.deadlineDaysLabel.toLowerCase().includes("retard");
   const extra = Math.max(0, c.members.length - 4);
   const shown = c.members.slice(0, 4);
   return (
     <>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+      {/* focal: name, with a quiet status dot — no saturated slab competing */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 7, minWidth: 0 }}>
+        <span
+          title={`Statut : ${c.statusLabel}`}
+          style={{ width: 7, height: 7, borderRadius: "50%", background: c.statusColor, flexShrink: 0, marginTop: 6 }}
+        />
         <div title={c.name} style={{ ...TX.bodyStrong, lineHeight: 1.3, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.name}</div>
-        <span title={`Statut : ${c.statusLabel}`} style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, fontSize: 10.5, fontWeight: 540, color: c.statusColor, background: c.statusBg, padding: "2px 7px", borderRadius: R.xs, whiteSpace: "nowrap" }}>
-          {c.statusLabel}
-        </span>
-      </div>
-      <div title={c.client} style={{ ...TX.caption, color: C.ink500, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.client}</div>
-
-      {/* progress */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }} title={`Avancement ${c.progress}%`}>
-        <ProgressBar pct={c.progress} color={progColor} height={6} />
-        <span style={{ ...numTab, fontSize: 11.5, fontWeight: 600, color: c.status === "à jour" ? C.brandText : C.ink700, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
       </div>
 
-      {/* deadline + budget */}
+      {/* secondary metadata — quiet ink, recedes under the name */}
+      <div title={c.client} style={{ fontSize: 12, fontWeight: 450, color: C.ink500, marginTop: 4, paddingLeft: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.client}</div>
+
+      {/* progress — mono fill, thin, quiet readout */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 11 }} title={`Avancement ${c.progress}%`}>
+        <ProgressBar pct={c.progress} color={C.ink350} height={4} />
+        <span style={{ ...numTab, fontSize: 11.5, fontWeight: 600, color: C.ink500, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
+      </div>
+
+      {/* deadline + budget — quiet; deadline reddens only when genuinely overdue */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginTop: 9 }}>
         <span
           title={`Échéance contractuelle : ${c.deadlineFull}`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 600, color: late ? STATUS_META["en retard"].color : C.ink600, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 500, color: overdue ? STATUS_META["en retard"].color : C.ink500, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
         >
           <ClockIcon size={11} />
           {c.deadlineDaysLabel}
         </span>
-        <span title={`Honoraires : ${c.budgetFmt}`} style={{ ...numTab, fontSize: 10.5, fontWeight: 600, color: C.ink700, whiteSpace: "nowrap" }}>{c.budgetFmt}</span>
+        <span title={`Honoraires : ${c.budgetFmt}`} style={{ ...numTab, fontSize: 11, fontWeight: 500, color: C.ink500, whiteSpace: "nowrap" }}>{c.budgetFmt}</span>
       </div>
 
-      {/* late badge (explicit, non-colour-only) */}
-      {late ? (
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 10, fontWeight: 600, color: STATUS_META["en retard"].color, background: STATUS_META["en retard"].bg, borderRadius: R.xs, padding: "2px 7px" }}>
-          <AlertTriangleIcon size={10} /> En retard
-        </div>
-      ) : null}
-
-      {/* team avatar group + next-rendu */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, gap: 6 }}>
+      {/* team avatar group (muted) + next-rendu (quiet) */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 11, gap: 6 }}>
         <div style={{ display: "flex", alignItems: "center" }} title={`Équipe : ${c.members.map((m) => m.name).join(", ") || "—"}`}>
           {shown.map((m, i) => (
             <span key={m.id} style={{ marginLeft: i === 0 ? 0 : -7, position: "relative", zIndex: shown.length - i }}>
@@ -545,10 +544,10 @@ function CardBody({ c }: { c: DerivedProject }) {
             </span>
           ))}
           {extra > 0 ? (
-            <span style={{ marginLeft: -7, width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: C.ink700, background: C.subtle, border: `2px solid ${C.surface}` }}>+{extra}</span>
+            <span style={{ marginLeft: -7, width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: C.ink600, background: C.subtle, border: `2px solid ${C.surface}` }}>+{extra}</span>
           ) : null}
         </div>
-        <span title={`Prochain rendu : ${c.renduFull}`} style={{ fontSize: 10, fontWeight: 600, color: c.renduDueColor, whiteSpace: "nowrap" }}>{c.renduDaysLabel}</span>
+        <span title={`Prochain rendu : ${c.renduFull}`} style={{ fontSize: 11, fontWeight: 500, color: C.ink500, whiteSpace: "nowrap" }}>{c.renduDaysLabel}</span>
       </div>
     </>
   );

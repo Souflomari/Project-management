@@ -715,7 +715,10 @@ export function Avatar({
 }
 
 /** Editorial metadata chip — uppercase, tracked, small (design.google idiom).
- *  `tone`: outline (hairline), soft (tinted), or plain. Optional leading dot. */
+ *  Calm by default: the LABEL is neutral ink on a quiet chip; `color` is spent
+ *  only as a thin accent (the optional leading dot / the selected outline), never
+ *  as a saturated fill. `tone`: outline (hairline), soft (faint neutral well), or
+ *  plain. Optional leading dot carries the hue. */
 export function Chip({
   label,
   color = C.ink600,
@@ -735,7 +738,7 @@ export function Chip({
   onClick?: () => void;
 }) {
   const toneStyle: CSSProperties =
-    tone === "soft" ? { background: `${color}14` } : tone === "outline" ? { border: `1px solid ${C.line}` } : {};
+    tone === "soft" ? { background: C.subtle } : tone === "outline" ? { border: `1px solid ${C.line}` } : {};
   const base: CSSProperties = {
     ...TX.eyebrow,
     fontSize: 10.5,
@@ -746,9 +749,10 @@ export function Chip({
     padding: "3px 8px",
     borderRadius: R.xs,
     whiteSpace: "nowrap",
-    color,
+    color: C.ink600,
     ...toneStyle,
   };
+  // Hue lives in the dot only — a thin accent, so the label stays neutral ink.
   const dotNode = dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} /> : null;
   if (onClick) {
     return (
@@ -763,8 +767,8 @@ export function Chip({
           cursor: "pointer",
           fontFamily: "inherit",
           border: `1px solid ${selected ? color : C.line}`,
-          background: selected ? `${color}1A` : tone === "soft" ? `${color}14` : "transparent",
-          color: selected ? color : C.ink600,
+          background: selected ? `${color}14` : tone === "soft" ? C.subtle : "transparent",
+          color: selected ? C.ink900 : C.ink600,
         }}
       >
         {dotNode}
@@ -834,10 +838,13 @@ export function ToggleButton({
 }
 
 export function PhaseBadge({ label }: { label: string }) {
+  // The LETTER code (ESQ/APS/…) carries phase identity, in neutral ink on a quiet
+  // grey chip. The mono-slate ramp colour appears only as the thin accent dot —
+  // reinforcing sequence (light→dark) without a saturated fill.
   const i = PHASES.indexOf(label as (typeof PHASES)[number]);
   const full = i >= 0 ? PHASES_FULL[i] : undefined;
-  const color = i >= 0 ? PHASE_COLORS[i] : C.ink500;
-  return <Chip label={label} color={color} tone="soft" title={full ? `${label} · ${full}` : label} />;
+  const color = i >= 0 ? PHASE_COLORS[i] : C.ink400;
+  return <Chip label={label} color={color} tone="soft" dot title={full ? `${label} · ${full}` : label} />;
 }
 
 export function StatusPill({
@@ -851,6 +858,10 @@ export function StatusPill({
   label: string;
   filled?: boolean;
 }) {
+  // Calm: the coloured DOT carries the semantic reading; the label stays in
+  // neutral ink so the badge reads as a quiet tag, not a saturated coloured
+  // word. `filled` adds a quiet tinted well (the pale STATUS_META bg) — not a
+  // loud slab — and the label darkens for legible AA contrast on it.
   return (
     <span
       style={{
@@ -860,7 +871,7 @@ export function StatusPill({
         fontSize: 11,
         fontWeight: 600,
         whiteSpace: "nowrap",
-        color,
+        color: filled && bg ? C.ink700 : C.ink600,
         ...(filled && bg ? { background: bg, padding: "3px 9px", borderRadius: R.pill } : null),
       }}
     >
@@ -872,13 +883,16 @@ export function StatusPill({
 
 export function ProgressBar({
   pct,
-  color,
+  color = C.ink700,
   track = C.subtle,
   height = 7,
   label,
 }: {
   pct: number;
-  color: string;
+  /** Fill colour. Defaults to neutral ink — a meter is monochrome unless the
+   *  caller passes a SEMANTIC colour (danger/brand) to mean something. Never
+   *  decorative. */
+  color?: string;
   track?: string;
   height?: number;
   /** Descriptive context for AT (e.g. "Avancement du projet"). The percentage
@@ -915,7 +929,7 @@ let sparkSeq = 0;
 export function Sparkline({
   values,
   height = 30,
-  color = C.brand,
+  color = C.ink500,
   fill = true,
   gradient = false,
   endLabel,
@@ -1002,17 +1016,18 @@ export function Sparkline({
 
 // ───────────────────────────────────────── Gauge (radial health arc)
 
-/** Radial health gauge — a 270° arc on a tonal track with a coloured progress
- *  sweep and a tabular figure at its centre. Tone + value carry the reading; the
- *  hue (governed green→amber→terracotta ramp via the caller) is reinforcement,
- *  never the only signal. Reduced-motion-safe (CSS transition only; honoured by
- *  the global prefers-reduced-motion rule, and the value can be pre-counted). */
+/** Radial health gauge — a 270° arc on a tonal track with a single-hue progress
+ *  sweep and a tabular figure at its centre. The figure + arc length carry the
+ *  reading; the sweep defaults to neutral ink (calm) and only takes a SEMANTIC
+ *  hue when the caller passes one (e.g. the dashboard's health colour) — hue is
+ *  reinforcement, never the only signal, and never decorative. Reduced-motion-safe
+ *  (CSS transition only; honoured by the global prefers-reduced-motion rule). */
 export function Gauge({
   value,
   max = 100,
   size = 132,
   thickness = 11,
-  color = C.brand,
+  color = C.ink700,
   label,
   sublabel,
   ariaLabel,
@@ -1134,12 +1149,16 @@ export function Badge({
   dot?: boolean;
   style?: CSSProperties;
 }) {
+  // Quiet by default: neutral is the resting tone. Colour is reserved for meaning
+  // — danger (the one alert) keeps its red; warn keeps a single amber. `brand` is
+  // the one positive identity accent; `info` rides the neutral well (no second
+  // decorative hue — its ink simply darkens for emphasis).
   const tones: Record<string, { fg: string; bg: string }> = {
     neutral: { fg: C.ink600, bg: C.subtle },
     brand: { fg: C.brandText, bg: C.brand50 },
     danger: { fg: "#7A2820", bg: "#FAEEEB" },
     warn: { fg: "#9A4708", bg: "#FAF1E4" },
-    info: { fg: "#1E4D55", bg: "#E2EEF0" },
+    info: { fg: C.ink700, bg: C.subtle },
   };
   const t = tones[tone];
   return (

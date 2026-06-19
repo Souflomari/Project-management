@@ -9,7 +9,7 @@ import { Avatar, Button, Card, EmptyState, IconButton, Input, rowProps, Segmente
 import { buildTeamLoad, type HeatBucket, type TeamLoad } from "@/lib/derive";
 import { fmtEur, isToday, MONS_LONG, MONTHS_FULL, monthRange, REFERENCE_DATE, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
-import { C, chargeColor, DUR, EASE, loadTier, num, PHASE_COLORS, R, SP, SURFACE, TX } from "@/lib/tokens";
+import { C, DUR, EASE, heatColor, loadTier, num, R, SP, SURFACE, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const MODE_OPTS: { value: TeamMode; label: string }[] = [
@@ -41,12 +41,10 @@ const FILTER_OPTS: { value: FilterKey; label: string }[] = [
 ];
 
 // ── derive-bridge ─────────────────────────────────────────────────────────────
-// The corrected fractional-allocation charge, per-bucket per-project split, and
-// per-member cost are being added to buildTeamLoad by a concurrent agent. We
-// CONSUME those fields when present and otherwise fall back locally so the view
-// is never broken. // TODO(derive): drop the fallbacks once they ship.
-interface ProjShare { projectId: number; projectName: string; color: string; days: number; }
-interface EnrichedBucket extends HeatBucket { shares: ProjShare[]; }
+// The corrected fractional-allocation charge and per-member cost are being added
+// to buildTeamLoad by a concurrent agent. We CONSUME those fields when present
+// and otherwise fall back locally so the view is never broken.
+// // TODO(derive): drop the fallbacks once they ship.
 interface EnrichedLoad {
   load: TeamLoad;
   /** Corrected (non-double-counting) charge, % of capacity. */
@@ -55,13 +53,12 @@ interface EnrichedLoad {
   costEur: number;
   /** Free capacity in working days (negative = overbooked). */
   freeDays: number;
-  buckets: EnrichedBucket[];
+  buckets: HeatBucket[];
 }
 
 type WithAlloc = TeamLoad & {
   chargeAllocPct?: number;
   costEur?: number;
-  buckets: (HeatBucket & { shares?: ProjShare[] })[];
 };
 
 function enrich(load: TeamLoad): EnrichedLoad {
@@ -73,31 +70,9 @@ function enrich(load: TeamLoad): EnrichedLoad {
   const costEur = w.costEur ?? Math.round(load.periodDays * (load.member.costPerDay ?? 0));
   const freeDays = Math.max(-load.capacity * 4, load.capacity - load.periodDays);
 
-  // Per-bucket per-project split for the stacked heatmap. Prefer derive's
-  // `shares`; else approximate from the member's tasks overlapping each bucket
-  // proportionally (keeps cross-project allocation visible without the data).
-  const buckets: EnrichedBucket[] = load.buckets.map((b) => {
-    const provided = (b as HeatBucket & { shares?: ProjShare[] }).shares;
-    if (provided && provided.length) return { ...b, shares: provided };
-    // Fallback: split the bucket's days across projects by their share of the
-    // member's total period days touching this bucket window.
-    const inBucket = load.tasks.filter((t) => t.start <= b.end && t.end >= b.start);
-    const totalDays = inBucket.reduce((s, t) => s + t.daysInPeriod, 0) || 1;
-    const byProject = new Map<number, ProjShare>();
-    for (const t of inBucket) {
-      const cur = byProject.get(t.projectId) ?? { projectId: t.projectId, projectName: t.projectName, color: projectColor(t.projectId), days: 0 };
-      cur.days += (t.daysInPeriod / totalDays) * b.days;
-      byProject.set(t.projectId, cur);
-    }
-    return { ...b, shares: Array.from(byProject.values()) };
-  });
-
-  return { load, chargePct, costEur, freeDays, buckets };
-}
-
-// Stable per-project colour from the phase ramp (deterministic, no data needed).
-function projectColor(projectId: number): string {
-  return PHASE_COLORS[Math.abs(projectId) % PHASE_COLORS.length];
+  // The heatmap reads as a single calm load gradient per bucket — no per-project
+  // split needed, so the buckets pass straight through.
+  return { load, chargePct, costEur, freeDays, buckets: load.buckets };
 }
 
 export function Team() {
@@ -322,9 +297,11 @@ function MemberCard({
 }) {
   const { load, chargePct, costEur, freeDays } = e;
   const m = load.member;
-  const c = chargeColor(chargePct);
   const tier = loadTier(chargePct);
   const over = tier === "over" || tier === "crit";
+  // Minimalism: the charge headline stays neutral ink and only turns red when the
+  // member is OVER capacity — colour signals the one state that needs attention.
+  const headColor = over ? C.danger : C.ink900;
   // Over capacity, the raw % balloons — cap the headline at a credible ceiling
   // (v1 overload cap) and carry the real figure as concrete overflow days.
   const shown = over ? Math.min(chargePct, 130) : chargePct;
@@ -364,13 +341,13 @@ function MemberCard({
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           {lens === "charge" ? (
             <>
-              <span style={{ ...num(26), color: c }}>{shown}&#8239;%{over ? " +" : ""}</span>
+              <span style={{ ...num(26), color: headColor }}>{shown}&#8239;%{over ? " +" : ""}</span>
               <span style={{ ...TX.caption, color: C.ink500 }}>
                 {load.periodDays} / {load.capacity} j
                 {over ? (
-                  <span style={{ color: c, fontWeight: 540 }}> · +{load.periodDays - load.capacity}&#8239;j de surcapacité</span>
+                  <span style={{ color: C.danger, fontWeight: 540 }}> · +{load.periodDays - load.capacity}&#8239;j de surcapacité</span>
                 ) : freeDays > 0 ? (
-                  <span style={{ color: C.brandText, fontWeight: 540 }}> · {freeDays}&#8239;j libres</span>
+                  <span style={{ color: C.ink500 }}> · {freeDays}&#8239;j libres</span>
                 ) : ""}
               </span>
             </>
@@ -386,7 +363,7 @@ function MemberCard({
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           {delta != null && delta !== 0 ? (
             <span
-              style={{ ...num(12), color: delta > 0 ? chargeColor(120) : C.brandText, whiteSpace: "nowrap" }}
+              style={{ ...num(12), color: C.ink500, whiteSpace: "nowrap" }}
               title={`Évolution vs période précédente : ${delta > 0 ? "+" : ""}${delta} % de charge`}
             >
               {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}&#8239;%
@@ -415,9 +392,9 @@ function MemberCard({
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", ...TX.caption, minHeight: 24, padding: "3px 4px", borderRadius: R.xxs }}
             >
               <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 7 }}>
-                <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: projectColor(task.projectId), flexShrink: 0 }} />
+                <span aria-hidden style={{ width: 5, height: 5, borderRadius: "50%", background: C.ink400, flexShrink: 0 }} />
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ fontWeight: 600, color: task.done ? C.ink500 : C.ink900 }}>{task.taskName}</span>
+                  <span style={{ fontWeight: 500, color: task.done ? C.ink500 : C.ink800 }}>{task.taskName}</span>
                   <span style={{ color: C.ink500 }}> · {task.projectName}</span>
                 </span>
               </div>
@@ -446,46 +423,43 @@ function isoWeek(d: Date): number {
   return 1 + Math.round((t.getTime() - firstThu.getTime()) / (7 * 86_400_000));
 }
 
-const HEAT_BANDS: { color: string; label: string }[] = [
-  { color: "#15803D", label: "≤ 84 % — sous-utilisé" },
-  { color: "#B45309", label: "85–100 % — pleine charge" },
-  { color: "#C2683E", label: "> 100 % — en surcharge" },
-];
-
-/** Shared legend, shown once at the top: colour bands, the capacity line, and the
- *  overflow cap meaning — the four simultaneous encodings, explained once. */
+/** Shared legend, shown once at the top. Minimalism: the heatmap is now a single
+ *  monochrome load ramp, so the legend reduces to three meanings: low-to-high
+ *  load, the 100% capacity line, and the single-red over-capacity cap. */
 function HeatmapLegend({ mode }: { mode: TeamMode }) {
   return (
     <div
       role="note"
       aria-label="Légende du graphique de charge"
-      style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, padding: "8px 12px", marginBottom: 16, background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, ...TX.nano, color: C.ink600 }}
+      style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 18, padding: "8px 12px", marginBottom: 16, background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, ...TX.nano, color: C.ink500 }}
     >
       <span style={{ fontWeight: 600, color: C.ink700 }}>Charge {mode === "semaine" ? "par jour" : "par semaine"}</span>
-      {HEAT_BANDS.map((b) => (
-        <span key={b.label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span aria-hidden style={{ width: 12, height: 12, borderRadius: 3, background: b.color }} />
-          {b.label}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+        <span aria-hidden style={{ display: "inline-flex", borderRadius: 3, overflow: "hidden", border: `1px solid ${C.line}` }}>
+          {[20, 70, 100].map((pct) => (
+            <span key={pct} style={{ width: 16, height: 12, background: heatColor(pct) }} />
+          ))}
         </span>
-      ))}
+        faible → pleine charge
+      </span>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <span aria-hidden style={{ width: 16, height: 0, borderTop: `1px dashed ${C.lineStrong}` }} />
-        ligne = 100&#8239;% (capacité)
+        ligne = 100 % (capacité)
       </span>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <span aria-hidden style={{ width: 12, height: 12, borderRadius: 3, background: chargeColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)" }} />
-        cap hachuré = jours au-delà de la capacité
+        <span aria-hidden style={{ width: 12, height: 12, borderRadius: 3, background: heatColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)" }} />
+        surcharge (au-delà de la capacité)
       </span>
-      <span style={{ color: C.ink500 }}>Les segments empilés = répartition par projet.</span>
     </div>
   );
 }
 
-/** Workload heatmap: each bar fills toward the 100%-capacity line and is STACKED
- *  by project colour, so cross-project allocation is visible. A terracotta
- *  hatched cap rises above the line when overbooked. Exposed as a labelled
- *  role=img figure with a per-bucket data-table fallback for assistive tech. */
-function Heatmap({ buckets, mode, memberName }: { buckets: EnrichedBucket[]; mode: TeamMode; memberName: string }) {
+/** Workload heatmap: each bar is a SINGLE monochrome load fill rising toward the
+ *  100%-capacity line, so the row reads as one calm load gradient (green within
+ *  capacity, one red over). A hatched cap in the same red rises above the line
+ *  when overbooked. Exposed as a labelled role=img figure with a per-bucket
+ *  data-table fallback for assistive tech. */
+function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: TeamMode; memberName: string }) {
   // Bars grow up from the baseline on mount (reduced-motion → instant full height).
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -516,45 +490,18 @@ function Heatmap({ buckets, mode, memberName }: { buckets: EnrichedBucket[]; mod
           const overDays = Math.max(0, b.days - b.capacity);
           const lab = bucketLabel(b, mode);
           const delay = `${Math.min(i * 25, 200)}ms`;
-          // Stack the in-capacity fill by project. Heights are proportions of the
-          // capped (≤100%) fill, scaled to the visual track.
-          const inCapDays = Math.min(b.days, b.capacity) || 1;
-          const stack = [...b.shares].sort((a, z) => z.days - a.days);
           return (
             <div key={i} style={{ flex: 1, minWidth: 0 }}>
               <div
                 tabIndex={0}
                 role="img"
-                aria-label={`${bucketLabel(b, mode, true)} : ${b.days} sur ${b.capacity} jours, ${b.pct} %${overDays > 0 ? `, ${overDays} jour(s) au-delà de la capacité` : ""}${b.shares.length ? ` — ${b.shares.map((s) => `${s.projectName} ${Math.round(s.days * 10) / 10} j`).join(", ")}` : ""}`}
+                aria-label={`${bucketLabel(b, mode, true)} : ${b.days} sur ${b.capacity} jours, ${b.pct} %${overDays > 0 ? `, ${overDays} jour(s) au-delà de la capacité` : ""}`}
                 style={{ position: "relative", height: H, borderRadius: R.xs, background: SURFACE.containerHigh, boxShadow: inThisBucketToday ? `inset 0 0 0 1px ${C.ink700}` : `inset 0 0 0 1px ${C.line}`, overflow: "hidden", outlineOffset: 1 }}
               >
                 <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
-                {/* stacked-by-project in-capacity fill */}
-                {(() => {
-                  let acc = 0;
-                  return stack.map((s, si) => {
-                    const segH = (Math.min(s.days, inCapDays) / inCapDays) * base;
-                    const bottom = acc;
-                    acc += segH;
-                    return (
-                      <div
-                        key={si}
-                        style={{
-                          position: "absolute", left: 0, right: 0, bottom,
-                          height: mounted ? segH : 0,
-                          background: s.color,
-                          boxShadow: si > 0 ? `inset 0 1px 0 rgba(255,255,255,.45)` : "none",
-                          transition: grow, transitionDelay: delay,
-                        }}
-                      />
-                    );
-                  });
-                })()}
-                {/* If no per-project split, fall back to a single charge-coloured fill */}
-                {b.shares.length === 0 ? (
-                  <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: mounted ? base : 0, background: chargeColor(b.pct), transition: grow, transitionDelay: delay }} />
-                ) : null}
-                {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: mounted ? over : 0, background: chargeColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)", transition: grow, transitionDelay: delay }} /> : null}
+                {/* single monochrome in-capacity load fill — one calm gradient, not a rainbow of project segments */}
+                <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: mounted ? base : 0, background: heatColor(b.pct), transition: grow, transitionDelay: delay }} />
+                {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: mounted ? over : 0, background: heatColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)", transition: grow, transitionDelay: delay }} /> : null}
                 {overDays > 0 ? <span aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.surface, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
               </div>
               <div style={{ fontSize: 10, fontWeight: inThisBucketToday ? 700 : 450, color: inThisBucketToday ? C.ink900 : C.ink500, textAlign: "center", marginTop: 4 }}>{lab}</div>

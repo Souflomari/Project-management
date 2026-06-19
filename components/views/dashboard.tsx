@@ -218,8 +218,6 @@ export function Dashboard() {
           sub={lateCount > 0 ? "à traiter en priorité" : "rien en retard"}
           subColor={lateCount > 0 ? STATUS_META["en retard"].color : undefined}
           dot={lateCount > 0 ? STATUS_META["en retard"].color : undefined}
-          accent={lateCount > 0 ? STATUS_META["en retard"].color : undefined}
-          tint={lateCount > 0 ? STATUS_META["en retard"].bg : undefined}
           onClick={lateCount > 0 ? goLate : undefined}
         />
         <Kpi
@@ -227,8 +225,8 @@ export function Dashboard() {
           title="Marge projetée"
           value={fmtEur(marginAnim)}
           sub={`${marginPct >= 0 ? "+" : "−"}${pct(Math.abs(Math.round(marginPctAnim)))} des honoraires`}
-          subColor={marginTotal < 0 ? C.danger : marginPct < 10 ? "#B45309" : C.brand}
-          accent={marginTotal < 0 ? C.danger : undefined}
+          subColor={marginTotal < 0 ? C.danger : marginPct < 10 ? "#B45309" : C.ink400}
+          dot={marginTotal < 0 ? C.danger : marginPct < 10 ? "#B45309" : undefined}
           onClick={() => goProjects("all")}
         />
         <Kpi
@@ -238,7 +236,6 @@ export function Dashboard() {
           sub={overCount > 0 ? "coût engagé > honoraires" : "marge préservée"}
           subColor={overCount > 0 ? "#B45309" : undefined}
           dot={overCount > 0 ? "#B45309" : undefined}
-          accent={overCount > 0 ? "#B45309" : undefined}
           onClick={overCount > 0 ? () => goProjects("all") : undefined}
         />
         <Kpi
@@ -463,11 +460,11 @@ function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: 
   );
 }
 
-function Kpi({ title, value, sub, subColor, dot, accent, tint, delta, onClick, className }: { title: string; value: string | number; sub: string; subColor?: string; dot?: string; accent?: string; tint?: string; delta?: number; onClick?: () => void; className?: string }) {
+function Kpi({ title, value, sub, subColor, dot, delta, onClick, className }: { title: string; value: string | number; sub: string; subColor?: string; dot?: string; delta?: number; onClick?: () => void; className?: string }) {
   const cls = [className, onClick ? "lift-hover row-focus" : ""].filter(Boolean).join(" ") || undefined;
   return (
     <div className={cls} {...(onClick ? rowProps(onClick) : {})} style={{ borderRadius: R.lg, ...(onClick ? { cursor: "pointer" } : {}) }}>
-      <Card padding="16px 18px" style={{ height: "100%", ...(accent ? { borderTop: `2px solid ${accent}` } : {}), ...(tint ? { background: tint } : {}) }}>
+      <Card padding="16px 18px" style={{ height: "100%" }}>
         <div style={{ ...TX.overline, color: C.ink700 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
           <span style={{ ...num(36), color: C.ink900 }}>{value}</span>

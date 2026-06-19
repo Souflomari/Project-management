@@ -29,7 +29,7 @@ import {
 } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import { useProjects, type CalMode } from "@/lib/store/projects-context";
-import { C, num, PHASE_COLORS, R, SH, SURFACE, TX, Z } from "@/lib/tokens";
+import { C, num, R, SH, SURFACE, TX, Z } from "@/lib/tokens";
 import { PHASES, PHASES_FULL } from "@/lib/types";
 
 const MODE_OPTS: { value: CalMode; label: string }[] = [
@@ -616,8 +616,12 @@ function PhaseLegend({
   onToggle: (i: number) => void;
   onClear: () => void;
 }) {
+  // One compact, quiet legend line: the phase letters double as filter chips.
+  // No coloured swatches — phase identity is the letter; the active filter is a
+  // neutral slate emphasis (selection, not decoration).
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 8px", alignItems: "center", marginBottom: 12 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 4px", alignItems: "center", marginBottom: 12 }}>
+      <span style={{ ...TX.nano, color: C.ink400, marginRight: 4 }}>Phase&nbsp;:</span>
       {PHASES.map((ph, i) => {
         const on = selected.size === 0 || selected.has(i);
         const explicit = selected.has(i);
@@ -625,27 +629,25 @@ function PhaseLegend({
           <button
             key={ph}
             type="button"
-            className="btn"
+            className="btn row-focus"
             aria-pressed={explicit}
             title={`${ph} · ${PHASES_FULL[i]}${explicit ? " (filtre actif)" : ""}`}
             onClick={() => onToggle(i)}
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 6,
-              minHeight: 26,
-              padding: "3px 9px",
-              borderRadius: R.pill,
-              border: `1px solid ${explicit ? PHASE_COLORS[i] : C.line}`,
-              background: explicit ? `${PHASE_COLORS[i]}1A` : C.surface,
-              color: on ? C.ink700 : C.ink400,
+              justifyContent: "center",
+              minHeight: 24,
+              padding: "2px 8px",
+              borderRadius: R.sm,
+              border: `1px solid ${explicit ? C.lineStrong : "transparent"}`,
+              background: explicit ? SURFACE.containerHigh : "transparent",
+              color: explicit ? C.ink800 : on ? C.ink500 : C.ink300,
               cursor: "pointer",
-              opacity: on ? 1 : 0.55,
               ...TX.nano,
-              fontWeight: 600,
+              fontWeight: explicit ? 700 : 600,
             }}
           >
-            <span style={{ width: 9, height: 9, borderRadius: 3, background: PHASE_COLORS[i] }} />
             {ph}
           </button>
         );
@@ -660,7 +662,7 @@ function PhaseLegend({
           Réinitialiser
         </button>
       ) : (
-        <span style={{ ...TX.nano, color: C.ink400, marginLeft: 2 }}>· glissez une barre pour replanifier · cliquez une phase pour filtrer</span>
+        <span style={{ ...TX.nano, color: C.ink400, marginLeft: 6 }}>· glissez une barre pour replanifier</span>
       )}
     </div>
   );
@@ -746,7 +748,9 @@ function SpanBar({
   const { startCol, endCol } = segColumns(seg, weekStartISO);
   const overdue = isOverdue(span);
   const dragging = dnd.dragId === span.subtaskId;
-  const color = span.color;
+  // Mono slate ramp value (lib/tokens PHASE_COLORS) — used ONLY as a quiet edge
+  // accent, never a saturated fill. Phase identity is carried by the letter badge.
+  const accent = span.color;
 
   return (
     <div
@@ -781,30 +785,37 @@ function SpanBar({
         gridColumn: `${startCol + 1} / ${endCol + 2}`,
         display: "flex",
         alignItems: "center",
-        gap: 4,
+        gap: 5,
         minWidth: 0,
         height: 22,
         padding: "0 6px",
         borderRadius: seg.isStart && seg.isEnd ? R.xs : seg.isStart ? "6px 3px 3px 6px" : seg.isEnd ? "3px 6px 6px 3px" : 3,
-        // Phase as a TINTED FILL (audit: not a 3px sliver on a low-contrast ramp).
-        background: `${color}22`,
-        borderLeft: seg.isStart ? `3px solid ${color}` : `1px dashed ${color}88`,
-        // Overdue = red edge.
+        // Quiet neutral chip — colour carries no decoration. Phase is shown by the
+        // letter badge + a thin slate accent on the start edge, not a tinted fill.
+        background: C.subtle,
+        border: `1px solid ${C.line}`,
+        borderLeft: seg.isStart ? `3px solid ${accent}` : `1px dashed ${C.lineStrong}`,
+        // Overdue is the ONE status colour (red ring); everything else stays neutral.
         boxShadow: overdue ? `inset 0 0 0 1.5px ${C.danger}` : "none",
         cursor: "grab",
         touchAction: "pan-y",
         overflow: "hidden",
-        opacity: dragging ? 0.4 : span.done ? 0.7 : 1,
+        opacity: dragging ? 0.4 : span.done ? 0.6 : 1,
         transition: "opacity var(--dur-fast) var(--ease-standard)",
       }}
     >
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: span.statusColor, flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0, ...TX.nano, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: span.done ? "line-through" : "none" }}>
+      {/* Phase letter carries identity (the colour cue is only the edge accent). */}
+      {seg.isStart ? (
+        <span aria-hidden style={{ ...TX.nano, fontWeight: 700, fontSize: 9.5, letterSpacing: ".02em", color: C.ink400, flexShrink: 0 }}>
+          {PHASES[span.phaseIndex]}
+        </span>
+      ) : null}
+      <span style={{ flex: 1, minWidth: 0, ...TX.nano, fontWeight: 600, color: C.ink800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: span.done ? "line-through" : "none" }}>
         {span.taskName}
       </span>
-      {/* Distinct DEADLINE cap/flag on the end day (not just a dot). */}
+      {/* Distinct DEADLINE cap/flag on the end day; red only when overdue, else neutral. */}
       {seg.isEnd ? (
-        <span style={{ display: "flex", flexShrink: 0, color: overdue ? C.danger : color }} title={`Échéance ${fmtFull(span.deadline)}`}>
+        <span style={{ display: "flex", flexShrink: 0, color: overdue ? C.danger : C.ink400 }} title={`Échéance ${fmtFull(span.deadline)}`}>
           <FlagIcon size={12} />
         </span>
       ) : null}
@@ -918,9 +929,10 @@ function MonthView({
       aria-label={`Calendrier ${MONS_LONG[month]} ${year}`}
       style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}
     >
-      <div role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.subtle, borderBottom: `1px solid ${C.line}` }}>
+      {/* Quiet weekday header: white field, separation carried by the hairline only. */}
+      <div role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.surface, borderBottom: `1px solid ${C.line}` }}>
         {WEEKDAYS_SHORT.map((wd, i) => (
-          <div key={wd} role="columnheader" title={WEEKDAYS_LONG[i]} aria-label={WEEKDAYS_LONG[i]} style={{ padding: "9px 12px", ...TX.overline, color: i >= 5 ? C.ink400 : C.ink500 }}>
+          <div key={wd} role="columnheader" title={WEEKDAYS_LONG[i]} aria-label={WEEKDAYS_LONG[i]} style={{ padding: "8px 12px", ...TX.nano, fontWeight: 600, color: i >= 5 ? C.ink300 : C.ink400 }}>
             {wd}
           </div>
         ))}
@@ -947,8 +959,9 @@ function MonthView({
                     minHeight: 124,
                     borderRight: `1px solid ${C.line}`,
                     padding: "5px 6px 6px",
-                    // Today cell tint (not just the badge); adjacent-month + weekend recede.
-                    background: today ? C.brand50 : !inMonth ? SURFACE.container : weekend ? SURFACE.container : C.surface,
+                    // Today is the ONE accent (the green badge below) — no redundant cell
+                    // tint. Adjacent-month + weekend simply recede into a quiet well.
+                    background: !inMonth ? SURFACE.container : weekend ? C.subtle : C.surface,
                     overflow: "hidden",
                   }}
                 >
@@ -1084,7 +1097,8 @@ function DayPopover({
             }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 30, padding: "5px 6px", border: "none", background: "transparent", borderRadius: R.sm, cursor: "pointer", textAlign: "left" }}
           >
-            <span style={{ width: 9, height: 9, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+            {/* Phase letter (with a thin slate accent edge) instead of a colour swatch. */}
+            <span aria-hidden style={{ ...TX.nano, fontWeight: 700, fontSize: 9.5, color: C.ink400, flexShrink: 0, borderLeft: `2px solid ${s.color}`, paddingLeft: 5 }}>{PHASES[s.phaseIndex]}</span>
             <span style={{ minWidth: 0, flex: 1 }}>
               <span style={{ display: "block", ...TX.nano, fontWeight: 600, color: C.ink900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.taskName}</span>
               <span style={{ display: "block", ...TX.nano, color: C.ink500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.projectName}</span>
@@ -1145,19 +1159,19 @@ function WeekView({
 
   return (
     <div className="enter-rise" role="grid" aria-label={weekLabel(anchorISO)} style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}>
-      {/* Day headers with per-day load summary */}
-      <div role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", borderBottom: `1px solid ${C.line}` }}>
+      {/* Quiet day headers with per-day load summary; today carried by the green date. */}
+      <div role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.surface, borderBottom: `1px solid ${C.line}` }}>
         {days.map((d, i) => {
           const iso = toISO(d);
           const today = isToday(iso);
           const weekend = i >= 5;
           const load = loadByISO.get(iso) ?? 0;
           return (
-            <div key={iso} role="columnheader" aria-current={today ? "date" : undefined} style={{ padding: "8px 10px", background: today ? C.brand50 : C.subtle, borderRight: `1px solid ${C.line}` }}>
-              <div title={WEEKDAYS_LONG[i]} style={{ ...TX.overline, color: weekend ? C.ink400 : C.ink500 }}>{WEEKDAYS_SHORT[i]}</div>
+            <div key={iso} role="columnheader" aria-current={today ? "date" : undefined} style={{ padding: "8px 10px", borderRight: `1px solid ${C.line}` }}>
+              <div title={WEEKDAYS_LONG[i]} style={{ ...TX.nano, fontWeight: 600, color: weekend ? C.ink300 : C.ink400 }}>{WEEKDAYS_SHORT[i]}</div>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 4 }}>
                 <div style={{ ...num(18), color: today ? C.brand : C.ink900 }}>{d.getDate()}</div>
-                {load > 0 ? <span title={`${load} échéance${load > 1 ? "s" : ""}`} style={{ ...TX.nano, fontWeight: 600, color: C.ink500, background: SURFACE.containerHigh, borderRadius: R.pill, padding: "1px 6px" }}>{load}</span> : null}
+                {load > 0 ? <span title={`${load} échéance${load > 1 ? "s" : ""}`} style={{ ...TX.nano, fontWeight: 600, color: C.ink500, background: C.subtle, borderRadius: R.pill, padding: "1px 6px" }}>{load}</span> : null}
               </div>
             </div>
           );
@@ -1172,7 +1186,7 @@ function WeekView({
             const today = isToday(iso);
             const weekend = i >= 5;
             return (
-              <DayCell key={iso} iso={iso} dnd={dnd} isToday={today} style={{ borderRight: `1px solid ${C.line}`, minHeight: Math.max(320, rows.length * 26 + 40), background: today ? C.brand50 : weekend ? SURFACE.container : C.surface }}>
+              <DayCell key={iso} iso={iso} dnd={dnd} isToday={today} style={{ borderRight: `1px solid ${C.line}`, minHeight: Math.max(320, rows.length * 26 + 40), background: today ? C.brand50 : weekend ? C.subtle : C.surface }}>
                 <div />
               </DayCell>
             );

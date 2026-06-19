@@ -21,11 +21,18 @@ const MAX_LEFT_W = 560;
 
 const DAY = 86_400_000;
 
-// Critical-path treatment: a distinct accent (deep indigo/slate) — NOT danger
-// red, which already means "late". A heavier outline + this accent ring reads as
-// "structurally critical" without colliding with the late semantics.
-// TODO(derive): promote to a token if reused elsewhere.
-const CP_ACCENT = "#4338CA";
+// Calm bar fill: a single ink/neutral tint for every task bar. Assignee identity
+// is already carried by the avatar in the left cell, so the bar itself does not
+// need per-person colour — that only turns the timeline into a rainbow. Colour is
+// reserved for the two states that carry meaning: critical path and done.
+const BAR_INK = C.ink700; // resting bar fill (mono, calm)
+const BAR_TRACK = C.subtle; // unfilled remainder of the bar
+
+// Critical-path treatment: ONE restrained ink accent (near-black), NOT a
+// saturated indigo and NOT danger red (red already means "late"). A slightly
+// darker fill + a quiet 1px ink ring reads as "structurally critical" without
+// competing with the late semantics or shouting on the timeline.
+const CP_ACCENT = C.ink900;
 
 type Zoom = "fit" | "trimestre" | "mois" | "semaine" | "jour";
 type ColKey = "debut" | "fin" | "duree" | "marge" | "avancement";
@@ -144,23 +151,21 @@ function buildAxis(windowStart: string, spanDays: number, pxPerDay: number, zoom
 }
 
 function Legend() {
+  const item = { display: "flex", alignItems: "center", gap: 5 } as const;
+  const swatch = { width: 15, height: 8, borderRadius: 2, flexShrink: 0 } as const;
   return (
-    <span style={{ ...TX.nano, color: C.ink500, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-      <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, borderRadius: 2, background: C.ink700, opacity: 0.85 }} />
+    <span style={{ ...TX.nano, color: C.ink500, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <span style={item}>
+        <span style={{ ...swatch, background: BAR_INK }} />
         avancement
       </span>
-      <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, borderRadius: 2, background: C.surface, border: `2px solid ${CP_ACCENT}` }} />
+      <span style={item}>
+        <span style={{ ...swatch, background: CP_ACCENT, boxShadow: `0 0 0 1px ${CP_ACCENT}` }} />
         chemin critique
       </span>
-      <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, borderRadius: 2, background: `repeating-linear-gradient(90deg, ${C.ink350}66 0 3px, transparent 3px 6px)`, border: `1px dashed ${C.ink350}` }} />
-        marge (float)
-      </span>
-      <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, borderRadius: 2, background: SURFACE.containerHigh }} />
-        week-end
+      <span style={item}>
+        <span style={{ ...swatch, background: `repeating-linear-gradient(90deg, ${C.ink350}55 0 3px, transparent 3px 6px)`, border: `1px dashed ${C.ink350}` }} />
+        marge
       </span>
     </span>
   );
@@ -543,16 +548,17 @@ function SubtaskLeftCell({ s, leftW, cols }: { s: GanttBar; leftW: number; cols:
 function ChartBackground({ leftW, timelineW, axis, todayPx, topOffset }: { leftW: number; timelineW: number; axis: Axis; todayPx: number; topOffset: number }) {
   return (
     <div aria-hidden style={{ position: "absolute", left: leftW, top: topOffset, width: timelineW, bottom: 0, pointerEvents: "none", zIndex: 0 }}>
+      {/* Weekend bands — barely-there tint; a quiet rhythm cue, not a stripe. */}
       {axis.weekends.map((b, i) => (
-        <div key={`we${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: b.px, width: b.w, background: SURFACE.containerHigh, opacity: 0.55 }} />
+        <div key={`we${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: b.px, width: b.w, background: SURFACE.container, opacity: 0.45 }} />
       ))}
-      {axis.bottom.map((t, i) => (
-        <div key={`bl${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, borderLeft: `1px solid ${C.line}` }} />
-      ))}
+      {/* Period dividers — only the major (year/quarter) lines are drawn, faintly,
+          so the field reads as open rather than ruled. Minor month/week lines are
+          dropped; the header already carries those labels. */}
       {axis.top.filter((t) => t.major).map((t, i) => (
-        <div key={`tl${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, borderLeft: `1px solid ${C.lineStrong}` }} />
+        <div key={`tl${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, borderLeft: `1px solid ${C.line}` }} />
       ))}
-      <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: C.brand, left: todayPx }} />
+      <div style={{ position: "absolute", top: 0, bottom: 0, width: 1.5, background: C.brand, opacity: 0.7, left: todayPx }} />
     </div>
   );
 }
@@ -650,25 +656,26 @@ function DependencyArrows({ subtasks, leftW, timelineW, hoverDep, onHover }: { s
   return (
     <svg style={{ position: "absolute", left: leftW, top: 0, width: timelineW, height: subtasks.length * SUB_ROW_H, pointerEvents: "none", zIndex: 4, overflow: "visible" }}>
       <defs>
+        {/* Quiet neutral arrowhead; a single slightly-darker head on hover. No red
+            marker — a backward link is shown by a dash, not by an alarm colour. */}
         <marker id="dep-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
           <path d="M0,0 L6,3 L0,6 Z" fill={C.ink350} />
         </marker>
         <marker id="dep-arrow-hot" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6 Z" fill={CP_ACCENT} />
-        </marker>
-        <marker id="dep-arrow-back" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6 Z" fill={C.danger} />
+          <path d="M0,0 L6,3 L0,6 Z" fill={C.ink700} />
         </marker>
       </defs>
       {links.map((l, i) => {
         const hot = hoverDep != null && (hoverDep === l.pred || hoverDep === l.succ);
-        const stroke = hot ? CP_ACCENT : l.backward ? C.danger : C.ink350;
-        const marker = hot ? "dep-arrow-hot" : l.backward ? "dep-arrow-back" : "dep-arrow";
+        // Always neutral; hover lifts to a darker ink. Backward links read via the
+        // dash pattern, never via colour (red is reserved for genuinely late).
+        const stroke = hot ? C.ink700 : C.ink350;
+        const marker = hot ? "dep-arrow-hot" : "dep-arrow";
         return (
           <g key={i}>
             {/* fat invisible hit path for hover */}
             <path d={l.d} stroke="transparent" strokeWidth={10} fill="none" style={{ pointerEvents: "stroke" }} onMouseEnter={() => onHover(l.succ)} onMouseLeave={() => onHover(null)} />
-            <path d={l.d} stroke={stroke} strokeWidth={hot ? 2 : 1.3} strokeDasharray={l.backward ? "4 3" : undefined} fill="none" markerEnd={`url(#${marker})`} strokeLinejoin="round" strokeLinecap="round" />
+            <path d={l.d} stroke={stroke} strokeWidth={hot ? 1.8 : 1.2} strokeDasharray={l.backward ? "4 3" : undefined} fill="none" markerEnd={`url(#${marker})`} strokeLinejoin="round" strokeLinecap="round" />
           </g>
         );
       })}
@@ -756,16 +763,19 @@ function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: Gantt
       animate={drag ? false : { left: `${left}%`, width: `${width}%` }}
       transition={SPRING.snappy}
       style={{
+        // Calm neutral track + ink progress fill. Status is carried by the pill in
+        // the left cell, so the bar itself stays mono. Critical projects get ONE
+        // restrained ink ring — no saturated tint, no second border colour.
         position: "absolute", top: (PROJ_ROW_H - 20) / 2, height: 20, borderRadius: R.xs,
         ...(drag ? { left: `${left}%`, width: `${width}%` } : {}),
-        minWidth: 12, background: `${g.color}14`,
-        border: cp ? `2px solid ${CP_ACCENT}` : `1px solid ${g.color}40`, overflow: "visible",
+        minWidth: 12, background: BAR_TRACK,
+        border: cp ? `1.5px solid ${CP_ACCENT}` : `1px solid ${C.line}`, overflow: "visible",
         cursor: drag ? "grabbing" : "grab", touchAction: "none",
         boxShadow: drag ? SH.md : undefined, zIndex: drag ? 5 : 1,
         outline: focused ? `2px solid ${C.brand}` : "none", outlineOffset: 1,
       }}
     >
-      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.9, borderRadius: `${R.xs}px 0 0 ${R.xs}px` }} />
+      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: cp ? CP_ACCENT : BAR_INK, borderRadius: `${R.xs}px 0 0 ${R.xs}px` }} />
       <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 10.5, fontWeight: 600, color: g.fill > 55 ? C.surface : C.ink700 }}>
         {g.progress} %
       </span>
@@ -831,9 +841,12 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
   const pStart = shiftISO(s.start, drag?.mode === "move" ? drag.dxDays : 0);
   const pDays = Math.max(1, workingDaysBetween(s.start, shiftISO(s.end, drag?.mode === "resize" ? drag.dxDays : 0)));
 
-  // Critical-path tasks keep the assignee fill but gain a heavy indigo outline +
-  // raised z. NOT danger red (that means "late"). Done tasks read neutral.
+  // Mono bar fill: assignee identity lives in the left-cell avatar, so the bar is
+  // a single calm ink — no per-person rainbow. Colour is reserved for the two
+  // states that carry meaning: critical (darker ink + ONE quiet ring) and done
+  // (receded neutral + hatch). NOT danger red — that means "late".
   const critical = s.onCriticalPath && !s.done;
+  const barFill = s.done ? C.ink300 : critical ? CP_ACCENT : BAR_INK;
   const critTitle = s.onCriticalPath ? " · chemin critique (marge nulle)" : s.float > 0 ? ` · marge ${s.float} j` : "";
   const labelOutside = (left + width) * (timelineW / 100) + 8; // px from timeline start for the trailing name
   const showLabel = pxPerDay >= 4 && !drag;
@@ -879,17 +892,17 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
         style={{
           position: "absolute", top: SUB_ROW_H / 2 - 7, height: 14, borderRadius: R.xs,
           ...(drag ? { left: `${left}%`, width: `${width}%` } : {}),
-          minWidth: 8, background: s.color, opacity: s.done ? 0.5 : 0.95,
-          // done = diagonal hatch overlay (non-opacity cue); critical = indigo ring.
+          minWidth: 8, background: barFill, opacity: s.done ? 0.7 : 1,
+          // done = diagonal hatch overlay (non-opacity cue); critical = ONE quiet ink ring.
           backgroundImage: s.done ? `repeating-linear-gradient(45deg, ${C.surface}99 0 2px, transparent 2px 5px)` : undefined,
-          boxShadow: drag ? SH.md : critical ? `0 0 0 2px ${CP_ACCENT}` : undefined,
+          boxShadow: drag ? SH.md : critical ? `0 0 0 1px ${CP_ACCENT}` : undefined,
           cursor: drag ? "grabbing" : "grab", touchAction: "none", zIndex: drag ? 5 : critical ? 3 : 1,
           outline: focused ? `2px solid ${C.brand}` : "none", outlineOffset: 1,
         }}
       >
-        {/* done checkmark */}
+        {/* done checkmark — ink on the light neutral done fill for legibility */}
         {s.done ? (
-          <span style={{ position: "absolute", left: 2, top: "50%", transform: "translateY(-50%)", color: C.surface, lineHeight: 0 }}>
+          <span style={{ position: "absolute", left: 2, top: "50%", transform: "translateY(-50%)", color: C.ink700, lineHeight: 0 }}>
             <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
           </span>
         ) : null}

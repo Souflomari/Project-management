@@ -75,6 +75,11 @@ export function StatusPicker({ p, size = "sm" }: { p: DerivedProject; size?: "sm
       {STATUSES.map((st) => {
         const m = STATUS_META[st];
         const active = st === p.status;
+        // Selection is a neutral state (near-black outline + ink label) — not a
+        // coloured slab. The small dot carries status meaning: red only for "en
+        // retard", green as the one positive identity ("à jour"); the rest stay
+        // grey so colour means something rather than decorating every chip.
+        const dot = dotColor(st);
         return (
           <button
             key={st}
@@ -84,18 +89,28 @@ export function StatusPicker({ p, size = "sm" }: { p: DerivedProject; size?: "sm
             style={{
               cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 540, whiteSpace: "nowrap",
               display: "inline-flex", alignItems: "center", gap: 6, padding: pad, borderRadius: R.sm,
-              ...(active
-                ? { background: m.bg, color: m.color, border: "1px solid transparent" }
-                : { background: C.surface, color: C.ink500, border: `1px solid ${C.line}` }),
+              background: active ? SURFACE.container : C.surface,
+              color: active ? C.ink900 : C.ink500,
+              border: `1px solid ${active ? C.ink900 : C.line}`,
             }}
           >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? m.color : C.ink400 }} />
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? dot : C.ink300 }} />
             {m.label}
           </button>
         );
       })}
     </div>
   );
+}
+
+/** Status dot — red reserved for late, green for the positive "à jour" identity,
+ *  everything else stays a quiet grey. Colour carries meaning, not decoration. */
+function dotColor(st: (typeof STATUSES)[number]): string {
+  switch (st) {
+    case "en retard": return C.danger;
+    case "à jour": return C.brand;
+    default: return C.ink400;
+  }
 }
 
 /** Fast-triage summary for the drawer: avancement, next deliverable, margin —
@@ -356,13 +371,14 @@ function AvancementBar({ p, height = 6 }: { p: DerivedProject; height?: number }
   );
 }
 
-/** A labelled over-budget badge (not colour-only — carries the word). */
+/** Over-budget marker — a quiet outlined label, not a filled red slab. Red is
+ *  reserved for this one "over" meaning; it carries the word, not colour alone. */
 function OverBudgetBadge() {
   return (
     <span
       style={{
-        ...TX.eyebrow, fontSize: 9.5, letterSpacing: ".04em", color: "#FFFFFF", background: C.danger,
-        padding: "2px 6px", borderRadius: R.xs, whiteSpace: "nowrap",
+        ...TX.eyebrow, fontSize: 9.5, letterSpacing: ".04em", color: C.danger,
+        border: `1px solid ${C.danger}`, padding: "1px 6px", borderRadius: R.xs, whiteSpace: "nowrap",
       }}
     >
       Dépassement
@@ -375,87 +391,63 @@ function OverBudgetBadge() {
 export function ProjectBudget({ p }: { p: DerivedProject }) {
   const { team } = useProjects();
   const b = buildBudget(p, team);
-  // Burn bar: committed cost (track fill) with earned VALUE overlaid. Committed
-  // can exceed 100% — render the slice past the fee line as a distinct overflow
-  // segment instead of silently clamping.
+  // Burn bar (quiet, monochrome): a neutral track carries the committed cost as a
+  // SINGLE restrained ink fill. Earned value is a thin tick on that fill (a
+  // marker, not a competing colour). Over-budget is the ONLY case that turns red —
+  // the fill past 100% reads as one red accent, reinforced by the label. No
+  // second hue, no overflow track, no multi-dot legend.
   const committed = b.committedPct;
   const committedIn = Math.min(100, committed);
-  const committedOver = Math.max(0, Math.min(40, committed - 100)); // shown in a small overflow track
   const earned = b.feesEur ? Math.min(100, Math.round((b.earnedValueEur / b.feesEur) * 100)) : 0;
-  const marginColor = b.overBudget ? C.danger : C.brand;
-  const barColor = b.overBudget ? C.danger : C.ink700;
-  const earnedColor = b.overBudget ? C.danger : C.brand;
+  const fillColor = b.overBudget ? C.danger : C.ink700;
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 9 }}>
-        <div style={LABEL}>Honoraires et coûts</div>
+      {/* one focal readout for the section: the margin */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+        <span style={{ ...num(20), color: b.overBudget ? C.danger : C.ink900 }}>
+          {b.marginEur >= 0 ? "marge " : "dépassement "}{fmtEur(Math.abs(b.marginEur))}
+        </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.micro, color: b.overBudget ? C.danger : C.ink500 }}>
-          marge {b.marginPct >= 0 ? "+" : ""}{pct(b.marginPct)}
+          {b.marginPct >= 0 ? "+" : ""}{pct(b.marginPct)}
           {b.overBudget ? <OverBudgetBadge /> : null}
         </span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-        <Stat label="Honoraires" value={fmtEur(b.feesEur)} />
-        <Stat label="Coût engagé" value={fmtEur(b.plannedCostEur)} hint={`${pct(b.committedPct)} des honoraires`} />
-        <Stat label="Valeur acquise" value={fmtEur(b.earnedValueEur)} valueColor={C.brand} hint={`${pct(b.spentPct)} du coût`} />
+      {/* Single monochrome burn bar with an earned-value tick. Plain-French
+          tooltip carries the full figures so the chrome can stay quiet. */}
+      <div
+        title={`Engagé : ${pct(committed)} des honoraires (${fmtEur(b.plannedCostEur)} sur ${fmtEur(b.feesEur)}). Acquis : ${pct(earned)} (valeur du travail terminé, ${fmtEur(b.earnedValueEur)}). Le repère marque 100 % des honoraires.${b.overBudget ? " Le plan dépasse les honoraires." : ""}`}
+        style={{ position: "relative", height: 8, borderRadius: R.pill, background: SURFACE.container, border: `1px solid ${C.line}`, overflow: "hidden", marginBottom: 7 }}
+      >
+        <div className="anim-bar" style={{ position: "absolute", insetBlock: 0, left: 0, width: `${committedIn}%`, ["--fill" as string]: `${committedIn}%`, background: fillColor }} />
+        {/* earned-value tick — a quiet position marker on the fill, not a slab */}
+        {earned > 0 ? (
+          <div aria-hidden style={{ position: "absolute", top: 1, bottom: 1, left: `${earned}%`, width: 2, background: C.surface, transform: "translateX(-1px)", opacity: 0.9 }} />
+        ) : null}
       </div>
 
-      <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px", marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={{ ...TX.overline, color: C.ink600 }}>Consommation des honoraires</span>
-          <span style={{ ...num(15), color: marginColor }}>
-            {b.marginEur >= 0 ? "marge " : "dépassement "}{fmtEur(Math.abs(b.marginEur))}
-          </span>
-        </div>
+      <div style={{ display: "flex", justifyContent: "space-between", ...TX.micro, color: C.ink500, marginBottom: 14 }}>
+        <span>engagé {pct(committed)}</span>
+        <span title="Valeur du travail terminé">acquis {pct(earned)}</span>
+      </div>
 
-        {/* legend — non-colour explanation of the two segments */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 7 }}>
-          <LegendDot color={`${barColor}55`} label="engagé" />
-          <LegendDot color={earnedColor} label="acquis" />
-        </div>
-
-        {/* Burn bar: committed cost (track fill) with earned VALUE as the green
-            inset. Plain-French tooltip explains the figures; committed >100%
-            shows as a visible overflow segment past the fee line. */}
-        <div
-          title={`Engagé : ${pct(committed)} des honoraires (${fmtEur(b.plannedCostEur)} sur ${fmtEur(b.feesEur)}). Acquis : ${pct(earned)} (valeur du travail terminé, ${fmtEur(b.earnedValueEur)}). Le repère à droite marque 100 % des honoraires.${b.overBudget ? " Le plan dépasse les honoraires." : ""}`}
-          style={{ display: "flex", alignItems: "stretch", gap: 2 }}
-        >
-          <div style={{ position: "relative", flex: 1, height: 8, borderRadius: R.pill, background: C.surface, border: `1px solid ${C.line}`, overflow: "hidden" }}>
-            <div className="anim-bar" style={{ position: "absolute", insetBlock: 0, left: 0, width: `${committedIn}%`, ["--fill" as string]: `${committedIn}%`, background: `${barColor}33` }} />
-            <div className="anim-bar" style={{ position: "absolute", insetBlock: 0, left: 0, width: `${earned}%`, ["--fill" as string]: `${earned}%`, background: earnedColor, opacity: 0.95 }} />
-            {b.feesEur ? (
-              <div style={{ position: "absolute", top: -2, bottom: -2, left: "100%", width: 2, background: C.ink400, transform: "translateX(-2px)" }} />
-            ) : null}
-          </div>
-          {/* overflow track: the portion of commitment past 100% of fees */}
-          {committedOver > 0 ? (
-            <div
-              title={`Dépassement : ${pct(committed - 100)} au-delà des honoraires`}
-              style={{ position: "relative", width: 28, height: 8, borderRadius: R.pill, background: "#FAEEEB", border: `1px solid ${C.danger}55`, overflow: "hidden", flexShrink: 0 }}
-            >
-              <div className="anim-bar" style={{ position: "absolute", insetBlock: 0, left: 0, width: `${(committedOver / 40) * 100}%`, ["--fill" as string]: `${(committedOver / 40) * 100}%`, background: C.danger }} />
-            </div>
-          ) : null}
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", ...TX.micro, color: C.ink500, marginTop: 6 }}>
-          <span>acquis {fmtEur(b.earnedValueEur)}</span>
-          <span>engagé {fmtEur(b.plannedCostEur)} / {fmtEur(b.feesEur)}</span>
-        </div>
+      {/* secondary detail, demoted: the three EVM figures as quiet label/value rows */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <BudgetRow label="Honoraires" value={fmtEur(b.feesEur)} />
+        <BudgetRow label="Coût engagé" value={fmtEur(b.plannedCostEur)} />
+        <BudgetRow label="Valeur acquise" value={fmtEur(b.earnedValueEur)} />
       </div>
     </>
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
+function BudgetRow({ label, value }: { label: string; value: string }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, ...TX.micro, color: C.ink600 }}>
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
-      {label}
-    </span>
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+      <span style={{ ...TX.caption, color: C.ink500 }}>{label}</span>
+      <span style={{ ...num(14), color: C.ink900 }}>{value}</span>
+    </div>
   );
 }
 
@@ -703,7 +695,7 @@ function SubtaskRow({
             {subtask.name}
           </span>
           {subtask.onCriticalPath && !subtask.done ? (
-            <span style={{ ...TX.eyebrow, fontSize: 9.5, letterSpacing: ".03em", color: "#FFFFFF", background: C.ink800, padding: "1px 5px", borderRadius: R.xs, flexShrink: 0 }} title="Sur le chemin critique — aucun retard possible sans décaler la fin">
+            <span style={{ ...TX.eyebrow, fontSize: 9.5, letterSpacing: ".03em", color: C.ink600, border: `1px solid ${C.lineStrong}`, padding: "0 5px", borderRadius: R.xs, flexShrink: 0 }} title="Sur le chemin critique — aucun retard possible sans décaler la fin">
               critique
             </span>
           ) : subtask.float > 0 && !subtask.done ? (

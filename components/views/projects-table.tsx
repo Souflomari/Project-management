@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 import { FilterBar, type FacetControls } from "../filter-bar";
 import { CaretDownIcon, CheckIcon } from "../icons";
-import { Avatar, Button, Checkbox, PhaseBadge, ProgressBar, Select, StatusPill } from "../ui";
+import { Avatar, Button, Checkbox, ProgressBar, Select, StatusPill } from "../ui";
 import { buildBudget, type DerivedProject, type ProjectBudget } from "@/lib/derive";
 import { fmtBudget } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
@@ -140,12 +140,16 @@ function MenuOption({ selected, label, dot, onSelect }: { selected: boolean; lab
 // ───────────────────────────────────────── inline editors
 
 function StatusCell({ p, setStatus }: { p: DerivedProject; setStatus: (id: number, s: Status) => void }) {
+  // Reserve the tinted well (a meaningful accent) for the statuses that warrant
+  // attention — at-risk / late. Healthy / finished read as a quiet dot + neutral
+  // label, so a normal row carries no status slab competing with the name.
+  const atRisk = p.status === "à risque" || p.status === "en retard";
   return (
     <InlinePopover
       label={`Statut de ${p.name}`}
       trigger={(open, toggle) => (
         <button type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} className="soft-hover" style={editTrigger}>
-          <StatusPill color={p.statusColor} bg={p.statusBg} label={p.statusLabel} filled />
+          <StatusPill color={p.statusColor} bg={p.statusBg} label={p.statusLabel} filled={atRisk} />
         </button>
       )}
     >
@@ -156,13 +160,31 @@ function StatusCell({ p, setStatus }: { p: DerivedProject; setStatus: (id: numbe
   );
 }
 
+/** Whisper-quiet phase chip: the LETTER code (ESQ/APS/…) in neutral ink on a
+ *  subtle neutral well. Colour is not used to carry the phase — the code does —
+ *  so the column stops reading as a stack of competing chips down the page. */
+function QuietPhaseChip({ label, title }: { label: string; title?: string }) {
+  return (
+    <span
+      title={title}
+      style={{
+        ...TX.eyebrow, fontSize: 10.5, letterSpacing: ".05em",
+        display: "inline-flex", alignItems: "center", padding: "3px 8px",
+        borderRadius: R.xs, whiteSpace: "nowrap", color: C.ink600, background: C.subtle,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 function PhaseCell({ p, setPhase }: { p: DerivedProject; setPhase: (id: number, i: number) => void }) {
   return (
     <InlinePopover
       label={`Phase de ${p.name}`}
       trigger={(open, toggle) => (
         <button type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} className="soft-hover" style={editTrigger}>
-          <PhaseBadge label={p.phaseLabel} />
+          <QuietPhaseChip label={p.phaseLabel} title={`${p.phaseLabel} · ${p.phaseFull}`} />
         </button>
       )}
     >
@@ -264,10 +286,12 @@ function renderCell(key: ColKey, p: DerivedProject, ctx: CellCtx): ReactNode {
   switch (key) {
     case "phase": return <PhaseCell p={p} setPhase={ctx.setPhase} />;
     case "rendu":
+      // Only an overdue rendu earns a colour (the meaningful red accent); on-time
+      // / due-soon stays neutral so the column isn't a second traffic light.
       return (
         <div style={{ minWidth: 0 }}>
           <div style={{ ...TX.caption, fontWeight: 540, color: C.ink800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.renduLabel}</div>
-          <div style={{ ...TX.caption, color: C.ink500 }}>{p.renduFmt} · <span style={{ color: p.renduDueColor, fontWeight: 600 }}>{p.renduDaysLabel}</span></div>
+          <div style={{ ...TX.caption, color: C.ink500 }}>{p.renduFmt} · <span style={{ color: p.renduDays != null && p.renduDays < 0 ? C.danger : C.ink600, fontWeight: 600 }}>{p.renduDaysLabel}</span></div>
         </div>
       );
     case "echeance":
@@ -278,10 +302,13 @@ function renderCell(key: ColKey, p: DerivedProject, ctx: CellCtx): ReactNode {
         </div>
       );
     case "progress":
+      // Mono meter: a thin neutral fill on the subtle track, the % in neutral
+      // ink. Status is read from the Statut column / dot, not duplicated as a
+      // coloured bar here.
       return (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ProgressBar pct={p.progress} color={p.ring} />
-          <span style={{ ...num(13), width: 38, textAlign: "right", color: p.status === "à jour" ? C.brandText : C.ink700 }}>{p.progress}&#8239;%</span>
+          <ProgressBar pct={p.progress} color={C.ink600} label={`Avancement de ${p.name}`} />
+          <span style={{ ...num(13), width: 38, textAlign: "right", color: C.ink700 }}>{p.progress}&#8239;%</span>
         </div>
       );
     case "budget": return <BudgetCell p={p} updateProject={ctx.updateProject} />;
@@ -725,10 +752,12 @@ const menuShell: React.CSSProperties = {
 };
 
 function controlBtn(active: boolean): React.CSSProperties {
+  // Quiet toolbar control: an active group-by reads as neutral ink on a subtle
+  // well, not a green-tinted chip — matches the calmed filter facets.
   return {
     cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 600, padding: "6px 10px 6px 12px", borderRadius: R.sm,
     display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
-    border: `1px solid ${active ? C.solid : C.line}`, background: active ? C.brand50 : C.surface, color: active ? C.brandText : C.ink700,
+    border: `1px solid ${active ? C.lineStrong : C.line}`, background: active ? C.subtle : C.surface, color: active ? C.ink900 : C.ink700,
     transition: "background .12s, border-color .12s",
   };
 }
@@ -793,11 +822,11 @@ function MobileCards({
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                       <PhaseCell p={p} setPhase={cellCtx.setPhase} />
-                      <div style={{ flex: 1 }}><ProgressBar pct={p.progress} color={p.ring} /></div>
+                      <div style={{ flex: 1 }}><ProgressBar pct={p.progress} color={C.ink600} label={`Avancement de ${p.name}`} /></div>
                       <span style={{ ...num(13), color: C.ink700 }}>{p.progress}&#8239;%</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, ...TX.caption, color: C.ink500 }}>
-                      <span>{p.renduFmt} · <span style={{ color: p.renduDueColor, fontWeight: 600 }}>{p.renduDaysLabel}</span></span>
+                      <span>{p.renduFmt} · <span style={{ color: p.renduDays != null && p.renduDays < 0 ? C.danger : C.ink600, fontWeight: 600 }}>{p.renduDaysLabel}</span></span>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
                         <HealthDot b={b} />
                         <BudgetCell p={p} updateProject={cellCtx.updateProject} />

@@ -70,13 +70,15 @@ function FacetPopover({
         style={{
           cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 600, padding: "6px 10px 6px 12px", borderRadius: R.sm,
           display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
-          border: `1px solid ${active ? C.solid : C.line}`, background: active ? C.brand50 : C.surface, color: active ? C.brandText : C.ink700,
+          // Calm: an active facet reads as neutral-ink with a stronger border, not
+          // a green-tinted control — colour is saved for row-level meaning.
+          border: `1px solid ${active ? C.lineStrong : C.line}`, background: active ? C.subtle : C.surface, color: active ? C.ink900 : C.ink700,
           transition: "background .12s, border-color .12s",
         }}
       >
         {label}
         {badge ? (
-          <span style={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 16, textAlign: "center", padding: "1px 5px", borderRadius: R.xs, background: C.brand, color: "#fff" }}>{badge}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 16, textAlign: "center", padding: "1px 5px", borderRadius: R.xs, background: C.ink800, color: "#fff" }}>{badge}</span>
         ) : null}
         <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .12s", color: C.ink500 }}>
           <CaretDownIcon size={12} />

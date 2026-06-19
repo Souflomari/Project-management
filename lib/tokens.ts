@@ -48,13 +48,14 @@ export const C = {
   surfaceLow: "#F4F3F1", // tracks / insets, a step below cards
 } as const;
 
-/** Curated assignee/avatar palette — one governed set used by the modal,
- *  sample data, and repository so colours never diverge. Every swatch is tuned
- *  so white initials clear WCAG AA (≥4.5:1): the lighter teals/green/amber were
- *  darkened (e.g. #4C8AA3→#37718A, #2C7A8C→#236877, #15803D→#136B33). */
+/** Assignee/avatar palette — minimalism: a calm set of LOW-CHROMA dark neutrals
+ *  (slate / stone / muted-teal / plum-grey) rather than saturated hues, so avatar
+ *  stacks read as quiet, not as a rainbow. Every swatch stays dark enough that
+ *  white initials clear WCAG AA (≥4.5:1); members are distinguished mainly by
+ *  their initials, colour is only a subtle secondary cue. */
 export const AVATAR_PALETTE = [
-  "#136B33", "#236877", "#37718A", "#9A4708", "#B5392E",
-  "#356A72", "#7C6353", "#2F4A63", "#585D67", "#615877",
+  "#4F5A63", "#5A5750", "#46555A", "#5E5560", "#4C5466",
+  "#5B5347", "#4F5E68", "#565160", "#4D564F", "#605C64",
 ] as const;
 
 // ── M3 tonal surface roles ──────────────────────────────────────────────────
@@ -249,8 +250,10 @@ export const DRAWER = {
   sub: C.ink500,
 } as const;
 
-/** Accent per study phase (ESQ → RÉC) — muted, single-family ramp. */
-export const PHASE_COLORS = ["#9C9488", "#6E8E84", "#5C81A0", "#4E7B82", "#3F8E5E", "#6C7286", "#8C7A66"];
+/** Phase ramp (ESQ → RÉC) — minimalism: a single low-chroma slate progression,
+ *  light→dark, so phases stay ordered and distinguishable WITHOUT a rainbow. The
+ *  letter code (ESQ/APS/…) carries identity; colour only reinforces sequence. */
+export const PHASE_COLORS = ["#B7BAC1", "#A4A8B2", "#9297A3", "#7F8593", "#6D7484", "#5C6376", "#4C5466"];
 
 /** Load tier — single source of truth so the headline colour and the heatmap
  *  cell always agree. Breakpoints 85 / 100 / 110. */
@@ -263,24 +266,26 @@ export function loadTier(pct: number): LoadTier {
   return "low";
 }
 
-/** Workload colour — calm green → amber → terracotta as load rises. */
+/** Workload colour — minimalism: green while within capacity, ONE amber when
+ *  high, ONE red when over (no three-way warm spread). */
 export function chargeColor(pct: number): string {
   switch (loadTier(pct)) {
-    case "crit": return "#B5532E";
-    case "over": return "#C2683E";
-    case "high": return "#B45309";
-    default: return "#15803D";
+    case "crit":
+    case "over": return C.danger; // over capacity → single danger red
+    case "high": return "#B45309"; // single amber
+    default: return C.brand; // within capacity → identity green
   }
 }
 
-/** Heatmap cell colour by load % — strictly darkening sage → terracotta ramp. */
+/** Heatmap cell colour by load % — minimalism: a single-hue green intensity ramp
+ *  (neutral → green) while within capacity, then ONE red for over-capacity. No
+ *  sage→terracotta multi-warmth. */
 export function heatColor(pct: number): string {
-  if (pct <= 0) return "#F2F1EF";
-  if (pct < 50) return "#E4ECE6";
-  if (pct < 85) return "#C2D8C7";
-  if (pct <= 100) return "#9FC0A6"; // full but within capacity
-  if (pct <= 110) return "#D2895F"; // slightly over (clearly darker + warmer)
-  return "#B5532E"; // well over — matches chargeColor "crit"
+  if (pct <= 0) return "#F1F0ED";
+  if (pct < 50) return "#E6EFE8";
+  if (pct < 85) return "#CBDDCF";
+  if (pct <= 100) return "#A9C8AF"; // full but within capacity
+  return "#C56B53"; // over capacity → single muted red (matches chargeColor over/crit)
 }
 
 // ── CSS-variable bridge ──────────────────────────────────────────────────────
