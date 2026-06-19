@@ -105,6 +105,10 @@ interface ProjectsContextValue {
   addTeamMember: (input: NewTeamMemberInput) => void;
   updateTeamMember: (id: number, patch: TeamMemberPatch) => void;
   deleteTeamMember: (id: number) => void;
+
+  bulkSetStatus: (ids: number[], status: Status) => void;
+  bulkAdvancePhase: (ids: number[]) => void;
+  bulkSetResponsable: (ids: number[], responsableId: number) => void;
 }
 
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
@@ -323,6 +327,65 @@ export function ProjectsProvider({
     [serverBacked, failToast, team, addTeamMember],
   );
 
+  // ---- bulk actions (optimistic batch + one summary toast + undo) ----
+  const reconcile = useCallback((rs: Project[]) => {
+    setProjects((prev) => { const m = new Map(rs.map((r) => [r.id, r])); return prev.map((p) => m.get(p.id) ?? p); });
+  }, []);
+
+  const bulkSetStatus = useCallback(
+    (ids: number[], status: Status) => {
+      if (!ids.length) return;
+      const snapshot = projects;
+      const prevById = new Map(snapshot.filter((p) => ids.includes(p.id)).map((p) => [p.id, p.status]));
+      const persist = (id: number, s: Status) => (serverBacked ? setStatusAction(id, s) : sampleRepository.setStatus(id, s));
+      setProjects((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, status } : p)));
+      Promise.all(ids.map((id) => persist(id, status))).then(reconcile).catch(() => { setProjects(snapshot); failToast(`${ids.length} projet(s) non mis à jour`); });
+      toast({
+        message: `${ids.length} projet${ids.length > 1 ? "s" : ""} · ${STATUS_META[status].label}`,
+        variant: "success",
+        action: { label: "Annuler", onClick: () => { setProjects(snapshot); Promise.all(ids.map((id) => persist(id, prevById.get(id) ?? status))).then(reconcile); } },
+      });
+    },
+    [projects, serverBacked, failToast, reconcile],
+  );
+
+  const bulkAdvancePhase = useCallback(
+    (ids: number[]) => {
+      const snapshot = projects;
+      const targets = snapshot
+        .filter((p) => ids.includes(p.id) && p.phaseIndex < FINAL_PHASE_INDEX)
+        .map((p) => ({ id: p.id, next: p.phaseIndex + 1, prev: p.phaseIndex }));
+      if (!targets.length) return;
+      const persist = (id: number, ph: number) => (serverBacked ? setPhaseAction(id, ph) : sampleRepository.setPhase(id, ph));
+      setProjects((prev) => prev.map((p) => { const t = targets.find((x) => x.id === p.id); return t ? { ...p, phaseIndex: t.next } : p; }));
+      Promise.all(targets.map((t) => persist(t.id, t.next))).then(reconcile).catch(() => { setProjects(snapshot); failToast(`${targets.length} projet(s) non mis à jour`); });
+      toast({
+        message: `${targets.length} projet${targets.length > 1 ? "s" : ""} · phase avancée`,
+        variant: "success",
+        action: { label: "Annuler", onClick: () => { setProjects(snapshot); Promise.all(targets.map((t) => persist(t.id, t.prev))).then(reconcile); } },
+      });
+    },
+    [projects, serverBacked, failToast, reconcile],
+  );
+
+  const bulkSetResponsable = useCallback(
+    (ids: number[], responsableId: number) => {
+      if (!ids.length) return;
+      const snapshot = projects;
+      const prevById = new Map(snapshot.filter((p) => ids.includes(p.id)).map((p) => [p.id, p.responsableId]));
+      const persist = (id: number, rid: number) => (serverBacked ? updateProjectAction(id, { responsableId: rid }) : sampleRepository.updateProject(id, { responsableId: rid }));
+      setProjects((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, responsableId } : p)));
+      Promise.all(ids.map((id) => persist(id, responsableId))).then(reconcile).catch(() => { setProjects(snapshot); failToast(`${ids.length} projet(s) non mis à jour`); });
+      const who = team.find((m) => m.id === responsableId)?.name ?? "";
+      toast({
+        message: `${ids.length} projet${ids.length > 1 ? "s" : ""} · responsable ${who}`,
+        variant: "success",
+        action: { label: "Annuler", onClick: () => { setProjects(snapshot); Promise.all(ids.map((id) => persist(id, prevById.get(id) ?? responsableId))).then(reconcile); } },
+      });
+    },
+    [projects, serverBacked, failToast, reconcile, team],
+  );
+
   // ---- ui actions ----
   const openProject = useCallback((id: number) => setSelectedId(id), []);
   const closeDrawer = useCallback(() => setSelectedId(null), []);
@@ -426,6 +489,9 @@ export function ProjectsProvider({
     addTeamMember,
     updateTeamMember,
     deleteTeamMember,
+    bulkSetStatus,
+    bulkAdvancePhase,
+    bulkSetResponsable,
   };
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;
