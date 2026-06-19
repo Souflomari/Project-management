@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 
 import { FlagIcon } from "../icons";
-import { Card, rowProps, StatusPill } from "../ui";
+import { Card, ProgressBar, rowProps, StatusPill } from "../ui";
 import { computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
 import { WEEK_SHORT } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
@@ -22,6 +22,17 @@ export function Dashboard() {
   const dist = statusDistribution(allDerived);
   const distTotal = Math.max(1, allDerived.length);
 
+  // Portfolio health: a single composite the director can read at a glance.
+  // à jour & terminé count fully, à risque half, en retard zero.
+  const countOf = (s: string) => dist.find((d) => d.status === s)?.count ?? 0;
+  const onTrack = countOf("à jour");
+  const atRisk = countOf("à risque");
+  const lateCount = countOf("en retard");
+  const done = countOf("terminé");
+  const health = Math.round((100 * (onTrack + done + atRisk * 0.5)) / distTotal);
+  const healthColor = health >= 75 ? C.brand : health >= 55 ? "#B45309" : C.danger;
+  const healthLabel = health >= 75 ? "Sous contrôle" : health >= 55 ? "À surveiller" : "Sous tension";
+
   const isStale = (renduDays: number | null) => renduDays !== null && renduDays < -STALE_DAYS;
   const staleCount = allDerived.filter((p) => p.nextTask && isStale(p.renduDays)).length;
   const upcoming = upcomingRendus(allDerived.filter((p) => !isStale(p.renduDays)));
@@ -34,34 +45,55 @@ export function Dashboard() {
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14, marginBottom: 20 }}>
-        <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} onClick={() => goProjects("all")} />
-        <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} onClick={goWeek} />
+      <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr 1fr", gap: 14, marginBottom: 20 }}>
+        {/* portfolio-health hero (spans both rows) */}
+        <div style={{ gridRow: "span 2" }}>
+          <Card padding="18px 20px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <div style={{ ...TX.overline, color: C.ink400 }}>Santé du portefeuille</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
+              <span style={{ ...num(46), color: healthColor }}>{health}</span>
+              <span style={{ ...num(18), color: C.ink400 }}>/ 100</span>
+            </div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
+              <span style={{ ...TX.bodyStrong, color: C.ink700 }}>{healthLabel}</span>
+            </div>
+
+            <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 18, background: C.subtle }}>
+              {dist.map((s) =>
+                s.count > 0 ? (
+                  <button
+                    key={s.status}
+                    onClick={() => goProjects(s.status)}
+                    title={`${s.label} · ${s.count} — filtrer`}
+                    aria-label={`Filtrer : ${s.label}`}
+                    style={{ width: `${(s.count / distTotal) * 100}%`, background: s.color, border: "none", padding: 0, cursor: "pointer" }}
+                  />
+                ) : null,
+              )}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 12 }}>
+              {dist.map((s) => (
+                <button key={s.status} onClick={() => goProjects(s.status)} className="soft-hover" style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: R.xs, background: s.color, flexShrink: 0 }} />
+                  {s.label} <span style={{ ...num(13), color: C.ink900 }}>{s.count}</span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ marginTop: "auto", paddingTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...TX.caption, color: C.ink500 }}>
+                <span>Avancement moyen</span>
+                <span style={{ ...num(15), color: C.ink900 }}>{kpis.avg}&#8239;%</span>
+              </div>
+              <div style={{ marginTop: 6 }}><ProgressBar pct={kpis.avg} color={C.brand} height={6} /></div>
+            </div>
+          </Card>
+        </div>
+
         <Kpi title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} accent={kpis.late > 0 ? STATUS_META["en retard"].color : undefined} onClick={kpis.late > 0 ? goLate : undefined} />
-        <Card padding="16px 18px">
-          <div style={{ ...TX.overline, color: C.ink400 }}>Répartition par statut</div>
-          <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 10, background: C.subtle }}>
-            {dist.map((s) =>
-              s.count > 0 ? (
-                <button
-                  key={s.status}
-                  onClick={() => goProjects(s.status)}
-                  title={`${s.label} · ${s.count} — filtrer`}
-                  aria-label={`Filtrer : ${s.label}`}
-                  style={{ width: `${(s.count / distTotal) * 100}%`, background: s.color, border: "none", padding: 0, cursor: "pointer" }}
-                />
-              ) : null,
-            )}
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 10 }}>
-            {dist.map((s) => (
-              <button key={s.status} onClick={() => goProjects(s.status)} className="soft-hover" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: C.ink500, background: "none", border: "none", padding: "1px 3px", borderRadius: R.xs, cursor: "pointer" }}>
-                <span style={{ width: 7, height: 7, borderRadius: R.xs, background: s.color, flexShrink: 0 }} />
-                {s.label} <span style={{ ...num(11), color: C.ink700 }}>{s.count}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
+        <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} onClick={goWeek} />
+        <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} onClick={() => goProjects("all")} />
         <Kpi title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} onClick={() => goProjects("all")} />
       </div>
 
