@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { CalendrierIcon, CheckIcon, FlagIcon } from "../icons";
 import { Card, EmptyState, Gauge, rowProps, Sparkline, StatusPill } from "../ui";
 import { buildHistory, buildKanban, computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
-import { WEEK_SHORT } from "@/lib/format";
+import { fmtBudget, WEEK_SHORT } from "@/lib/format";
+import { useCountUp } from "@/lib/use-count-up";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, num, PHASE_COLORS, R, SURFACE, STATUS_META, TX } from "@/lib/tokens";
 
@@ -39,8 +40,22 @@ export function Dashboard() {
   const lateCount = countOf("en retard");
   const done = countOf("terminé");
   const health = Math.round((100 * (onTrack + done + atRisk * 0.5)) / distTotal);
+  // Single animated value drives BOTH the readout and the gauge arc so they
+  // never disagree mid-flight. Colour/label stay derived from the FINAL value.
+  const healthAnim = useCountUp(health);
   const healthColor = health >= 75 ? C.brand : health >= 55 ? "#B45309" : C.danger;
   const healthLabel = health >= 75 ? "Sous contrôle" : health >= 55 ? "À surveiller" : "Sous tension";
+
+  // Animated KPI figures (~750ms ramp on load).
+  const lateAnim = useCountUp(kpis.late);
+  const rendusAnim = useCountUp(kpis.rendus);
+  const activeAnim = useCountUp(kpis.active);
+  const avgAnim = useCountUp(kpis.avg);
+  const onTrackAnim = useCountUp(onTrack);
+  // Honoraires: count the underlying total (k€) then format identically.
+  const budgetTotalK = allDerived.reduce((s, p) => s + p.budget, 0);
+  const budgetAnim = useCountUp(budgetTotalK);
+  const budgetDisplay = fmtBudget(Math.round(budgetAnim));
 
   const isStale = (renduDays: number | null) => renduDays !== null && renduDays < -STALE_DAYS;
   const staleCount = allDerived.filter((p) => p.nextTask && isStale(p.renduDays)).length;
@@ -64,11 +79,11 @@ export function Dashboard() {
             {/* command-viz: radial health gauge on the governed load ramp */}
             <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14 }}>
               <Gauge
-                value={health}
+                value={healthAnim}
                 size={128}
                 thickness={11}
                 color={healthColor}
-                label={<span style={{ ...num(38), color: healthColor }}>{health}</span>}
+                label={<span style={{ ...num(38), color: healthColor }}>{Math.round(healthAnim)}</span>}
                 sublabel={<span style={{ ...TX.nano, color: C.ink400 }}>/ 100</span>}
               />
               <div style={{ minWidth: 0 }}>
@@ -90,7 +105,8 @@ export function Dashboard() {
                     onClick={() => goProjects(s.status)}
                     title={`${s.label} · ${s.count} — filtrer`}
                     aria-label={`Filtrer : ${s.label}`}
-                    style={{ width: `${(s.count / distTotal) * 100}%`, background: s.color, border: "none", padding: 0, cursor: "pointer" }}
+                    className="anim-bar"
+                    style={{ width: `${(s.count / distTotal) * 100}%`, ["--fill" as string]: `${(s.count / distTotal) * 100}%`, background: s.color, border: "none", padding: 0, cursor: "pointer" }}
                   />
                 ) : null,
               )}
@@ -99,7 +115,10 @@ export function Dashboard() {
               {dist.map((s) => (
                 <button key={s.status} onClick={() => goProjects(s.status)} className="soft-hover" style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
                   <span style={{ width: 8, height: 8, borderRadius: R.xs, background: s.color, flexShrink: 0 }} />
-                  {s.label} <span style={{ ...num(13), color: C.ink900 }}>{s.count}</span>
+                  {s.label}{" "}
+                  <span style={{ ...num(13), color: s.status === "à jour" ? C.brand : C.ink900 }}>
+                    {s.status === "à jour" ? Math.round(onTrackAnim) : s.count}
+                  </span>
                 </button>
               ))}
             </div>
@@ -107,7 +126,7 @@ export function Dashboard() {
             <div style={{ marginTop: "auto", paddingTop: 16 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...TX.caption, color: C.ink500 }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>Avancement moyen <Delta v={avgDelta} unit="pts" /></span>
-                <span style={{ ...num(15), color: C.ink900 }}>{kpis.avg}&#8239;%</span>
+                <span style={{ ...num(15), color: C.brand }}>{Math.round(avgAnim)}&#8239;%</span>
               </div>
               <div style={{ marginTop: 10, paddingRight: 30 }}>
                 <Sparkline values={history.map((h) => h.avg)} height={46} gradient endLabel={`${kpis.avg} %`} />
@@ -117,10 +136,19 @@ export function Dashboard() {
           </Card>
         </div>
 
-        <Kpi className="b-late" title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} accent={kpis.late > 0 ? STATUS_META["en retard"].color : undefined} onClick={kpis.late > 0 ? goLate : undefined} />
-        <Kpi className="b-rendus7" title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} delta={rendusDelta} onClick={goWeek} />
-        <Kpi className="b-active" title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} onClick={() => goProjects("all")} />
-        <Kpi className="b-budget" title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} onClick={() => goProjects("all")} />
+        <Kpi
+          className="b-late"
+          title="En retard"
+          value={Math.round(lateAnim)}
+          sub="à traiter"
+          subColor={kpis.late > 0 ? STATUS_META["en retard"].color : undefined}
+          dot={kpis.late > 0 ? STATUS_META["en retard"].color : undefined}
+          accent={kpis.late > 0 ? STATUS_META["en retard"].color : undefined}
+          onClick={kpis.late > 0 ? goLate : undefined}
+        />
+        <Kpi className="b-rendus7" title="Rendus 7 jours" value={Math.round(rendusAnim)} sub={WEEK_SHORT} delta={rendusDelta} onClick={goWeek} />
+        <Kpi className="b-active" title="Projets actifs" value={Math.round(activeAnim)} sub={`portefeuille · ${kpis.total}`} onClick={() => goProjects("all")} />
+        <Kpi className="b-budget" title="Honoraires engagés" value={budgetDisplay} sub={`${kpis.total} projets`} onClick={() => goProjects("all")} />
 
         <PhaseStrip className="b-phase" columns={phaseCols} total={allDerived.length} onPhase={goPhase} />
 
@@ -210,18 +238,23 @@ function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: 
   );
 }
 
-function Kpi({ title, value, sub, color, accent, delta, onClick, className }: { title: string; value: string | number; sub: string; color?: string; accent?: string; delta?: number; onClick?: () => void; className?: string }) {
+function Kpi({ title, value, sub, subColor, dot, accent, delta, onClick, className }: { title: string; value: string | number; sub: string; subColor?: string; dot?: string; accent?: string; delta?: number; onClick?: () => void; className?: string }) {
   const cls = [className, onClick ? "lift-hover row-focus" : ""].filter(Boolean).join(" ") || undefined;
-  const display = value;
   return (
     <div className={cls} {...(onClick ? rowProps(onClick) : {})} style={{ borderRadius: R.lg, ...(onClick ? { cursor: "pointer" } : {}) }}>
       <Card padding="16px 18px" style={{ height: "100%", ...(accent ? { borderTop: `2px solid ${accent}` } : {}) }}>
-        <div style={{ ...TX.overline, color: C.ink500 }}>{title}</div>
+        {/* legible KPI label — sentence-case 12/560 at ink700, not a faint tiny line */}
+        <div style={{ ...TX.overline, color: C.ink700 }}>{title}</div>
+        {/* numbers stay neutral ink900 across all KPIs for visual consistency —
+            urgency is carried by the card's accent + the coloured sub, never a big red figure */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
-          <span style={{ ...num(36), color: color ?? C.ink900 }}>{display}</span>
+          <span style={{ ...num(36), color: C.ink900 }}>{value}</span>
           {delta !== undefined ? <Delta v={delta} /> : null}
         </div>
-        <div style={{ ...TX.nano, color: C.ink400, marginTop: 7 }}>{sub}</div>
+        <div style={{ ...TX.nano, color: subColor ?? C.ink400, marginTop: 7, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          {dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, flexShrink: 0 }} /> : null}
+          {sub}
+        </div>
       </Card>
     </div>
   );
@@ -246,7 +279,8 @@ function PhaseStrip({ className, columns, total, onPhase }: { className?: string
                 onClick={() => onPhase(c.phaseIndex)}
                 title={`${c.full} · ${c.count} — filtrer`}
                 aria-label={`Filtrer : ${c.full}`}
-                style={{ width: `${(c.count / denom) * 100}%`, background: PHASE_COLORS[c.phaseIndex], border: "none", padding: 0, cursor: "pointer" }}
+                className="anim-bar"
+                style={{ width: `${(c.count / denom) * 100}%`, ["--fill" as string]: `${(c.count / denom) * 100}%`, background: PHASE_COLORS[c.phaseIndex], border: "none", padding: 0, cursor: "pointer" }}
               />
             ) : null,
           )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon } from "../icons";
@@ -9,7 +9,7 @@ import { Avatar, Button, Card, EmptyState, IconButton, rowProps, Segmented, Tool
 import { buildTeamLoad, type HeatBucket } from "@/lib/derive";
 import { isToday, MONS_LONG, MONTHS_FULL, monthRange, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
-import { C, chargeColor, loadTier, num, R, SP, SURFACE, TX } from "@/lib/tokens";
+import { C, chargeColor, DUR, EASE, loadTier, num, R, SP, SURFACE, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const MODE_OPTS: { value: TeamMode; label: string }[] = [
@@ -124,7 +124,7 @@ export function Team() {
                 <span style={{ ...TX.caption, color: C.ink500 }}>{t.projectsActive} projet{t.projectsActive > 1 ? "s" : ""}</span>
               </div>
 
-              <div style={{ background: SURFACE.containerLow, border: `1px solid ${C.line}`, borderRadius: R.md, padding: `${SP[5]}px ${SP[5]}px ${SP[4]}px` }}>
+              <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: `${SP[5]}px ${SP[5]}px ${SP[4]}px` }}>
                 <Heatmap buckets={t.buckets} mode={teamMode} />
               </div>
 
@@ -166,10 +166,23 @@ const WD = ["L", "M", "M", "J", "V", "S", "D"];
  *  the dashed line at full capacity, and a terracotta cap rises above it when
  *  the period is overbooked — so *when* overload happens is readable at a glance. */
 function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
+  // Bars grow up from the baseline on mount: heights start at 0 and ease to their
+  // value once mounted, so *when* load lands across the period animates in.
+  // Reduced motion is honoured by mounting full-height immediately (no transition).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setMounted(true);
+      return;
+    }
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   if (buckets.length === 0) return null;
   const FULL = 32; // px height representing 100% capacity
   const OVER = 10; // headroom above the line for the overflow cap
   const H = FULL + OVER;
+  const grow = `height ${DUR.slow} ${EASE.decel}`;
   return (
     <div style={{ display: "flex", gap: mode === "semaine" ? 5 : 3, alignItems: "flex-end" }}>
       {buckets.map((b, i) => {
@@ -182,13 +195,14 @@ function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
         const over = b.pct > 100 ? Math.min((b.pct - 100) / 40, 1) * OVER : 0;
         const overDays = Math.max(0, b.days - b.capacity);
         const lab = mode === "semaine" ? WD[(d.getDay() + 6) % 7] : String(d.getDate());
+        const delay = `${Math.min(i * 25, 200)}ms`;
         return (
           <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${d.getDate()} ${MONTHS_FULL[d.getMonth()]} · ${b.days} / ${b.capacity} j · ${b.pct} %`}>
             <div style={{ position: "relative", height: H, borderRadius: R.xs, background: SURFACE.containerHigh, boxShadow: `inset 0 0 0 1px ${C.line}`, overflow: "hidden" }}>
               <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: base, background: chargeColor(b.pct) }} />
-              {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: over, background: chargeColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)" }} /> : null}
-              {overDays > 0 ? <span style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.surface }}>+{overDays}&#8239;j</span> : null}
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: mounted ? base : 0, background: chargeColor(b.pct), transition: grow, transitionDelay: delay }} />
+              {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: mounted ? over : 0, background: chargeColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)", transition: grow, transitionDelay: delay }} /> : null}
+              {overDays > 0 ? <span style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.surface, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
             </div>
             <div style={{ fontSize: 10, fontWeight: today ? 700 : 450, color: today ? C.ink900 : C.ink500, textAlign: "center", marginTop: 4 }}>{lab}</div>
           </div>

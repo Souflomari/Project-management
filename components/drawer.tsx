@@ -13,6 +13,16 @@ import { C, R, SH, TX } from "@/lib/tokens";
 
 const SECTION: React.CSSProperties = { ...TX.overline, color: C.ink700, marginBottom: 10 };
 
+// Each drawer block is a white card lifted off the field by a hairline + soft
+// shadow (unified-white depth model — no tinted fills).
+const CARD: React.CSSProperties = {
+  background: C.surface,
+  border: `1px solid ${C.line}`,
+  borderRadius: R.lg,
+  boxShadow: SH.sm,
+  padding: "18px 20px",
+};
+
 export function ProjectDrawer() {
   const { selected, team, closeDrawer } = useProjects();
   const router = useRouter();
@@ -83,12 +93,14 @@ export function ProjectDrawer() {
           <ProjectIdentity p={p} titleId="drawer-title" />
         </div>
 
-        <div className="enter-stagger" style={{ padding: "20px 24px 36px" }}>
-          <ProjectOverview p={p} />
-          <div style={{ marginTop: 28 }}>
+        <div className="enter-stagger" style={{ display: "flex", flexDirection: "column", gap: 16, padding: "20px 24px 36px" }}>
+          <div style={CARD}>
+            <ProjectOverview p={p} />
+          </div>
+          <div style={CARD}>
             <ProjectTasks p={p} />
           </div>
-          <div style={{ marginTop: 28 }}>
+          <div style={CARD}>
             <div style={SECTION}>Commentaires</div>
             <ProjectComments p={p} />
           </div>

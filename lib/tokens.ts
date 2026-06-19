@@ -2,8 +2,8 @@ import type { CSSProperties } from "react";
 
 import type { Status } from "./types";
 
-/** Body / UI text — Inter. Headings & figures — Inter Tight (Linear uses
- *  "Inter Display" for headings to add expression; Inter Tight is its public twin). */
+/** Body / UI text — Hanken Grotesk (clean, legible at dense sizes). Headings &
+ *  figures — Space Grotesk (precise, technical face with mono-derived numerals). */
 export const FONT_UI = "var(--font-ui), system-ui, -apple-system, 'Segoe UI', sans-serif";
 export const FONT_DISPLAY = "var(--font-display), var(--font-ui), system-ui, -apple-system, sans-serif";
 export const FONT_NUM = FONT_DISPLAY;
@@ -23,11 +23,11 @@ export const C = {
   ink500: "#78716C", // secondary (receded) — AA floor for body text ≈ 4.7:1
   ink400: "#857E78", // muted label / eyebrow — darkened to ~3.6:1 (was #9B948F ≈ 2.9:1, failed AA)
   ink300: "#BDB8B2", // disabled text/control
-  line: "#E7E3DE", // warm hairline — bumped from #EEECE9 (~1.18:1) so structure registers on white cards
-  lineStrong: "#D9D4CC", // hover / modal border / visible divider (~1.45:1)
+  line: "#EAE8E4", // hairline — visible on the unified white field without reading as noise
+  lineStrong: "#DAD7D1", // hover / modal border / visible divider
   surface: "#FFFFFF",
-  canvas: "#FAF9F7", // warm off-white app background — white cards now sit ON it and read as raised (was pure white = flat)
-  subtle: "#F2F0ED", // inset / track / hover / rail — a step below the tinted canvas
+  canvas: "#FFFFFF", // unified white app background — depth now comes from borders + soft shadow, not tone
+  subtle: "#F4F3F1", // inset / track / hover / rail — a clean near-neutral well on white
   // near-black action surface (Vercel/Geist-style primary)
   solid: "#1C1917",
   solidHover: "#000000",
@@ -40,8 +40,8 @@ export const C = {
   inversePrimary: "#6FCF8E", // green legible on the dark (inverse) toast surface
   ink350: "#A8A29E", // named warm grey between ink400/ink300 (gantt secondary, rings)
   danger: "#B5392E", // single danger hue
-  surfaceHigh: "#FCFBFA", // raised overlays — faintly warm tint vs pure white
-  surfaceLow: "#F7F6F4", // tracks / insets, a step below cards
+  surfaceHigh: "#FFFFFF", // raised overlays — white, lifted by shadow (not tone)
+  surfaceLow: "#F4F3F1", // tracks / insets, a step below cards
 } as const;
 
 /** Curated assignee/avatar palette — one governed set used by the modal,
@@ -56,13 +56,16 @@ export const AVATAR_PALETTE = [
 // on progressively deeper tints of the neutral. Mapped onto our warm scale so a
 // component asks for a role ("a container, one step up") instead of a raw hex —
 // and a future dark theme only has to remap these six values.
+// Unified white field: raised surfaces (base/lowest/low) are white and read as
+// lifted via border + shadow; the higher steps are clean neutral wells used for
+// insets / tracks / pressed states.
 export const SURFACE = {
-  base: "#FAF9F7", // warm off-white app canvas — white cards rest ON it and read as raised
-  containerLowest: "#FFFFFF", // raised cards & dialogs (pop white against the tinted canvas)
-  containerLow: "#FCFBFA", // faintly raised overlays
-  container: "#F2F0ED", // default filled container / track
-  containerHigh: "#ECE9E5", // insets, rails, hover wells
-  containerHighest: "#E5E2DD", // deepest inset / pressed track
+  base: "#FFFFFF", // app canvas (unified white)
+  containerLowest: "#FFFFFF", // raised cards & dialogs
+  containerLow: "#FFFFFF", // raised overlays (lifted by shadow)
+  container: "#F4F3F1", // default filled container / track / inset
+  containerHigh: "#ECEBE8", // deeper inset, rails, hover wells
+  containerHighest: "#E4E3DF", // deepest inset / pressed track
 } as const;
 
 // ── M3 state-layer opacities ─────────────────────────────────────────────────
@@ -85,7 +88,7 @@ export const SH = {
   md: "0 4px 16px -4px rgba(28,25,23,.10), 0 2px 4px -2px rgba(28,25,23,.06)",
   lg: "0 16px 48px -12px rgba(28,25,23,.18), 0 4px 12px -4px rgba(28,25,23,.08)",
   drawer: "-12px 0 40px -16px rgba(28,25,23,.18)",
-  focus: "0 0 0 3px rgba(28,25,23,.10)",
+  focus: "0 0 0 3px rgba(21,128,61,.20)", // brand-green focus ring (identity-forward)
 } as const;
 
 // ── M3 colour roles ──────────────────────────────────────────────────────────
@@ -138,10 +141,10 @@ export const DUR = { fast: "120ms", base: "180ms", slow: "260ms" } as const;
 // M3 expresses elevation primarily as surface TONE; we add a whisper of shadow
 // only to confirm a lift. Border-first identity preserved.
 export const ELEV: Record<0 | 1 | 2 | 3, CSSProperties> = {
-  0: { background: SURFACE.base, boxShadow: "none" },
-  1: { background: SURFACE.containerLow, boxShadow: SH.sm },
-  2: { background: SURFACE.container, boxShadow: SH.md },
-  3: { background: SURFACE.containerHigh, boxShadow: SH.lg },
+  0: { background: "#FFFFFF", boxShadow: "none" },
+  1: { background: "#FFFFFF", boxShadow: SH.sm },
+  2: { background: "#FFFFFF", boxShadow: SH.md },
+  3: { background: "#FFFFFF", boxShadow: SH.lg },
 };
 
 /** Type scale by role. Headings use Inter Tight (tight tracking, real weight);
@@ -153,26 +156,27 @@ export const TX: Record<
   | "overline" | "eyebrow",
   CSSProperties
 > = {
-  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 600, letterSpacing: "-.028em", lineHeight: 1.05 },
-  display: { fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 600, letterSpacing: "-.024em", lineHeight: 1.1 },
-  h1: { fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.18 },
-  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, letterSpacing: "-.018em", lineHeight: 1.2 },
-  h2: { fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.3 },
-  bodyLg: { fontSize: 15, fontWeight: 440, lineHeight: 1.55 },
-  body: { fontSize: 14, fontWeight: 440, lineHeight: 1.55 },
-  bodyStrong: { fontSize: 14, fontWeight: 540, lineHeight: 1.5 },
-  caption: { fontSize: 13, fontWeight: 440, lineHeight: 1.5 },
+  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.06 },
+  display: { fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 600, letterSpacing: "-.018em", lineHeight: 1.12 },
+  h1: { fontFamily: FONT_DISPLAY, fontSize: 25, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.2 },
+  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, letterSpacing: "-.012em", lineHeight: 1.22 },
+  h2: { fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, letterSpacing: "-.01em", lineHeight: 1.3 },
+  bodyLg: { fontSize: 15, fontWeight: 450, lineHeight: 1.55 },
+  body: { fontSize: 14, fontWeight: 450, lineHeight: 1.55 },
+  bodyStrong: { fontSize: 14, fontWeight: 560, lineHeight: 1.5 },
+  caption: { fontSize: 13, fontWeight: 450, lineHeight: 1.5 },
   micro: { fontSize: 12, fontWeight: 500, lineHeight: 1.4 },
   nano: { fontSize: 11, fontWeight: 500, lineHeight: 1.35 },
   // quiet sentence-case label (no uppercase, no heavy tracking)
-  overline: { fontSize: 12, fontWeight: 520, letterSpacing: "0", lineHeight: 1.35 },
-  // design.google-style category/metadata label — uppercase, tracked
-  eyebrow: { fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", lineHeight: 1.3 },
+  overline: { fontSize: 12, fontWeight: 560, letterSpacing: "0", lineHeight: 1.35 },
+  // category/metadata label — uppercase, tracked (use sparingly, ≤2-word tags)
+  eyebrow: { fontSize: 11, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", lineHeight: 1.3 },
 };
 
-/** Tabular numeric display (Inter Tight), tight tracking for large figures. */
+/** Tabular numeric display (Space Grotesk). Its numerals are wide and even, so
+ *  only a whisper of negative tracking — heavy tracking would cramp them. */
 export function num(size: number): CSSProperties {
-  return { fontFamily: FONT_NUM, fontWeight: 580, lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-.02em", fontSize: size };
+  return { fontFamily: FONT_NUM, fontWeight: 540, lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-.01em", fontSize: size };
 }
 
 export interface StatusMeta {

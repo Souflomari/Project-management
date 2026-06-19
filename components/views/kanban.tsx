@@ -101,7 +101,7 @@ export function Kanban() {
                 style={{ width: 46, flexShrink: 0, background: C.surface, borderRadius: R.md, border: `1px solid ${isOver ? C.brand : C.line}`, boxShadow: isOver ? `inset 0 0 0 1px ${C.brand}, 0 0 0 3px ${C.brand50}` : undefined, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer", transition: "box-shadow var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard)" }}
               >
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: accent, flexShrink: 0 }} />
-                <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? WIP_COLOR : C.ink700 }}>{col.count}</span>
+                <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? WIP_COLOR : col.count > 0 ? C.brandText : C.ink500 }}>{col.count}</span>
                 <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, letterSpacing: ".06em", color: C.ink700 }}>{col.label}</span>
               </div>
             );
@@ -123,8 +123,8 @@ export function Kanban() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
                   <span
-                    title={overWip ? `Limite dépassée (${col.count}/${WIP_LIMIT})` : undefined}
-                    style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? WIP_COLOR : C.ink700, background: overWip ? WIP_BG : C.subtle, borderRadius: R.xs, padding: "1px 8px" }}
+                    title={overWip ? `Limite dépassée (${col.count}/${WIP_LIMIT})` : `Dans la limite (${col.count}/${WIP_LIMIT})`}
+                    style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? WIP_COLOR : col.count > 0 ? C.brandText : C.ink500, background: overWip ? WIP_BG : col.count > 0 ? C.brand50 : C.subtle, borderRadius: R.xs, padding: "1px 8px", transition: "color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard)" }}
                   >
                     {overWip ? `${col.count} / ${WIP_LIMIT}` : col.count}
                   </span>
@@ -150,7 +150,7 @@ export function Kanban() {
 
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
                       <ProgressBar pct={c.progress} color={c.ring} height={6} />
-                      <span style={{ ...numTab, fontSize: 11.5, fontWeight: 600, color: C.ink700, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
+                      <span style={{ ...numTab, fontSize: 11.5, fontWeight: 600, color: c.status === "à jour" ? C.brandText : C.ink700, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, gap: 6 }}>

@@ -7,7 +7,7 @@ import { Button, IconButton, Modal, rowProps, Segmented, Select, Toolbar } from 
 import { buildMonthGrid, buildTaskEvents, eventsInRange, type TaskEvent } from "@/lib/derive";
 import { fmtFull, isToday, MONS_LONG, MONTHS_FULL, shiftISO, taskStartForEnd, toDate, monthRange, weekRange } from "@/lib/format";
 import { useProjects, type CalMode } from "@/lib/store/projects-context";
-import { C, num, PHASE_COLORS, TX } from "@/lib/tokens";
+import { C, num, PHASE_COLORS, SH, SURFACE, TX } from "@/lib/tokens";
 import { PHASES } from "@/lib/types";
 
 const MODE_OPTS: { value: CalMode; label: string }[] = [
@@ -235,7 +235,7 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
     });
 
   return (
-    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640 }}>
+    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.subtle, borderBottom: `1px solid ${C.line}` }}>
         {WEEKDAYS_SHORT.map((w, i) => {
           const weekend = i >= 5;
@@ -261,7 +261,10 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
             borderRight: `1px solid ${C.line}`,
             borderBottom: `1px solid ${C.line}`,
             padding: "5px 6px",
-            background: c.day === null ? C.subtle : weekend ? C.canvas : C.surface,
+            // Unified white field: weekday cells are white; weekends + empty
+            // (other-month) cells recede onto the neutral inset so the grid still
+            // reads distinct on white (the old warm C.canvas tint is gone).
+            background: c.day === null ? SURFACE.container : weekend ? SURFACE.container : C.surface,
             overflow: "hidden",
           };
           const shown = isExpanded ? c.events : c.events.slice(0, 3);
@@ -326,9 +329,9 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
   });
 
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(7,1fr)", minWidth: 640 }}>
+    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(7,1fr)", minWidth: 640, boxShadow: SH.sm }}>
       {days.map((d) => (
-        <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320, minWidth: 0, overflow: "hidden", background: d.weekend ? C.canvas : C.surface }}>
+        <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320, minWidth: 0, overflow: "hidden", background: d.weekend ? SURFACE.container : C.surface }}>
           <div style={{ padding: "9px 10px", background: d.isToday ? C.brand50 : C.subtle, borderBottom: `1px solid ${C.line}` }}>
             <div title={d.dowLong} style={{ ...TX.overline, color: d.weekend ? C.ink400 : C.ink500 }}>{d.dow}</div>
             <div style={{ ...num(18), color: d.isToday ? C.brand : C.ink900 }}>{d.num}</div>
@@ -345,7 +348,7 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
 function AgendaView({ year, month, events, onOpen }: { year: number; month: number; events: TaskEvent[]; onOpen: (id: number) => void }) {
   const list = eventsInRange(events, monthRange(year, month));
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden" }}>
+    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", boxShadow: SH.sm }}>
       {list.length === 0 ? (
         <div style={{ padding: 24, ...TX.body, color: C.ink500 }}>Aucune échéance ce mois-ci.</div>
       ) : (

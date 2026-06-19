@@ -25,11 +25,13 @@ function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
             aria-selected={active}
             style={{
               fontSize: 12.5,
-              fontWeight: 600,
+              fontWeight: active ? 640 : 600,
               padding: "5px 12px",
               borderRadius: R.sm,
-              background: active ? C.surface : "transparent",
-              color: active ? C.ink900 : C.ink500,
+              // Active lens carries a faint green-tint pill + green text so the
+              // switcher reads as part of the brand identity, not just a neutral toggle.
+              background: active ? C.brand50 : "transparent",
+              color: active ? C.brandText : C.ink500,
               boxShadow: active ? SH.sm : "none",
               transition: `background ${DUR.fast} ${EASE.standard}, color ${DUR.fast} ${EASE.standard}, box-shadow ${DUR.fast} ${EASE.standard}`,
               whiteSpace: "nowrap",

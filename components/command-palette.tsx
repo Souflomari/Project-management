@@ -258,8 +258,8 @@ export function CommandPalette() {
   const run = (i: number) => results[i]?.run();
 
   return (
-    <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh", animation: "fadeIn .14s ease" }}>
-      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Recherche rapide" style={{ width: 560, maxWidth: "92%", background: C.surface, borderRadius: R.lg, boxShadow: SH.lg, overflow: "hidden", animation: "popIn .18s cubic-bezier(.2,.7,.2,1)" }}>
+    <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(17,17,17,.32)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh", animation: "fadeIn .14s ease" }}>
+      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Recherche rapide" style={{ width: 560, maxWidth: "92%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.lg, overflow: "hidden", animation: "popIn .18s cubic-bezier(.2,.7,.2,1)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: `1px solid ${C.line}`, color: C.ink400 }}>
           <SearchIcon size={16} />
           <input
@@ -295,7 +295,7 @@ export function CommandPalette() {
                     <span aria-hidden style={{ position: "absolute", left: 3, top: "50%", transform: `translateY(-50%) scaleY(${sel ? 1 : 0})`, width: 3, height: 16, borderRadius: R.pill, background: C.brand, transition: `transform ${DUR.fast} ${EASE.out}` }} />
                     <span style={{ width: 20, display: "flex", justifyContent: "center", flexShrink: 0 }}>{it.leading}</span>
                     <span style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ ...TX.bodyStrong, color: C.ink900, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</span>
+                      <span style={{ ...TX.bodyStrong, color: sel ? C.brandText : C.ink900, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: `color ${DUR.fast} ${EASE.standard}` }}>{it.label}</span>
                       {it.sub ? <span style={{ ...TX.micro, color: C.ink500, display: "block" }}>{it.sub}</span> : null}
                     </span>
                   </button>

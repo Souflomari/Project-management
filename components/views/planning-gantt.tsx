@@ -10,7 +10,7 @@ import { fmtShort, shiftISO, toDate, workingDaysBetween } from "@/lib/format";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { useProjects } from "@/lib/store/projects-context";
 import { toast } from "@/lib/toast";
-import { C, FONT_NUM, R, SH, TX } from "@/lib/tokens";
+import { C, FONT_NUM, R, SH, SURFACE, TX } from "@/lib/tokens";
 
 const LEFT_W = 324;
 const PROJ_ROW_H = 48;
@@ -149,6 +149,7 @@ export function PlanningGantt() {
             background: C.surface,
             border: `1px solid ${C.line}`,
             borderRadius: R.lg,
+            boxShadow: SH.sm,
             overflow: "auto",
             maxHeight: "calc(100vh - 215px)",
           }}
@@ -257,7 +258,7 @@ export function PlanningGantt() {
                           key={s.id}
                           onClick={clickGuard(() => openProject(g.id))}
                           className="soft-hover"
-                          style={{ display: "flex", borderTop: `1px solid ${C.subtle}`, cursor: "pointer", background: C.canvas, height: SUB_ROW_H }}
+                          style={{ display: "flex", borderTop: `1px solid ${C.subtle}`, cursor: "pointer", background: SURFACE.container, height: SUB_ROW_H }}
                         >
                           <div
                             style={{
@@ -266,7 +267,7 @@ export function PlanningGantt() {
                               padding: "0 14px 0 37px",
                               position: "sticky",
                               left: 0,
-                              background: C.canvas,
+                              background: SURFACE.container,
                               borderRight: `1px solid ${C.line}`,
                               minWidth: 0,
                               display: "flex",

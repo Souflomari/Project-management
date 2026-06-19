@@ -90,7 +90,7 @@ export function ProjectsTable() {
       ) : null}
 
       <div className="table-scroll">
-      <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760 }}>
+      <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760, boxShadow: SH.sm }}>
         <div
           style={{
             display: "grid",
@@ -113,7 +113,7 @@ export function ProjectsTable() {
                 className="sortable"
                 onClick={() => toggleSort(h.key)}
                 aria-sort={active ? (sort!.dir === 1 ? "ascending" : "descending") : "none"}
-                style={{ display: "flex", alignItems: "center", justifyContent: right ? "flex-end" : "flex-start", gap: 3, color: active ? C.ink800 : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.overline, transition: "color var(--dur-fast) var(--ease-standard)" }}
+                style={{ display: "flex", alignItems: "center", justifyContent: right ? "flex-end" : "flex-start", gap: 3, color: active ? C.brandText : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.overline, transition: "color var(--dur-fast) var(--ease-standard)" }}
               >
                 {h.label}
                 <span className="sort-caret" style={{ display: "inline-flex", opacity: active ? 1 : 0, transform: active && sort!.dir === -1 ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)" }}>
@@ -131,7 +131,7 @@ export function ProjectsTable() {
               key={p.id}
               {...rowProps(() => openProject(p.id))}
               className="row-hover row-focus"
-              style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", minHeight: 58, padding: "10px 18px", borderTop: `1px solid ${C.line}`, cursor: "pointer", background: on ? C.brand50 : undefined }}
+              style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", minHeight: 58, padding: "10px 18px", borderTop: `1px solid ${C.line}`, cursor: "pointer", background: on ? C.brand50 : undefined, boxShadow: on ? `inset 3px 0 0 ${C.brand}` : undefined, transition: "background var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard)" }}
             >
               <span
                 onClickCapture={(e) => {
@@ -159,7 +159,7 @@ export function ProjectsTable() {
 
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <ProgressBar pct={p.progress} color={p.ring} />
-                <span style={{ ...num(13), width: 38, textAlign: "right", color: C.ink700 }}>{p.progress}&#8239;%</span>
+                <span style={{ ...num(13), width: 38, textAlign: "right", color: p.status === "à jour" ? C.brandText : C.ink700 }}>{p.progress}&#8239;%</span>
               </div>
 
               <div style={{ ...num(14), fontWeight: 500, color: C.ink700, textAlign: "right" }}>{p.budgetFmt}</div>

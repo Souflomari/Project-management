@@ -1,19 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Inter_Tight } from "next/font/google";
+import { Hanken_Grotesk, Space_Grotesk } from "next/font/google";
 
 import "./globals.css";
 import { tokenCssVars } from "@/lib/tokens";
 
 // Self-hosted at build time (no runtime CDN dependency) — fonts always load.
-// Loaded as VARIABLE fonts (no fixed `weight`) so in-between weights like 440 /
-// 540 / 580 render for real instead of snapping to the nearest static instance.
-const inter = Inter({
+// UI/body: Hanken Grotesk — a clean, neutral grotesk that stays legible at the
+// dense small sizes the tables and gantt use. Display/figures: Space Grotesk —
+// a precise, technical face (mono-derived numerals) that gives the engineering
+// product a distinctive, confident voice. Both loaded as VARIABLE fonts so the
+// in-between weights in the type scale render for real.
+const fontUi = Hanken_Grotesk({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-ui",
 });
 
-const interTight = Inter_Tight({
+const fontDisplay = Space_Grotesk({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-display",
@@ -44,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className={`${inter.variable} ${interTight.variable}`}>
+    <html lang="fr" className={`${fontUi.variable} ${fontDisplay.variable}`}>
       <head>
         {/* design-token bridge: projects lib/tokens onto :root custom properties */}
         <style dangerouslySetInnerHTML={{ __html: tokenCssVars() }} />

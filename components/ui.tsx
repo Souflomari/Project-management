@@ -346,13 +346,14 @@ export function Card({
   radius?: number;
   style?: CSSProperties;
 }) {
-  // Surfaces rest with a soft border and no shadow (structure, not noise).
-  // When elevated, ELEV supplies a deeper tone (the lift), the border stays —
-  // border-first identity preserved, no shadow soup.
-  const lift = elevation > 0 ? ELEV[elevation] : null;
+  // On the unified white field, cards read by a hairline border + a soft resting
+  // shadow (depth comes from light, not tone). `elevation` deepens the shadow for
+  // hero/overlay surfaces. All cards lift on hover (`.card-lift`) so the surface
+  // feels physical and responsive.
+  const lift = elevation > 0 ? ELEV[elevation] : { background: C.surface, boxShadow: SH.sm };
   const border = elevation > 0 ? `1px solid ${C.lineStrong}` : `1px solid ${C.line}`;
   return (
-    <div style={{ background: C.surface, border, borderRadius: radius, padding, ...lift, ...style }}>
+    <div className="card-lift" style={{ background: C.surface, border, borderRadius: radius, padding, ...lift, ...style }}>
       {children}
     </div>
   );
@@ -645,7 +646,13 @@ export function ProgressBar({
       aria-valuemax={100}
       style={{ flex: 1, height, background: track, borderRadius: R.pill, overflow: "hidden" }}
     >
-      <div style={{ height: "100%", width: `${clamped}%`, background: color, borderRadius: R.pill, transition: "width var(--dur-slow) var(--ease-standard)" }} />
+      {/* `.anim-bar` grows the fill from 0 to `--fill` on mount (reduced-motion
+          neutralises the keyframe, so it simply appears at full width). The inline
+          width matches `--fill` so the resting state is correct without JS. */}
+      <div
+        className="anim-bar"
+        style={{ height: "100%", width: `${clamped}%`, ["--fill" as string]: `${clamped}%`, background: color, borderRadius: R.pill }}
+      />
     </div>
   );
 }
@@ -764,6 +771,16 @@ export function Gauge({
   sublabel?: ReactNode;
 }) {
   const pct = Math.min(1, Math.max(0, value / max));
+  // Animate the sweep in from 0 on mount: render at 0, then flip to the real
+  // value on the next frame so the CSS transition fills the arc in. Reduced
+  // motion short-circuits to the final value (no transition runs).
+  const [mounted, setMounted] = useState(prefersReducedMotion());
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const drawn = mounted ? pct : 0;
   const r = (size - thickness) / 2;
   const cx = size / 2;
   const cy = size / 2;
@@ -823,8 +840,8 @@ export function Gauge({
           stroke={color}
           strokeWidth={thickness}
           strokeLinecap="round"
-          strokeDasharray={`${arcLen * pct} ${circ}`}
-          style={{ transition: "stroke-dasharray var(--dur-slow) var(--ease-standard), stroke var(--dur-fast) var(--ease-standard)" }}
+          strokeDasharray={`${arcLen * drawn} ${circ}`}
+          style={{ transition: "stroke-dasharray var(--dur-slow) var(--ease-decel), stroke var(--dur-fast) var(--ease-standard)" }}
         />
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>

@@ -75,6 +75,7 @@ export function ProjectOverview({ p }: { p: DerivedProject }) {
         <Stat
           label="Avancement"
           value={`${p.progress} %`}
+          valueColor={C.brand}
           hint={`${doneCount} / ${p.subtasksD.length} tâches`}
           title={`Avancement pondéré par la durée des tâches (jours terminés ÷ jours planifiés). Le décompte ${doneCount} / ${p.subtasksD.length} indique le nombre de tâches.`}
         >
@@ -184,7 +185,10 @@ export function ProjectBudget({ p }: { p: DerivedProject }) {
   const committed = Math.min(100, b.committedPct);
   const earned = b.feesEur ? Math.min(100, Math.round((b.earnedValueEur / b.feesEur) * 100)) : 0;
   const marginColor = b.overBudget ? C.danger : C.brand;
+  // Committed cost is neutral (or danger when over); earned VALUE is the positive
+  // figure, so it reads green while the project stays within its fees.
   const barColor = b.overBudget ? C.danger : C.ink700;
+  const earnedColor = b.overBudget ? C.danger : C.brand;
 
   return (
     <>
@@ -198,7 +202,7 @@ export function ProjectBudget({ p }: { p: DerivedProject }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
         <Stat label="Honoraires" value={fmtEur(b.feesEur)} />
         <Stat label="Coût engagé" value={fmtEur(b.plannedCostEur)} hint={`${b.committedPct} % des honoraires`} />
-        <Stat label="Valeur acquise" value={fmtEur(b.earnedValueEur)} hint={`${b.spentPct} % du coût`} />
+        <Stat label="Valeur acquise" value={fmtEur(b.earnedValueEur)} valueColor={C.brand} hint={`${b.spentPct} % du coût`} />
       </div>
 
       <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px", marginBottom: 24 }}>
@@ -208,10 +212,12 @@ export function ProjectBudget({ p }: { p: DerivedProject }) {
             {b.marginEur >= 0 ? "marge " : "dépassement "}{fmtEur(Math.abs(b.marginEur))}
           </span>
         </div>
-        {/* Burn bar: committed cost (track fill) with earned value as a darker inset. */}
+        {/* Burn bar: committed cost (track fill, neutral) with earned VALUE — the
+            positive figure — as a green inset. Both grow from 0 on mount via
+            `.anim-bar` + inline `--fill`. */}
         <div style={{ position: "relative", height: 8, borderRadius: R.pill, background: C.surface, border: `1px solid ${C.line}`, overflow: "hidden" }}>
-          <div style={{ position: "absolute", inset: 0, width: `${committed}%`, background: `${barColor}33` }} />
-          <div style={{ position: "absolute", insetBlock: 0, left: 0, width: `${earned}%`, background: barColor, opacity: 0.9 }} />
+          <div className="anim-bar" style={{ position: "absolute", insetBlock: 0, left: 0, width: `${committed}%`, ["--fill" as string]: `${committed}%`, background: `${barColor}33` }} />
+          <div className="anim-bar" style={{ position: "absolute", insetBlock: 0, left: 0, width: `${earned}%`, ["--fill" as string]: `${earned}%`, background: earnedColor, opacity: 0.95 }} />
           {b.feesEur ? (
             <div style={{ position: "absolute", top: -2, bottom: -2, left: "100%", width: 2, background: C.ink400, transform: "translateX(-2px)" }} />
           ) : null}
@@ -438,11 +444,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Stat({ label, value, hint, title, children }: { label: string; value: string; hint?: string; title?: string; children?: React.ReactNode }) {
+function Stat({ label, value, hint, title, valueColor, children }: { label: string; value: string; hint?: string; title?: string; valueColor?: string; children?: React.ReactNode }) {
   return (
     <div title={title} style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
       <div style={{ ...TX.overline, color: C.ink600 }}>{label}</div>
-      <div style={{ ...num(22), marginTop: 4, color: C.ink900 }}>{value}</div>
+      <div style={{ ...num(22), marginTop: 4, color: valueColor ?? C.ink900 }}>{value}</div>
       {hint ? <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{hint}</div> : null}
       {children}
     </div>

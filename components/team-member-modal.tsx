@@ -94,8 +94,11 @@ export function TeamMemberModal({ member, onClose }: { member: TeamMember | null
             aria-pressed={color === c}
             style={{
               width: 26, height: 26, borderRadius: "50%", background: c, cursor: "pointer",
-              border: color === c ? `2px solid ${C.ink900}` : `2px solid transparent`,
-              transition: `border-color ${DUR.fast} ${EASE.standard}, transform ${DUR.fast} ${EASE.standard}`,
+              // Selected swatch gets a green identity ring, offset from the swatch
+              // by a white gap so it reads on every palette colour.
+              border: "2px solid transparent",
+              boxShadow: color === c ? `0 0 0 2px ${C.surface}, 0 0 0 4px ${C.brand}` : "none",
+              transition: `box-shadow ${DUR.fast} ${EASE.standard}, transform ${DUR.fast} ${EASE.standard}`,
             }}
           />
         ))}
