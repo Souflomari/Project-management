@@ -37,7 +37,11 @@ export const C = {
   brand50: "#EDF4EE",
   brandText: "#136B35", // text on brand50 (AA)
   brandDot: "#1E8E48", // small-element green — tonal sibling of brand, not neon
+  inversePrimary: "#6FCF8E", // green legible on the dark (inverse) toast surface
+  ink350: "#A8A29E", // named warm grey between ink400/ink300 (gantt secondary, rings)
   danger: "#B5392E", // single danger hue
+  surfaceHigh: "#FCFBFA", // raised overlays — faintly warm tint vs pure white
+  surfaceLow: "#F7F6F4", // tracks / insets, a step below cards
 } as const;
 
 /** Curated assignee/avatar palette — one governed set used by the modal,
@@ -47,7 +51,7 @@ export const AVATAR_PALETTE = [
   "#3B7179", "#8A6F5C", "#2F4A63", "#6A6F7A", "#6E6486",
 ] as const;
 
-export const R = { xs: 6, sm: 8, md: 10, lg: 14, xl: 18, pill: 999 } as const;
+export const R = { xxs: 4, xs: 6, sm: 8, md: 10, lg: 14, xl: 18, pill: 999 } as const;
 
 /** 4px-based spacing scale. Use instead of ad-hoc inline magic numbers. */
 export const SP = { 0: 0, 1: 2, 2: 4, 3: 8, 4: 12, 5: 16, 6: 20, 7: 24, 8: 32, 9: 40, 10: 48, 11: 64 } as const;
@@ -65,7 +69,7 @@ export const SH = {
 /** Type scale by role. Headings use Inter Tight (tight tracking, real weight);
  *  body recedes at 14/440. Hierarchy by size + weight + colour, not boxes. */
 export const TX: Record<
-  "display" | "h1" | "h2" | "bodyLg" | "body" | "bodyStrong" | "caption" | "micro" | "overline",
+  "display" | "h1" | "h2" | "bodyLg" | "body" | "bodyStrong" | "caption" | "micro" | "nano" | "overline",
   CSSProperties
 > = {
   display: { fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.12 },
@@ -76,6 +80,7 @@ export const TX: Record<
   bodyStrong: { fontSize: 14, fontWeight: 540, lineHeight: 1.5 },
   caption: { fontSize: 13, fontWeight: 440, lineHeight: 1.5 },
   micro: { fontSize: 12, fontWeight: 500, lineHeight: 1.4 },
+  nano: { fontSize: 11, fontWeight: 500, lineHeight: 1.35 },
   // quiet sentence-case label (no uppercase, no heavy tracking)
   overline: { fontSize: 12, fontWeight: 520, letterSpacing: "0", lineHeight: 1.35 },
 };

@@ -22,7 +22,7 @@ interface PendingMove {
 }
 
 export function CalendarView() {
-  const { allDerived, calMode, calAnchor, calProjectFilter, setCalMode, calPrev, calNext, setCalProjectFilter, openProject, updateSubtask } =
+  const { allDerived, calMode, calAnchor, calProjectFilter, setCalMode, calPrev, calNext, calToday, setCalProjectFilter, openProject, updateSubtask } =
     useProjects();
 
   const dragged = useRef<TaskEvent | null>(null);
@@ -56,6 +56,7 @@ export function CalendarView() {
         <IconButton onClick={calPrev} size={34} aria-label="Précédent"><ChevronLeftIcon /></IconButton>
         <h2 style={{ ...num(21), minWidth: 210 }}>{label}</h2>
         <IconButton onClick={calNext} size={34} aria-label="Suivant"><ChevronRightIcon /></IconButton>
+        <Button variant="secondary" size="sm" onClick={calToday}>Aujourd&apos;hui</Button>
         <div style={{ marginLeft: 4 }}>
           <Segmented value={calMode} options={MODE_OPTS} onChange={setCalMode} />
         </div>

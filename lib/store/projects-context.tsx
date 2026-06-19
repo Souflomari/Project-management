@@ -25,7 +25,7 @@ import {
 import { sampleRepository } from "../data";
 import type { ProjectPatch, SubtaskPatch, TeamMemberPatch } from "../data/repository";
 import { buildFilters, deriveAll, type DerivedProject, type FilterDef } from "../derive";
-import { toISO, toDate } from "../format";
+import { REFERENCE_DATE, toISO, toDate } from "../format";
 import { toast } from "../toast";
 import { STATUS_META } from "../tokens";
 import {
@@ -83,11 +83,13 @@ interface ProjectsContextValue {
   setCalMode: (m: CalMode) => void;
   calPrev: () => void;
   calNext: () => void;
+  calToday: () => void;
   setCalProjectFilter: (id: number | null) => void;
 
   setTeamMode: (m: TeamMode) => void;
   teamPrev: () => void;
   teamNext: () => void;
+  teamToday: () => void;
 
   updateProject: (id: number, patch: ProjectPatch) => void;
   advancePhase: (id: number) => void;
@@ -152,40 +154,64 @@ export function ProjectsProvider({
   }, []);
 
   // ---- project / task / team mutations (server actions vs sample repo) ----
-  const fail = useCallback(() => toast({ message: "Échec de l’enregistrement", variant: "error" }), []);
+  // Specific, recoverable error: names the action and offers a retry.
+  const failToast = useCallback(
+    (message: string, retry?: () => void) =>
+      toast({ message, variant: "error", action: retry ? { label: "Réessayer", onClick: retry } : undefined }),
+    [],
+  );
+  const nameOf = useCallback((id: number) => projects.find((p) => p.id === id)?.name ?? "ce projet", [projects]);
 
   const setStatus = useCallback(
     (id: number, status: Status) => {
       const snapshot = projects;
-      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p))); // optimistic
+      const prev = projects.find((p) => p.id === id)?.status;
+      setProjects((p2) => p2.map((p) => (p.id === id ? { ...p, status } : p))); // optimistic
       (serverBacked ? setStatusAction(id, status) : sampleRepository.setStatus(id, status))
-        .then((u) => { applyUpdate(u); toast({ message: `Statut : ${STATUS_META[status].label}`, variant: "success" }); })
-        .catch(() => { setProjects(snapshot); fail(); });
+        .then((u) => {
+          applyUpdate(u);
+          toast({ message: `Statut : ${STATUS_META[status].label}`, variant: "success", action: prev && prev !== status ? { label: "Annuler", onClick: () => setStatus(id, prev) } : undefined });
+        })
+        .catch(() => { setProjects(snapshot); failToast(`Statut non enregistré pour « ${nameOf(id)} »`, () => setStatus(id, status)); });
     },
-    [serverBacked, applyUpdate, fail, projects],
+    [serverBacked, applyUpdate, failToast, nameOf, projects],
   );
 
   const updateProject = useCallback(
     (id: number, patch: ProjectPatch) => {
       const snapshot = projects;
-      // Optimistic: reflect the edit immediately, reconcile with the server result.
-      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-      (serverBacked ? updateProjectAction(id, patch) : sampleRepository.updateProject(id, patch))
+      // Forgiving dates: keep deadline ≥ start whichever field changed (Postel's law).
+      const cur = projects.find((p) => p.id === id);
+      const norm: ProjectPatch = { ...patch };
+      if (cur) {
+        const start = norm.start ?? cur.start;
+        const deadline = norm.deadline ?? cur.deadline;
+        if (deadline < start) {
+          if (norm.deadline !== undefined) norm.deadline = start;
+          else if (norm.start !== undefined) norm.start = deadline;
+        }
+      }
+      setProjects((p2) => p2.map((p) => (p.id === id ? { ...p, ...norm } : p))); // optimistic
+      (serverBacked ? updateProjectAction(id, norm) : sampleRepository.updateProject(id, norm))
         .then(applyUpdate)
-        .catch(() => { setProjects(snapshot); fail(); });
+        .catch(() => { setProjects(snapshot); failToast(`Modification non enregistrée pour « ${nameOf(id)} »`, () => updateProject(id, norm)); });
     },
-    [serverBacked, applyUpdate, fail, projects],
+    [serverBacked, applyUpdate, failToast, nameOf, projects],
   );
 
   const setPhase = useCallback(
     (id: number, phaseIndex: number) => {
       const snapshot = projects;
-      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, phaseIndex } : p))); // optimistic
+      const prev = projects.find((p) => p.id === id)?.phaseIndex;
+      setProjects((p2) => p2.map((p) => (p.id === id ? { ...p, phaseIndex } : p))); // optimistic
       (serverBacked ? setPhaseAction(id, phaseIndex) : sampleRepository.setPhase(id, phaseIndex))
-        .then((u) => { applyUpdate(u); toast({ message: `Phase : ${PHASES[phaseIndex]}`, variant: "success" }); })
-        .catch(() => { setProjects(snapshot); fail(); });
+        .then((u) => {
+          applyUpdate(u);
+          toast({ message: `Phase : ${PHASES[phaseIndex]}`, variant: "success", action: prev !== undefined && prev !== phaseIndex ? { label: "Annuler", onClick: () => setPhase(id, prev) } : undefined });
+        })
+        .catch(() => { setProjects(snapshot); failToast(`Phase non enregistrée pour « ${nameOf(id)} »`, () => setPhase(id, phaseIndex)); });
     },
-    [serverBacked, applyUpdate, fail, projects],
+    [serverBacked, applyUpdate, failToast, nameOf, projects],
   );
 
   const advancePhase = useCallback(
@@ -205,9 +231,9 @@ export function ProjectsProvider({
         applyUpdate(u);
         setCommentDraft("");
         toast({ message: "Commentaire ajouté", variant: "success" });
-      }).catch(fail);
+      }).catch(() => failToast("Commentaire non publié"));
     },
-    [serverBacked, commentDraft, applyUpdate, fail],
+    [serverBacked, commentDraft, applyUpdate, failToast],
   );
 
   const submitAdd = useCallback(async () => {
@@ -223,9 +249,11 @@ export function ProjectsProvider({
 
   const addSubtask = useCallback(
     (projectId: number, input: NewSubtaskInput) => {
-      (serverBacked ? addSubtaskAction(projectId, input) : sampleRepository.addSubtask(projectId, input)).then(applyUpdate).catch(fail);
+      (serverBacked ? addSubtaskAction(projectId, input) : sampleRepository.addSubtask(projectId, input))
+        .then((u) => { applyUpdate(u); toast({ message: "Tâche ajoutée", variant: "success" }); })
+        .catch(() => failToast("Tâche non ajoutée", () => addSubtask(projectId, input)));
     },
-    [serverBacked, applyUpdate, fail],
+    [serverBacked, applyUpdate, failToast],
   );
 
   const updateSubtask = useCallback(
@@ -236,9 +264,9 @@ export function ProjectsProvider({
       (serverBacked
         ? updateSubtaskAction(projectId, subtaskId, patch)
         : sampleRepository.updateSubtask(projectId, subtaskId, patch)
-      ).then(applyUpdate).catch(() => { setProjects(snapshot); fail(); });
+      ).then(applyUpdate).catch(() => { setProjects(snapshot); failToast("Modification non enregistrée", () => updateSubtask(projectId, subtaskId, patch)); });
     },
-    [serverBacked, applyUpdate, fail, projects],
+    [serverBacked, applyUpdate, failToast, projects],
   );
 
   const deleteSubtask = useCallback(
@@ -250,7 +278,7 @@ export function ProjectsProvider({
       (serverBacked
         ? deleteSubtaskAction(projectId, subtaskId)
         : sampleRepository.deleteSubtask(projectId, subtaskId)
-      ).then(applyUpdate).catch(() => { setProjects(snapshot); fail(); });
+      ).then(applyUpdate).catch(() => { setProjects(snapshot); failToast("Suppression non enregistrée"); });
       if (s) {
         toast({
           message: `« ${s.name} » supprimée`,
@@ -259,27 +287,31 @@ export function ProjectsProvider({
         });
       }
     },
-    [serverBacked, applyUpdate, fail, projects, addSubtask],
+    [serverBacked, applyUpdate, failToast, projects, addSubtask],
   );
 
   const addTeamMember = useCallback(
     (input: NewTeamMemberInput) => {
-      (serverBacked ? addTeamMemberAction(input) : sampleRepository.addTeamMember(input)).then(setTeam).catch(fail);
+      (serverBacked ? addTeamMemberAction(input) : sampleRepository.addTeamMember(input))
+        .then((t) => { setTeam(t); toast({ message: `${input.name} ajouté·e à l’équipe`, variant: "success" }); })
+        .catch(() => failToast("Membre non ajouté"));
     },
-    [serverBacked, fail],
+    [serverBacked, failToast],
   );
 
   const updateTeamMember = useCallback(
     (id: number, patch: TeamMemberPatch) => {
-      (serverBacked ? updateTeamMemberAction(id, patch) : sampleRepository.updateTeamMember(id, patch)).then(setTeam).catch(fail);
+      (serverBacked ? updateTeamMemberAction(id, patch) : sampleRepository.updateTeamMember(id, patch))
+        .then((t) => { setTeam(t); toast({ message: "Membre mis à jour", variant: "success" }); })
+        .catch(() => failToast("Modification non enregistrée"));
     },
-    [serverBacked, fail],
+    [serverBacked, failToast],
   );
 
   const deleteTeamMember = useCallback(
     (id: number) => {
       const m = team.find((x) => x.id === id);
-      (serverBacked ? deleteTeamMemberAction(id) : sampleRepository.deleteTeamMember(id)).then(setTeam).catch(fail);
+      (serverBacked ? deleteTeamMemberAction(id) : sampleRepository.deleteTeamMember(id)).then(setTeam).catch(() => failToast("Suppression non enregistrée"));
       if (m) {
         toast({
           message: `${m.name} retiré·e de l’équipe`,
@@ -288,7 +320,7 @@ export function ProjectsProvider({
         });
       }
     },
-    [serverBacked, fail, team, addTeamMember],
+    [serverBacked, failToast, team, addTeamMember],
   );
 
   // ---- ui actions ----
@@ -309,12 +341,15 @@ export function ProjectsProvider({
     setCalAnchor((a) => (calMode === "semaine" ? shiftDays(a, 7) : shiftMonth(a, 1)));
   }, [calMode]);
 
+  const calToday = useCallback(() => setCalAnchor(REFERENCE_DATE), []);
+
   const teamPrev = useCallback(() => {
     setTeamAnchor((a) => (teamMode === "semaine" ? shiftDays(a, -7) : shiftMonth(a, -1)));
   }, [teamMode]);
   const teamNext = useCallback(() => {
     setTeamAnchor((a) => (teamMode === "semaine" ? shiftDays(a, 7) : shiftMonth(a, 1)));
   }, [teamMode]);
+  const teamToday = useCallback(() => setTeamAnchor(REFERENCE_DATE), []);
 
   // ---- derived ----
   const allDerived = useMemo(() => deriveAll(projects, team), [projects, team]);
@@ -373,10 +408,12 @@ export function ProjectsProvider({
     setCalMode,
     calPrev,
     calNext,
+    calToday,
     setCalProjectFilter,
     setTeamMode,
     teamPrev,
     teamNext,
+    teamToday,
     updateProject,
     advancePhase,
     setPhase,

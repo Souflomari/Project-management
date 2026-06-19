@@ -89,7 +89,7 @@ export function Kanban() {
                   >
                     {overWip ? `${col.count}/${WIP_LIMIT}` : col.count}
                   </span>
-                  <IconButton size={24} onClick={() => toggleCollapse(col.phaseIndex)} title="Replier" aria-label="Replier la colonne"><MinusIcon size={14} /></IconButton>
+                  <IconButton size={28} onClick={() => toggleCollapse(col.phaseIndex)} title="Replier" aria-label="Replier la colonne"><MinusIcon size={14} /></IconButton>
                 </div>
               </div>
 

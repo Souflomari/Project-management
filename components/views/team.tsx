@@ -18,7 +18,7 @@ const MODE_OPTS: { value: TeamMode; label: string }[] = [
 ];
 
 export function Team() {
-  const { allDerived, team, teamMode, teamAnchor, setTeamMode, teamPrev, teamNext, deleteTeamMember, openProject, setSearch } = useProjects();
+  const { allDerived, team, teamMode, teamAnchor, setTeamMode, teamPrev, teamNext, teamToday, deleteTeamMember, openProject, setSearch } = useProjects();
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
@@ -53,6 +53,7 @@ export function Team() {
         <IconButton onClick={teamPrev} aria-label="Précédent"><ChevronLeftIcon /></IconButton>
         <h2 style={{ ...num(18), minWidth: 150 }}>{periodLabel}</h2>
         <IconButton onClick={teamNext} aria-label="Suivant"><ChevronRightIcon /></IconButton>
+        <Button variant="secondary" size="sm" onClick={teamToday}>Aujourd&apos;hui</Button>
         <Segmented value={teamMode} options={MODE_OPTS} onChange={setTeamMode} />
         <div style={{ marginLeft: "auto" }}>
           <Button onClick={openAdd} icon={<PlusIcon size={15} />}>Nouveau membre</Button>
@@ -161,7 +162,7 @@ function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
               <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: base, background: chargeColor(b.pct) }} />
               {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: over, background: "#B5532E" }} /> : null}
-              {b.pct > 100 ? <span style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9.5, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#7A2E22" }}>{b.pct}%</span> : null}
+              {b.pct > 100 ? <span style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9.5, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "#fff" }}>{b.pct}%</span> : null}
             </div>
             <div style={{ fontSize: 10, fontWeight: today ? 700 : 450, color: today ? C.ink900 : C.ink400, textAlign: "center", marginTop: 4 }}>{lab}</div>
           </div>

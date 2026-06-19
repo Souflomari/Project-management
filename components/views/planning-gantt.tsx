@@ -3,28 +3,29 @@
 import { useEffect, useRef, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
-import { Segmented } from "../ui";
+import { ChevronRightIcon } from "../icons";
+import { Avatar, Button, Segmented } from "../ui";
 import { buildGantt, type GanttBar, type GanttRow } from "@/lib/derive";
-import { shiftISO, toDate, workingDaysBetween } from "@/lib/format";
+import { fmtShort, shiftISO, toDate, workingDaysBetween } from "@/lib/format";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { useProjects } from "@/lib/store/projects-context";
-import { FONT_NUM, SH } from "@/lib/tokens";
+import { toast } from "@/lib/toast";
+import { C, FONT_NUM, R, SH, TX } from "@/lib/tokens";
 
 const LEFT_W = 250;
 const SUB_ROW_H = 28;
 
 function Legend() {
   return (
-    <span style={{ fontSize: 11, color: "#78716C", display: "flex", alignItems: "center", gap: 14 }}>
+    <span style={{ ...TX.nano, color: C.ink500, display: "flex", alignItems: "center", gap: 14 }}>
       <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, background: "#15803D" }} />
+        <span style={{ width: 16, height: 9, borderRadius: 2, background: C.ink700, opacity: 0.85 }} />
         avancement
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <span style={{ width: 16, height: 9, background: "#15803D22", border: "1px solid #15803D66" }} />
+        <span style={{ width: 16, height: 9, borderRadius: 2, background: `${C.ink700}1f`, border: `1px solid ${C.ink700}55` }} />
         durée
       </span>
-      <span style={{ color: "#A8A29E" }}>▸ cliquez un projet pour ses tâches & dépendances</span>
     </span>
   );
 }
@@ -97,9 +98,7 @@ export function PlanningGantt() {
         trailing={
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Legend />
-            <button onClick={() => scrollToToday()} className="btn btn-secondary" style={{ fontSize: 12, fontWeight: 540, color: "#44403C", background: "#fff", border: "1px solid #E3E0DB", borderRadius: 8, padding: "5px 11px", cursor: "pointer" }}>
-              Aujourd&apos;hui
-            </button>
+            <Button variant="secondary" size="sm" onClick={() => scrollToToday()}>Aujourd&apos;hui</Button>
             <Segmented
               value={zoom}
               onChange={setZoom}
@@ -123,16 +122,16 @@ export function PlanningGantt() {
           onMouseUp={endPan}
           onMouseLeave={endPan}
           style={{
-            background: "#fff",
-            border: "1px solid #EEECE9",
-            borderRadius: 8,
+            background: C.surface,
+            border: `1px solid ${C.line}`,
+            borderRadius: R.sm,
             overflow: "auto",
             maxHeight: "calc(100vh - 215px)",
           }}
         >
           <div style={{ minWidth: LEFT_W + timelineW }}>
             {/* month header (sticky) */}
-            <div style={{ display: "flex", borderBottom: "1px solid #E3E0DB", position: "sticky", top: 0, background: "#F5F4F2", zIndex: 4 }}>
+            <div style={{ display: "flex", borderBottom: `1px solid ${C.lineStrong}`, position: "sticky", top: 0, background: C.subtle, zIndex: 4 }}>
               <div
                 style={{
                   width: LEFT_W,
@@ -141,12 +140,12 @@ export function PlanningGantt() {
                   fontSize: 10,
                   letterSpacing: ".07em",
                   textTransform: "uppercase",
-                  color: "#78716C",
+                  color: C.ink500,
                   fontWeight: 700,
                   position: "sticky",
                   left: 0,
-                  background: "#F5F4F2",
-                  borderRight: "1px solid #E3E0DB",
+                  background: C.subtle,
+                  borderRight: `1px solid ${C.lineStrong}`,
                   zIndex: 1,
                 }}
               >
@@ -162,20 +161,20 @@ export function PlanningGantt() {
                       bottom: 0,
                       left: `${m.left}%`,
                       width: `${m.width}%`,
-                      borderLeft: "1px solid #E3E0DB",
+                      borderLeft: `1px solid ${C.lineStrong}`,
                       display: "flex",
                       alignItems: "center",
                       paddingLeft: 6,
                       fontFamily: FONT_NUM,
-                      fontSize: 10.5,
+                      fontSize: 11,
                       fontWeight: 500,
-                      color: "#78716C",
+                      color: C.ink500,
                     }}
                   >
                     {m.label}
                   </div>
                 ))}
-                <TodayLine left={todayLeft} />
+                <TodayLine left={todayLeft} label />
               </div>
             </div>
 
@@ -187,7 +186,7 @@ export function PlanningGantt() {
                   <div
                     onClick={clickGuard(() => toggle(g.id))}
                     className="row-hover"
-                    style={{ display: "flex", borderTop: "1px solid #F5F4F2", cursor: "pointer", background: isOpen ? "#F5F4F2" : "#fff" }}
+                    style={{ display: "flex", borderTop: `1px solid ${C.subtle}`, cursor: "pointer", background: isOpen ? C.subtle : C.surface }}
                   >
                     <div
                       style={{
@@ -196,8 +195,8 @@ export function PlanningGantt() {
                         padding: "8px 14px",
                         position: "sticky",
                         left: 0,
-                        background: isOpen ? "#F5F4F2" : "#fff",
-                        borderRight: "1px solid #F5F4F2",
+                        background: isOpen ? C.subtle : C.surface,
+                        borderRight: `1px solid ${C.subtle}`,
                         minWidth: 0,
                         display: "flex",
                         gap: 8,
@@ -205,10 +204,10 @@ export function PlanningGantt() {
                         zIndex: 1,
                       }}
                     >
-                      <span style={{ color: "#A8A29E", fontSize: 10, width: 10, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▸</span>
+                      <span style={{ color: C.ink400, display: "flex", flexShrink: 0, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .12s" }}><ChevronRightIcon size={14} /></span>
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</div>
-                        <div style={{ fontSize: 10.5, color: "#78716C", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <div style={{ ...TX.bodyStrong, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</div>
+                        <div style={{ ...TX.nano, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {g.responsable} · {g.taskCount} tâches
                         </div>
                       </div>
@@ -228,7 +227,7 @@ export function PlanningGantt() {
                           key={s.id}
                           onClick={clickGuard(() => openProject(g.id))}
                           className="soft-hover"
-                          style={{ display: "flex", borderTop: "1px solid #F5F4F2", cursor: "pointer", background: "#FAFAF9", height: SUB_ROW_H }}
+                          style={{ display: "flex", borderTop: `1px solid ${C.subtle}`, cursor: "pointer", background: C.canvas, height: SUB_ROW_H }}
                         >
                           <div
                             style={{
@@ -237,8 +236,8 @@ export function PlanningGantt() {
                               padding: "0 14px 0 32px",
                               position: "sticky",
                               left: 0,
-                              background: "#FAFAF9",
-                              borderRight: "1px solid #F5F4F2",
+                              background: C.canvas,
+                              borderRight: `1px solid ${C.subtle}`,
                               minWidth: 0,
                               display: "flex",
                               alignItems: "center",
@@ -246,10 +245,8 @@ export function PlanningGantt() {
                               zIndex: 1,
                             }}
                           >
-                            <span title={s.assigneeInitials} style={{ width: 18, height: 18, borderRadius: "50%", background: s.color, color: "#fff", fontSize: 8.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                              {s.assigneeInitials}
-                            </span>
-                            <span style={{ fontSize: 11.5, color: s.done ? "#A8A29E" : "#1C1917", textDecoration: s.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <Avatar initials={s.assigneeInitials} color={s.color} size={18} fontSize={9} title={s.assigneeInitials} />
+                            <span style={{ ...TX.micro, color: s.done ? C.ink400 : C.ink900, textDecoration: s.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                               {s.name}
                             </span>
                           </div>
@@ -306,11 +303,11 @@ function DependencyArrows({ subtasks }: { subtasks: GanttBar[] }) {
     >
       <defs>
         <marker id="dep-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
-          <path d="M0,0 L6,3 L0,6 Z" fill="#A8A29E" />
+          <path d="M0,0 L6,3 L0,6 Z" fill={C.ink350} />
         </marker>
       </defs>
       {links.map((l, i) => (
-        <g key={i} stroke="#A8A29E" strokeWidth={1.2} fill="none">
+        <g key={i} stroke={C.ink350} strokeWidth={1.2} fill="none">
           <line x1={`${l.x1}%`} y1={l.y1} x2={`${l.x2}%`} y2={l.y1} />
           <line x1={`${l.x2}%`} y1={l.y1} x2={`${l.x2}%`} y2={l.y2} markerEnd="url(#dep-arrow)" />
         </g>
@@ -341,37 +338,53 @@ function ProjectBar({ g, spanDays, onCommit }: { g: GanttRow; spanDays: number; 
     setDrag(null);
     if (dxDays === 0) return;
     if (mode === "move") {
+      const prev = { start: g.start, deadline: g.deadline };
       onCommit(g.id, { start: shiftISO(g.start, dxDays), deadline: shiftISO(g.deadline, dxDays) });
+      toast({ message: `« ${g.name} » déplacé`, action: { label: "Annuler", onClick: () => onCommit(g.id, prev) } });
     } else {
-      // keep the deadline at least one day after the start
       const minDeadline = shiftISO(g.start, 1);
       const next = shiftISO(g.deadline, dxDays);
+      const prev = { deadline: g.deadline };
       onCommit(g.id, { deadline: next < minDeadline ? minDeadline : next });
+      toast({ message: `Échéance de « ${g.name} » modifiée`, action: { label: "Annuler", onClick: () => onCommit(g.id, prev) } });
     }
   };
   const left = g.left + (drag?.mode === "move" ? drag.dxDays * pctPerDay : 0);
   const width = Math.max(0.6, g.width + (drag?.mode === "resize" ? drag.dxDays * pctPerDay : 0));
+  const pStart = shiftISO(g.start, drag?.mode === "move" ? drag.dxDays : 0);
+  const pEnd = shiftISO(g.deadline, drag ? drag.dxDays : 0);
 
   return (
     <div
       ref={ref}
+      className="gantt-bar"
       onClick={(e) => e.stopPropagation()}
       onPointerDown={begin("move")}
       onPointerMove={onMove}
       onPointerUp={onUp}
       title={`${g.name} — glisser pour déplacer · bord droit pour l'échéance`}
       style={{
-        position: "absolute", top: 9, height: 16, borderRadius: 4, left: `${left}%`, width: `${width}%`,
-        background: `${g.color}1f`, border: `1px solid ${g.color}66`, overflow: "hidden",
-        cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined,
+        position: "absolute", top: 9, height: 16, borderRadius: R.xxs, left: `${left}%`, width: `${width}%`, minWidth: 10,
+        background: `${g.color}1f`, border: `1px solid ${g.color}66`, overflow: "visible",
+        cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined, zIndex: drag ? 5 : undefined,
       }}
     >
-      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.85 }} />
-      <span style={{ position: "absolute", right: 5, top: 1, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 600, color: g.fill > 55 ? "#fff" : "#44403C" }}>
+      <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: g.color, opacity: 0.85, borderRadius: `${R.xxs}px 0 0 ${R.xxs}px` }} />
+      <span style={{ position: "absolute", right: 5, top: 1, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 600, color: g.fill > 55 ? "#fff" : C.ink700 }}>
         {g.progress}%
       </span>
-      <div onPointerDown={begin("resize")} style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 9, cursor: "ew-resize" }} />
+      {drag ? <DatePill text={drag.mode === "move" ? `${fmtShort(pStart)} → ${fmtShort(pEnd)}` : fmtShort(pEnd)} /> : null}
+      <div onPointerDown={begin("resize")} style={{ position: "absolute", right: -3, top: 0, bottom: 0, width: 14, cursor: "ew-resize" }} />
     </div>
+  );
+}
+
+/** Floating date readout shown above a bar while dragging. */
+function DatePill({ text }: { text: string }) {
+  return (
+    <span style={{ position: "absolute", bottom: "calc(100% + 4px)", left: "50%", transform: "translateX(-50%)", ...TX.nano, fontWeight: 600, color: "#fff", background: C.ink900, borderRadius: R.xs, padding: "2px 7px", whiteSpace: "nowrap", pointerEvents: "none", boxShadow: SH.sm }}>
+      {text}
+    </span>
   );
 }
 
@@ -402,33 +415,41 @@ function SubtaskBar({ projectId, s, spanDays, onCommit }: { projectId: number; s
     setDrag(null);
     if (dxDays === 0) return;
     if (mode === "move") {
+      const prev = { start: s.start };
       onCommit(projectId, s.id, { start: shiftISO(s.start, dxDays) });
+      toast({ message: `« ${s.name} » déplacée`, action: { label: "Annuler", onClick: () => onCommit(projectId, s.id, prev) } });
     } else {
       const newEnd = shiftISO(s.end, dxDays);
+      const prev = { plannedDays: s.plannedDays };
       onCommit(projectId, s.id, { plannedDays: Math.max(1, workingDaysBetween(s.start, newEnd)) });
+      toast({ message: `Durée de « ${s.name} » modifiée`, action: { label: "Annuler", onClick: () => onCommit(projectId, s.id, prev) } });
     }
   };
 
   const left = s.left + (drag?.mode === "move" ? drag.dxDays * pctPerDay : 0);
   const width = Math.max(0.8, s.width + (drag?.mode === "resize" ? drag.dxDays * pctPerDay : 0));
+  const pStart = shiftISO(s.start, drag?.mode === "move" ? drag.dxDays : 0);
+  const pDays = Math.max(1, workingDaysBetween(s.start, shiftISO(s.end, drag?.mode === "resize" ? drag.dxDays : 0)));
 
   return (
     <div
       ref={ref}
+      className="gantt-bar"
       onClick={(e) => e.stopPropagation()}
       onPointerDown={begin("move")}
       onPointerMove={onMove}
       onPointerUp={onUp}
       title={`${s.name} — glisser pour déplacer · bord droit pour la durée`}
       style={{
-        position: "absolute", top: SUB_ROW_H / 2 - 6, height: 12, borderRadius: 4,
-        left: `${left}%`, width: `${width}%`, background: s.color, opacity: s.done ? 0.5 : 0.95,
-        cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined,
+        position: "absolute", top: SUB_ROW_H / 2 - 6, height: 12, borderRadius: R.xxs,
+        left: `${left}%`, width: `${width}%`, minWidth: 8, background: s.color, opacity: s.done ? 0.5 : 0.95,
+        cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined, zIndex: drag ? 5 : undefined,
       }}
     >
+      {drag ? <DatePill text={drag.mode === "move" ? fmtShort(pStart) : `${pDays} j`} /> : null}
       <div
         onPointerDown={begin("resize")}
-        style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 9, cursor: "ew-resize", borderRadius: "0 4px 4px 0" }}
+        style={{ position: "absolute", right: -3, top: 0, bottom: 0, width: 14, cursor: "ew-resize" }}
       />
     </div>
   );
@@ -438,12 +459,18 @@ function GridLines({ months }: { months: { left: number }[] }) {
   return (
     <>
       {months.map((m, i) => (
-        <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: `${m.left}%`, borderLeft: "1px solid #EEECE9" }} />
+        <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: `${m.left}%`, borderLeft: `1px solid ${C.line}` }} />
       ))}
     </>
   );
 }
 
-function TodayLine({ left }: { left: number }) {
-  return <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: "#15803D", left: `${left}%`, zIndex: 1 }} />;
+function TodayLine({ left, label }: { left: number; label?: boolean }) {
+  return (
+    <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: C.brand, left: `${left}%`, zIndex: 3, pointerEvents: "none" }}>
+      {label ? (
+        <span style={{ position: "absolute", top: 4, left: 3, ...TX.nano, fontWeight: 600, color: "#fff", background: C.brand, borderRadius: R.xxs, padding: "0 4px", whiteSpace: "nowrap" }}>Auj.</span>
+      ) : null}
+    </div>
+  );
 }

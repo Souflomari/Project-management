@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { FilterBar } from "../filter-bar";
 import { CaretDownIcon } from "../icons";
-import { Avatar, PhaseBadge, ProgressBar, rowProps, StatusPill } from "../ui";
+import { Avatar, Button, PhaseBadge, ProgressBar, rowProps, StatusPill } from "../ui";
 import type { DerivedProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, num, R, TX } from "@/lib/tokens";
@@ -37,7 +37,7 @@ function compare(a: DerivedProject, b: DerivedProject, key: SortKey): number {
 }
 
 export function ProjectsTable() {
-  const { filtered, openProject } = useProjects();
+  const { filtered, searched, openProject, openAdd } = useProjects();
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 } | null>(null);
 
   const rows = sort ? [...filtered].sort((a, b) => compare(a, b, sort.key) * sort.dir) : filtered;
@@ -115,8 +115,11 @@ export function ProjectsTable() {
           </div>
         ))}
         {rows.length === 0 ? (
-          <div style={{ padding: "40px 18px", textAlign: "center", ...TX.caption, color: C.ink400, borderTop: `1px solid ${C.line}` }}>
-            Aucun projet pour ce filtre.
+          <div style={{ padding: "40px 18px", textAlign: "center", borderTop: `1px solid ${C.line}` }}>
+            <div style={{ ...TX.caption, color: C.ink500 }}>{searched.length === 0 ? "Aucun projet pour l’instant." : "Aucun projet ne correspond à ce filtre."}</div>
+            <div style={{ marginTop: 12 }}>
+              <Button variant="secondary" onClick={openAdd} style={{ margin: "0 auto" }}>Nouveau projet</Button>
+            </div>
           </div>
         ) : null}
       </div>

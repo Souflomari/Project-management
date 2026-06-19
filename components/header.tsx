@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { PlusIcon, SearchIcon } from "./icons";
 import { Button } from "./ui";
@@ -13,6 +14,10 @@ export function Header() {
   const pathname = usePathname();
   const item = navItemForPath(pathname);
   const { search, setSearch, searched, filtered, openAdd } = useProjects();
+  const [kbd, setKbd] = useState("⌘K");
+  useEffect(() => {
+    if (!/Mac|iPhone|iPad/.test(navigator.platform)) setKbd("Ctrl K");
+  }, []);
 
   const subtitle =
     item.key === "projets"
@@ -77,7 +82,7 @@ export function Header() {
           >
             <SearchIcon />
             <span style={{ fontSize: 14, flex: 1, textAlign: "left" }}>Rechercher…</span>
-            <kbd style={{ fontSize: 11, fontWeight: 600, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit" }}>⌘K</kbd>
+            <kbd style={{ fontSize: 11, fontWeight: 600, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit" }}>{kbd}</kbd>
           </button>
         )}
         <Button onClick={openAdd} icon={<PlusIcon size={15} />}>

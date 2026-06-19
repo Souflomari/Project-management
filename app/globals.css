@@ -201,6 +201,13 @@ select:focus-visible,
     opacity: 1;
   }
 }
+.gantt-bar {
+  transition: box-shadow 0.12s ease, filter 0.12s ease;
+}
+.gantt-bar:hover {
+  box-shadow: 0 0 0 2px rgba(28, 25, 23, 0.14);
+  filter: brightness(1.03);
+}
 @keyframes toastIn {
   from {
     transform: translateY(12px);
@@ -209,6 +216,16 @@ select:focus-visible,
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+@keyframes toastOut {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(8px);
+    opacity: 0;
   }
 }
 @keyframes popIn {

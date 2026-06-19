@@ -8,7 +8,7 @@ import type { SubtaskPatch } from "@/lib/data/repository";
 import { deriveProject, type DerivedSubtask } from "@/lib/derive";
 import { fmtFull, REFERENCE_DATE } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, FONT_DISPLAY, R, SH, STATUS_META, TX } from "@/lib/tokens";
+import { C, FONT_DISPLAY, num, R, SH, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
 
 const LABEL: React.CSSProperties = { ...TX.overline, color: C.ink500 };
@@ -126,7 +126,7 @@ export function ProjectDrawer() {
                   className="inline-edit"
                   onBlur={(e) => { const v = Math.max(0, Math.round(Number(e.target.value) || 0)); if (v !== selected.budget) updateProject(p.id, { budget: v }); }}
                   onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-                  style={{ width: 92, fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, letterSpacing: "-.02em", color: C.ink900, border: "1px solid transparent", background: "transparent", borderRadius: R.xs, padding: "0 3px", margin: "0 -3px", outline: "none" }}
+                  style={{ width: 92, ...num(22), color: C.ink900, border: "1px solid transparent", background: "transparent", borderRadius: R.xs, padding: "0 3px", margin: "0 -3px", outline: "none" }}
                 />
                 <span style={{ ...TX.caption, color: C.ink500 }}>k€</span>
               </div>
@@ -372,7 +372,7 @@ function SubtaskRow({
             color: subtask.done ? C.ink400 : C.ink900,
           }}
         />
-        <IconButton size={26} tone="danger" onClick={() => onDelete(projectId, subtask.id)} aria-label="Supprimer la tâche">
+        <IconButton size={28} tone="danger" onClick={() => onDelete(projectId, subtask.id)} aria-label="Supprimer la tâche">
           <TrashIcon size={13} />
         </IconButton>
       </div>
@@ -450,7 +450,7 @@ function Stat({ label, value, hint, children }: { label: string; value: string; 
   return (
     <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
       <div style={{ ...TX.overline, color: C.ink500 }}>{label}</div>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, letterSpacing: "-.02em", marginTop: 4, color: C.ink900 }}>{value}</div>
+      <div style={{ ...num(22), marginTop: 4, color: C.ink900 }}>{value}</div>
       {hint ? <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{hint}</div> : null}
       {children}
     </div>
