@@ -27,6 +27,14 @@ function Legend() {
         <span style={{ width: 16, height: 9, borderRadius: 2, background: `${C.ink700}14`, border: `1px solid ${C.ink700}40` }} />
         durée planifiée
       </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={{ width: 16, height: 9, borderRadius: 2, background: C.danger, opacity: 0.95, boxShadow: `0 0 0 1.5px ${C.danger}` }} />
+        chemin critique
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={{ width: 16, height: 9, borderRadius: 2, background: `repeating-linear-gradient(90deg, ${C.ink350}66 0 3px, transparent 3px 6px)`, border: `1px dashed ${C.ink350}` }} />
+        marge (float)
+      </span>
     </span>
   );
 }
@@ -438,27 +446,50 @@ function SubtaskBar({ projectId, s, spanDays, onCommit }: { projectId: number; s
   const pStart = shiftISO(s.start, drag?.mode === "move" ? drag.dxDays : 0);
   const pDays = Math.max(1, workingDaysBetween(s.start, shiftISO(s.end, drag?.mode === "resize" ? drag.dxDays : 0)));
 
+  // Critical-path tasks read in the danger hue (unless done); slack tasks keep
+  // the assignee colour. A heavier ring reinforces the critical chain.
+  const critical = s.onCriticalPath && !s.done;
+  const barColor = critical ? C.danger : s.color;
+  const critTitle = s.onCriticalPath
+    ? " · chemin critique (marge nulle)"
+    : s.float > 0 ? ` · marge ${s.float} j` : "";
+
   return (
-    <div
-      ref={ref}
-      className="gantt-bar"
-      onClick={(e) => e.stopPropagation()}
-      onPointerDown={begin("move")}
-      onPointerMove={onMove}
-      onPointerUp={onUp}
-      title={`${s.name} — glisser pour déplacer · bord droit pour la durée`}
-      style={{
-        position: "absolute", top: SUB_ROW_H / 2 - 6, height: 12, borderRadius: R.xs,
-        left: `${left}%`, width: `${width}%`, minWidth: 8, background: s.color, opacity: s.done ? 0.5 : 0.95,
-        cursor: drag ? "grabbing" : "grab", touchAction: "none", boxShadow: drag ? SH.md : undefined, zIndex: drag ? 5 : undefined,
-      }}
-    >
-      {drag ? <DatePill text={drag.mode === "move" ? fmtShort(pStart) : `${pDays} j`} /> : null}
+    <>
+      {/* float ghost — faint trailing extension showing schedule slack */}
+      {s.float > 0 && s.floatWidth > 0 && !s.done ? (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute", top: SUB_ROW_H / 2 - 5, height: 10, borderRadius: R.xs,
+            left: `${s.left + s.width}%`, width: `${s.floatWidth}%`, minWidth: 4,
+            background: `repeating-linear-gradient(90deg, ${C.ink350}55 0 3px, transparent 3px 6px)`,
+            border: `1px dashed ${C.ink350}`, pointerEvents: "none", opacity: drag ? 0.4 : 0.9,
+          }}
+        />
+      ) : null}
       <div
-        onPointerDown={begin("resize")}
-        style={{ position: "absolute", right: -3, top: 0, bottom: 0, width: 14, cursor: "ew-resize" }}
-      />
-    </div>
+        ref={ref}
+        className="gantt-bar"
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={begin("move")}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        title={`${s.name} — glisser pour déplacer · bord droit pour la durée${critTitle}`}
+        style={{
+          position: "absolute", top: SUB_ROW_H / 2 - 6, height: 12, borderRadius: R.xs,
+          left: `${left}%`, width: `${width}%`, minWidth: 8, background: barColor, opacity: s.done ? 0.5 : 0.95,
+          boxShadow: drag ? SH.md : critical ? `0 0 0 1.5px ${C.danger}` : undefined,
+          cursor: drag ? "grabbing" : "grab", touchAction: "none", zIndex: drag ? 5 : critical ? 2 : undefined,
+        }}
+      >
+        {drag ? <DatePill text={drag.mode === "move" ? fmtShort(pStart) : `${pDays} j`} /> : null}
+        <div
+          onPointerDown={begin("resize")}
+          style={{ position: "absolute", right: -3, top: 0, bottom: 0, width: 14, cursor: "ew-resize" }}
+        />
+      </div>
+    </>
   );
 }
 

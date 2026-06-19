@@ -5,15 +5,17 @@
 import { shiftISO, taskEnd, taskStartForEnd } from "../format";
 import type { Project, Status, Subtask, TeamMember } from "../types";
 
+// costPerDay = loaded daily rate in € (charge journalière) — seniors/directors
+// command higher rates than engineers, in line with French engineering-firm TJM.
 export const TEAM: TeamMember[] = [
-  { id: 0, name: "C. Mercier", initials: "CM", color: "#15803D", role: "Cheffe de projet senior" },
-  { id: 1, name: "A. Lefèvre", initials: "AL", color: "#2C7A8C", role: "Ingénieur OA" },
-  { id: 2, name: "N. Diallo", initials: "ND", color: "#4C8AA3", role: "Ingénieure hydraulique" },
-  { id: 3, name: "M. Caron", initials: "MC", color: "#B45309", role: "Chef de projet géotech." },
-  { id: 4, name: "L. Petit", initials: "LP", color: "#B5392E", role: "Ingénieure VRD" },
-  { id: 5, name: "S. Roux", initials: "SR", color: "#3B7179", role: "Chef de projet énergie" },
-  { id: 6, name: "H. Bonnet", initials: "HB", color: "#8A6F5C", role: "Architecte bâtiment" },
-  { id: 7, name: "F. Aubry", initials: "FA", color: "#2F4A63", role: "Directeur ferroviaire" },
+  { id: 0, name: "C. Mercier", initials: "CM", color: "#15803D", role: "Cheffe de projet senior", costPerDay: 920 },
+  { id: 1, name: "A. Lefèvre", initials: "AL", color: "#2C7A8C", role: "Ingénieur OA", costPerDay: 680 },
+  { id: 2, name: "N. Diallo", initials: "ND", color: "#4C8AA3", role: "Ingénieure hydraulique", costPerDay: 660 },
+  { id: 3, name: "M. Caron", initials: "MC", color: "#B45309", role: "Chef de projet géotech.", costPerDay: 850 },
+  { id: 4, name: "L. Petit", initials: "LP", color: "#B5392E", role: "Ingénieure VRD", costPerDay: 640 },
+  { id: 5, name: "S. Roux", initials: "SR", color: "#3B7179", role: "Chef de projet énergie", costPerDay: 870 },
+  { id: 6, name: "H. Bonnet", initials: "HB", color: "#8A6F5C", role: "Architecte bâtiment", costPerDay: 760 },
+  { id: 7, name: "F. Aubry", initials: "FA", color: "#2F4A63", role: "Directeur ferroviaire", costPerDay: 1150 },
 ];
 
 // [name, client, discipline, leadIdx, phaseIndex, progress, status, budget(k€), start, deadline, renduLabel, renduDate]

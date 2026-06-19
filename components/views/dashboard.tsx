@@ -2,12 +2,12 @@
 
 import { useRouter } from "next/navigation";
 
-import { FlagIcon } from "../icons";
-import { Card, rowProps, Sparkline, StatusPill } from "../ui";
+import { CalendrierIcon, CheckIcon, FlagIcon } from "../icons";
+import { Card, EmptyState, Gauge, rowProps, Sparkline, StatusPill } from "../ui";
 import { buildHistory, buildKanban, computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
 import { WEEK_SHORT } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, num, PHASE_COLORS, R, STATUS_META, TX } from "@/lib/tokens";
+import { C, num, PHASE_COLORS, R, SURFACE, STATUS_META, TX } from "@/lib/tokens";
 import { useCountUp } from "@/lib/use-count-up";
 
 const STALE_DAYS = 90;
@@ -57,20 +57,34 @@ export function Dashboard() {
   return (
     <>
       <div className="bento">
-        {/* portfolio-health hero — the 2x2 anchor tile */}
+        {/* portfolio-health hero — the 2x2 anchor tile, raised tone + larger
+            radius so it commands the bento over the flat KPI tiles. */}
         <div className="b-hero">
-          <Card padding="18px 20px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+          <Card elevation={1} radius={R.xxl} padding="22px 24px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
             <div style={{ ...TX.eyebrow, color: C.ink400 }}>Santé du portefeuille</div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
-              <span style={{ ...num(46), color: healthColor }}>{healthShown}</span>
-              <span style={{ ...num(18), color: C.ink400 }}>/ 100</span>
-            </div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
-              <span style={{ ...TX.bodyStrong, color: C.ink700 }}>{healthLabel}</span>
+
+            {/* command-viz: radial health gauge on the governed load ramp */}
+            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14 }}>
+              <Gauge
+                value={healthShown}
+                size={128}
+                thickness={11}
+                color={healthColor}
+                label={<span style={{ ...num(38), color: healthColor }}>{healthShown}</span>}
+                sublabel={<span style={{ ...TX.nano, color: C.ink400 }}>/ 100</span>}
+              />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
+                  <span style={{ ...TX.bodyStrong, color: C.ink900, fontSize: 16 }}>{healthLabel}</span>
+                </div>
+                <div style={{ ...TX.caption, color: C.ink500, marginTop: 6, maxWidth: 200 }}>
+                  Composite pondéré de l&apos;état des {distTotal} projet{distTotal > 1 ? "s" : ""} du portefeuille.
+                </div>
+              </div>
             </div>
 
-            <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 18, background: C.subtle }}>
+            <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 18, background: SURFACE.containerHigh, boxShadow: `inset 0 0 0 1px ${C.line}` }}>
               {dist.map((s) =>
                 s.count > 0 ? (
                   <button
@@ -97,7 +111,9 @@ export function Dashboard() {
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>Avancement moyen <Delta v={avgDelta} unit="pts" /></span>
                 <span style={{ ...num(15), color: C.ink900 }}>{kpis.avg}&#8239;%</span>
               </div>
-              <div style={{ marginTop: 8 }}><Sparkline values={history.map((h) => h.avg)} height={34} /></div>
+              <div style={{ marginTop: 10, paddingRight: 30 }}>
+                <Sparkline values={history.map((h) => h.avg)} height={46} gradient endLabel={`${kpis.avg}%`} />
+              </div>
               <div style={{ ...TX.nano, color: C.ink400, marginTop: 4 }}>8 dernières semaines</div>
             </div>
           </Card>
@@ -116,7 +132,9 @@ export function Dashboard() {
             Prochains rendus <span style={{ ...num(13), color: C.ink400 }}>{upcoming.length}</span>
           </h2>
           {upcoming.length === 0 ? (
-            <div style={{ ...TX.caption, color: C.ink500, padding: "10px 6px", borderTop: `1px solid ${C.line}` }}>Aucun rendu à venir.</div>
+            <div style={{ borderTop: `1px solid ${C.line}` }}>
+              <EmptyState compact icon={<CalendrierIcon size={22} />} title="Aucun rendu à venir" hint="Les prochaines échéances du portefeuille apparaîtront ici." />
+            </div>
           ) : null}
           {upcoming.map((r) => (
             <div
@@ -156,9 +174,8 @@ export function Dashboard() {
             Points de vigilance <span style={{ ...num(13), color: C.ink400 }}>{alerts.length}</span>
           </h2>
           {alerts.length === 0 ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, ...TX.caption, color: C.ink500, padding: "10px 6px", borderTop: `1px solid ${C.line}` }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.brand, flexShrink: 0 }} />
-              Aucun point de vigilance.
+            <div style={{ borderTop: `1px solid ${C.line}` }}>
+              <EmptyState compact icon={<span style={{ color: C.brand, display: "flex" }}><CheckIcon size={22} /></span>} title="Aucun point de vigilance" hint="Tous les projets actifs sont à jour ou sous contrôle." />
             </div>
           ) : null}
           {alerts.map((a) => (

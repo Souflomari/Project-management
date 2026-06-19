@@ -9,8 +9,8 @@ import { useState } from "react";
 import { CloseIcon, PlusIcon, TrashIcon } from "./icons";
 import { Avatar, Button, Checkbox, IconButton, Input, ProgressBar, Select } from "./ui";
 import type { SubtaskPatch } from "@/lib/data/repository";
-import type { DerivedProject, DerivedSubtask } from "@/lib/derive";
-import { fmtFull, REFERENCE_DATE } from "@/lib/format";
+import { buildBudget, type DerivedProject, type DerivedSubtask } from "@/lib/derive";
+import { fmtEur, fmtFull, REFERENCE_DATE } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, FONT_DISPLAY, num, R, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
@@ -73,6 +73,8 @@ export function ProjectOverview({ p }: { p: DerivedProject }) {
           <div style={{ marginTop: 8 }}><ProgressBar pct={p.progress} color={C.brand} height={5} /></div>
         </Stat>
       </div>
+
+      <ProjectBudget p={p} />
 
       <div style={{ ...LABEL, marginBottom: 9 }}>Statut</div>
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 24 }}>
@@ -159,6 +161,56 @@ export function ProjectOverview({ p }: { p: DerivedProject }) {
             <Avatar initials={m.initials} color={m.color} size={28} fontSize={10} ring title={`${m.name} · ${m.role}`} />
           </div>
         ))}
+      </div>
+    </>
+  );
+}
+
+/** Honoraires vs coût engagé / valeur acquise — earned-value control. Reads the
+ *  team from the store so it stays in sync with rate edits. */
+export function ProjectBudget({ p }: { p: DerivedProject }) {
+  const { team } = useProjects();
+  const b = buildBudget(p, team);
+  // Burn bar: how much of the fees the plan commits, with earned value overlaid.
+  const committed = Math.min(100, b.committedPct);
+  const earned = b.feesEur ? Math.min(100, Math.round((b.earnedValueEur / b.feesEur) * 100)) : 0;
+  const marginColor = b.overBudget ? C.danger : C.brand;
+  const barColor = b.overBudget ? C.danger : C.ink700;
+
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 9 }}>
+        <div style={LABEL}>Honoraires &amp; coûts</div>
+        <span style={{ ...TX.micro, color: b.overBudget ? C.danger : C.ink500 }}>
+          marge {b.marginPct >= 0 ? "+" : ""}{b.marginPct} %
+        </span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <Stat label="Honoraires" value={fmtEur(b.feesEur)} />
+        <Stat label="Coût engagé" value={fmtEur(b.plannedCostEur)} hint={`${b.committedPct} % des honoraires`} />
+        <Stat label="Valeur acquise" value={fmtEur(b.earnedValueEur)} hint={`${b.spentPct} % du coût`} />
+      </div>
+
+      <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px", marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={{ ...TX.eyebrow, color: C.ink500 }}>Consommation des honoraires</span>
+          <span style={{ ...num(15), color: marginColor }}>
+            {b.marginEur >= 0 ? "marge " : "dépassement "}{fmtEur(Math.abs(b.marginEur))}
+          </span>
+        </div>
+        {/* Burn bar: committed cost (track fill) with earned value as a darker inset. */}
+        <div style={{ position: "relative", height: 8, borderRadius: R.pill, background: C.surface, border: `1px solid ${C.line}`, overflow: "hidden" }}>
+          <div style={{ position: "absolute", inset: 0, width: `${committed}%`, background: `${barColor}33` }} />
+          <div style={{ position: "absolute", insetBlock: 0, left: 0, width: `${earned}%`, background: barColor, opacity: 0.9 }} />
+          {b.feesEur ? (
+            <div style={{ position: "absolute", top: -2, bottom: -2, left: "100%", width: 2, background: C.ink400, transform: "translateX(-2px)" }} />
+          ) : null}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", ...TX.micro, color: C.ink500, marginTop: 6 }}>
+          <span>acquis {fmtEur(b.earnedValueEur)}</span>
+          <span>engagé {fmtEur(b.plannedCostEur)} / {fmtEur(b.feesEur)}</span>
+        </div>
       </div>
     </>
   );

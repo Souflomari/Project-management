@@ -28,7 +28,7 @@ export function Sidebar() {
         padding: "20px 12px 16px",
         position: "sticky",
         top: 0,
-        height: "100vh",
+        height: "100dvh",
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 19, fontWeight: 600, fontFamily: FONT_DISPLAY, letterSpacing: "-.02em", color: C.ink900, padding: "2px 10px 0" }}>

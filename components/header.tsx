@@ -14,7 +14,7 @@ import { C, R, SH, TX } from "@/lib/tokens";
 /** Segmented links switching the lens of the Projets workspace. */
 function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
   return (
-    <div role="tablist" aria-label="Vue des projets" className="ws-switcher" style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3 }}>
+    <div role="tablist" aria-label="Vue des projets" className="ws-switcher" style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3, maxWidth: "100%", overflowX: "auto" }}>
       {WORKSPACE_VIEWS.map((v) => {
         const active = v.key === activeKey;
         return (
@@ -91,7 +91,7 @@ export function Header() {
         zIndex: 30,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
+      <div className="header-lead" style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
         <h1 style={{ ...TX.h1, margin: 0, whiteSpace: "nowrap" }}>{title}</h1>
         {inWorkspace ? <WorkspaceSwitcher activeKey={item.key} /> : null}
         {isListe ? <span className="header-search" style={{ ...TX.caption, color: C.ink400, whiteSpace: "nowrap" }}>{count}</span> : null}
@@ -116,6 +116,7 @@ export function Header() {
           >
             <SearchIcon />
             <input
+              data-projets-search
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher un projet…"
@@ -135,8 +136,8 @@ export function Header() {
             <kbd style={{ fontSize: 11, fontWeight: 600, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit" }}>{kbd}</kbd>
           </button>
         )}
-        <Button onClick={openAdd} icon={<PlusIcon size={15} />}>
-          Nouveau projet
+        <Button onClick={openAdd} icon={<PlusIcon size={15} />} aria-label="Nouveau projet">
+          <span className="btn-label-collapsible">Nouveau projet</span>
         </Button>
       </div>
     </header>

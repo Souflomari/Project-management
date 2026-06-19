@@ -28,6 +28,10 @@ export interface DerivedSubtask extends Subtask {
   end: string;
   assignee: TeamMember;
   color: string;
+  /** Total float in working days (0 = on the critical path). */
+  float: number;
+  /** True when the task lies on a zero-float (critical) chain. */
+  onCriticalPath: boolean;
 }
 
 export interface DerivedProject extends Project {
@@ -60,14 +64,95 @@ export interface DerivedProject extends Project {
 }
 
 const FALLBACK_MEMBER: TeamMember = {
-  id: -1, name: "—", initials: "—", color: "#A8A29E", role: "",
+  id: -1, name: "—", initials: "—", color: "#A8A29E", role: "", costPerDay: 0,
 };
+
+// ------------------------------------------------------------------ CPM
+//
+// Critical-path method over the Finish-to-Start `dependsOn` graph. Durations are
+// the tasks' planned working days; the pass is purely topological (it ignores the
+// calendar `start`, so float is the pure schedule slack the network allows).
+//
+// Cycle-guarded: the seed is a clean chain, but user edits can introduce cycles.
+// We compute a topological order with Kahn's algorithm and only run the passes on
+// the acyclic subset; any task caught in / fed by a cycle is treated as having no
+// usable float (float 0, not on the critical path) rather than looping forever.
+
+export interface CpmResult {
+  /** subtaskId → total float in working days. */
+  float: Map<number, number>;
+  /** subtaskId → on the critical (zero-float) path. */
+  critical: Map<number, boolean>;
+}
+
+export function computeCpm(subtasks: Subtask[]): CpmResult {
+  const float = new Map<number, number>();
+  const critical = new Map<number, boolean>();
+  const ids = subtasks.map((s) => s.id);
+  for (const id of ids) { float.set(id, 0); critical.set(id, false); }
+  if (subtasks.length === 0) return { float, critical };
+
+  const byId = new Map(subtasks.map((s) => [s.id, s]));
+  const dur = (id: number) => Math.max(1, Math.floor(byId.get(id)?.plannedDays ?? 1));
+  // Keep only dependency edges that point at real sibling tasks.
+  const preds = new Map<number, number[]>(
+    subtasks.map((s) => [s.id, s.dependsOn.filter((d) => byId.has(d) && d !== s.id)]),
+  );
+  const succs = new Map<number, number[]>(ids.map((id) => [id, []]));
+  for (const id of ids) for (const p of preds.get(id)!) succs.get(p)!.push(id);
+
+  // Kahn topological sort — nodes left out of `order` are part of a cycle.
+  const indeg = new Map<number, number>(ids.map((id) => [id, preds.get(id)!.length]));
+  const queue = ids.filter((id) => indeg.get(id) === 0);
+  const order: number[] = [];
+  while (queue.length) {
+    const id = queue.shift()!;
+    order.push(id);
+    for (const s of succs.get(id)!) {
+      indeg.set(s, indeg.get(s)! - 1);
+      if (indeg.get(s) === 0) queue.push(s);
+    }
+  }
+  const acyclic = new Set(order);
+  if (order.length === 0) return { float, critical }; // fully cyclic — bail safely
+
+  // Forward pass: earliest start / finish (offsets in working days).
+  const es = new Map<number, number>();
+  const ef = new Map<number, number>();
+  for (const id of order) {
+    const start = Math.max(0, ...preds.get(id)!.filter((p) => acyclic.has(p)).map((p) => ef.get(p) ?? 0));
+    es.set(id, start);
+    ef.set(id, start + dur(id));
+  }
+  const projectFinish = Math.max(0, ...order.map((id) => ef.get(id)!));
+
+  // Backward pass: latest finish / start.
+  const lf = new Map<number, number>();
+  const ls = new Map<number, number>();
+  for (let i = order.length - 1; i >= 0; i--) {
+    const id = order[i];
+    const downstream = succs.get(id)!.filter((s) => acyclic.has(s));
+    const latestFinish = downstream.length
+      ? Math.min(...downstream.map((s) => ls.get(s) ?? projectFinish))
+      : projectFinish;
+    lf.set(id, latestFinish);
+    ls.set(id, latestFinish - dur(id));
+  }
+
+  for (const id of order) {
+    const fl = Math.max(0, (ls.get(id) ?? 0) - (es.get(id) ?? 0));
+    float.set(id, fl);
+    critical.set(id, fl === 0);
+  }
+  return { float, critical };
+}
 
 export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
   const meta = STATUS_META[p.status];
   const ring = ringColor(p.status);
   const findMember = (id: number) => team.find((m) => m.id === id) ?? FALLBACK_MEMBER;
 
+  const cpm = computeCpm(p.subtasks);
   const subtasksD: DerivedSubtask[] = p.subtasks.map((s) => {
     const assignee = findMember(s.assigneeId);
     return {
@@ -75,6 +160,8 @@ export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
       end: taskEnd(s.start, s.plannedDays),
       assignee,
       color: s.done ? "#A8A29E" : assignee.color,
+      float: cpm.float.get(s.id) ?? 0,
+      onCriticalPath: cpm.critical.get(s.id) ?? false,
     };
   });
 
@@ -235,6 +322,12 @@ export interface GanttBar {
   start: string;
   end: string;
   plannedDays: number;
+  /** Total float in working days (0 = critical). */
+  float: number;
+  /** On the critical (zero-float) path — rendered distinctly. */
+  onCriticalPath: boolean;
+  /** Width (% of timeline) of the float ghost trailing the bar, 0 when none. */
+  floatWidth: number;
 }
 
 export interface GanttRow {
@@ -332,6 +425,10 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
       deadline: p.deadline,
       subtasks: p.subtasksD.map((s) => {
         const sg = geom(s.start, s.end);
+        // Float ghost: extend the bar by `float` working days past its end so the
+        // view can render the slack as a faint trailing extension.
+        const floatEnd = s.float > 0 ? taskEnd(s.end, s.float + 1) : s.end;
+        const fg = s.float > 0 ? geom(s.end, floatEnd) : { width: 0 };
         return {
           id: s.id,
           name: s.name,
@@ -345,12 +442,65 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
           start: s.start,
           end: s.end,
           plannedDays: s.plannedDays,
+          float: s.float,
+          onCriticalPath: s.onCriticalPath,
+          floatWidth: Math.max(0, fg.width),
         };
       }),
     };
   });
 
   return { months, rows, todayLeft: pctOf(REFERENCE_TS), spanDays: Math.round(span / DAY_MS), windowStart: toISO(new Date(winStart)) };
+}
+
+// --------------------------------------------------------------- budget / EVM
+//
+// Earned-value control derived from the same effort-in-days model:
+//   • plannedCost  = Σ task.plannedDays × assignee.costPerDay   (budget at completion)
+//   • earnedValue  = Σ done task.plannedDays × rate             (BCWP / valeur acquise)
+//   • the project's `budget` (honoraires) is in k€ — multiply by 1000 to compare.
+// No calendar/Date.now() — purely schedule-driven, consistent with the rest of derive.
+
+export interface ProjectBudget {
+  /** Honoraires (fees) in euros — project.budget × 1000. */
+  feesEur: number;
+  /** Planned cost at completion (coût engagé prévisionnel), euros. */
+  plannedCostEur: number;
+  /** Earned value — done work valued at its rate (valeur acquise), euros. */
+  earnedValueEur: number;
+  /** earnedValue ÷ plannedCost, 0..100 (work-value consumed). */
+  spentPct: number;
+  /** plannedCost ÷ fees, 0..100+ (how much of the fee the plan commits). */
+  committedPct: number;
+  /** Projected margin = fees − plannedCost, euros (can be negative). */
+  marginEur: number;
+  /** marginEur ÷ fees, percentage (can be negative). */
+  marginPct: number;
+  /** True when the plan commits more than the fees (margin under water). */
+  overBudget: boolean;
+}
+
+export function buildBudget(p: Project, team: TeamMember[]): ProjectBudget {
+  const rateOf = (id: number) => team.find((m) => m.id === id)?.costPerDay ?? 0;
+  let plannedCostEur = 0;
+  let earnedValueEur = 0;
+  for (const s of p.subtasks) {
+    const cost = Math.max(1, Math.floor(s.plannedDays)) * rateOf(s.assigneeId);
+    plannedCostEur += cost;
+    if (s.done) earnedValueEur += cost;
+  }
+  const feesEur = p.budget * 1000;
+  const marginEur = feesEur - plannedCostEur;
+  return {
+    feesEur,
+    plannedCostEur,
+    earnedValueEur,
+    spentPct: plannedCostEur ? Math.round((earnedValueEur / plannedCostEur) * 100) : 0,
+    committedPct: feesEur ? Math.round((plannedCostEur / feesEur) * 100) : 0,
+    marginEur,
+    marginPct: feesEur ? Math.round((marginEur / feesEur) * 100) : 0,
+    overBudget: plannedCostEur > feesEur,
+  };
 }
 
 // ---------------------------------------------------------------- calendar

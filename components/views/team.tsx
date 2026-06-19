@@ -9,7 +9,7 @@ import { Avatar, Button, Card, EmptyState, IconButton, rowProps, Segmented, Tool
 import { buildTeamLoad, type HeatBucket } from "@/lib/derive";
 import { isToday, MONS_LONG, MONTHS_FULL, monthRange, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
-import { C, chargeColor, num, R, TX } from "@/lib/tokens";
+import { C, chargeColor, num, R, SP, SURFACE, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const MODE_OPTS: { value: TeamMode; label: string }[] = [
@@ -109,12 +109,16 @@ export function Team() {
                 <span style={{ ...TX.caption, color: C.ink500 }}>{t.projectsActive} projet{t.projectsActive > 1 ? "s" : ""}</span>
               </div>
 
-              <Heatmap buckets={t.buckets} mode={teamMode} />
+              <div style={{ background: SURFACE.containerLow, border: `1px solid ${C.line}`, borderRadius: R.md, padding: `${SP[5]}px ${SP[5]}px ${SP[4]}px` }}>
+                <Heatmap buckets={t.buckets} mode={teamMode} />
+              </div>
 
               {t.tasks.length === 0 ? (
-                <div style={{ marginTop: 12 }}><EmptyState title="Aucune tâche planifiée sur la période." /></div>
+                <div style={{ marginTop: SP[4] }}>
+                  <EmptyState compact title="Aucune tâche planifiée" hint="Rien d'affecté à ce membre sur la période." />
+                </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 12 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: SP[4] }}>
                   {t.tasks.map((task, i) => (
                     <div
                       key={i}
@@ -161,7 +165,7 @@ function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
         const lab = mode === "semaine" ? WD[(d.getDay() + 6) % 7] : String(d.getDate());
         return (
           <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${d.getDate()} ${MONTHS_FULL[d.getMonth()]} · ${b.days} / ${b.capacity} j · ${b.pct}%`}>
-            <div style={{ position: "relative", height: H, borderRadius: R.xs, background: C.subtle, boxShadow: `inset 0 0 0 1px ${C.line}`, overflow: "hidden" }}>
+            <div style={{ position: "relative", height: H, borderRadius: R.xs, background: SURFACE.containerHigh, boxShadow: `inset 0 0 0 1px ${C.line}`, overflow: "hidden" }}>
               <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: base, background: chargeColor(b.pct) }} />
               {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: over, background: "#B5532E" }} /> : null}

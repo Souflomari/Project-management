@@ -332,6 +332,22 @@ select:focus-visible,
   padding: 36px 36px 72px;
 }
 
+/* ---- mobile bottom tab bar (<=768px) ----
+   Hidden by default; becomes a floating, translucent thumb-zone surface on
+   small screens (see the 768px query). Mirrors the header's glass. */
+.mobile-tabbar {
+  display: none;
+}
+.mobile-tab {
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  padding: 4px 6px;
+}
+/* "Nouveau projet" label collapses to an icon-only button on small screens. */
+.btn-label-collapsible {
+  display: inline;
+}
+
 /* dashboard bento — one unified field of tiles (4 cols); hierarchy by size. */
 .bento {
   display: grid;
@@ -386,9 +402,39 @@ select:focus-visible,
     padding: 9px 0 !important;
   }
 }
+/* Mobile: drop the left rail entirely and rely on the bottom tab bar. */
+@media (max-width: 768px) {
+  .app-sidebar {
+    display: none !important;
+  }
+  .mobile-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    gap: 4px;
+    padding: 6px 10px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    border-top: 1px solid var(--c-line);
+  }
+  /* Keep content clear of the fixed bottom bar (bar height + safe area). */
+  .app-main {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  /* Hide the verbose "Nouveau projet" label; the + icon + aria-label remain. */
+  .btn-label-collapsible {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   .app-main {
-    padding: 20px 16px 56px;
+    padding: 20px 16px calc(76px + env(safe-area-inset-bottom));
   }
   .bento {
     grid-template-columns: 1fr;

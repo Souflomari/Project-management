@@ -1,9 +1,9 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { CloseIcon } from "./icons";
-import { Button, Select } from "./ui";
+import { Button, Input, Modal, Select } from "./ui";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, R, TX } from "@/lib/tokens";
 import { PHASES } from "@/lib/types";
@@ -16,6 +16,13 @@ export function FilterBar({ trailing, showViews }: { trailing?: ReactNode; showV
   } = useProjects();
 
   const hasFacets = filter !== "all" || respFilter != null || phaseFilter != null;
+
+  // Replaces window.prompt/confirm with focus-trapped, styled, i18n-friendly modals.
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [viewName, setViewName] = useState("");
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const submitSave = () => { const n = viewName.trim(); if (n) saveView(n); setSaveOpen(false); setViewName(""); };
 
   return (
     <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
@@ -74,12 +81,12 @@ export function FilterBar({ trailing, showViews }: { trailing?: ReactNode; showV
                 {savedViews.map((v) => (<option key={v.id} value={v.id}>{v.name}</option>))}
               </Select>
             ) : null}
-            <Button size="sm" variant="secondary" onClick={() => { const n = window.prompt("Nom de la vue ?"); if (n && n.trim()) saveView(n.trim()); }}>
+            <Button size="sm" variant="secondary" onClick={() => { setViewName(""); setSaveOpen(true); }}>
               Enregistrer la vue
             </Button>
             {savedViews.length > 0 ? (
               <button
-                onClick={() => { if (savedViews.length && window.confirm("Supprimer toutes les vues enregistrées ?")) savedViews.forEach((v) => deleteView(v.id)); }}
+                onClick={() => setConfirmClear(true)}
                 title="Supprimer les vues"
                 className="soft-hover"
                 style={{ ...TX.caption, color: C.ink400, background: "none", border: "none", borderRadius: R.xs, padding: "4px 6px", cursor: "pointer" }}
@@ -90,6 +97,49 @@ export function FilterBar({ trailing, showViews }: { trailing?: ReactNode; showV
           </>
         ) : null}
       </div>
+
+      {saveOpen ? (
+        <Modal
+          title="Enregistrer la vue"
+          subtitle="Conserve les filtres, la recherche et le tri actuels."
+          width={420}
+          onClose={() => setSaveOpen(false)}
+          footer={
+            <>
+              <Button size="sm" variant="ghost" onClick={() => setSaveOpen(false)}>Annuler</Button>
+              <Button size="sm" onClick={submitSave} disabled={!viewName.trim()}>Enregistrer</Button>
+            </>
+          }
+        >
+          <Input
+            autoFocus
+            value={viewName}
+            onChange={(e) => setViewName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitSave(); } }}
+            placeholder="Nom de la vue"
+            aria-label="Nom de la vue"
+          />
+        </Modal>
+      ) : null}
+
+      {confirmClear ? (
+        <Modal
+          title="Supprimer les vues enregistrées ?"
+          subtitle="Cette action est irréversible."
+          width={420}
+          onClose={() => setConfirmClear(false)}
+          footer={
+            <>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmClear(false)}>Annuler</Button>
+              <Button size="sm" variant="danger" onClick={() => { savedViews.forEach((v) => deleteView(v.id)); setConfirmClear(false); }}>Supprimer</Button>
+            </>
+          }
+        >
+          <p style={{ ...TX.caption, color: C.ink600, margin: 0 }}>
+            {savedViews.length} vue{savedViews.length > 1 ? "s" : ""} ser{savedViews.length > 1 ? "ont" : "a"} définitivement supprimée{savedViews.length > 1 ? "s" : ""}.
+          </p>
+        </Modal>
+      ) : null}
     </div>
   );
 }

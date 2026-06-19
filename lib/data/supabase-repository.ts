@@ -41,6 +41,29 @@ interface ProjectRow {
   }[];
 }
 
+/** Fallback daily rate (€) when a row/insert omits one. */
+const DEFAULT_COST_PER_DAY = 700;
+
+interface TeamMemberRow {
+  id: number;
+  name: string;
+  initials: string;
+  color: string;
+  role: string;
+  cost_per_day: number | null;
+}
+
+function rowToTeamMember(row: TeamMemberRow): TeamMember {
+  return {
+    id: row.id,
+    name: row.name,
+    initials: row.initials,
+    color: row.color,
+    role: row.role,
+    costPerDay: row.cost_per_day ?? DEFAULT_COST_PER_DAY,
+  };
+}
+
 function unwrap<T>(res: { data: T | null; error: PostgrestError | null }): T {
   if (res.error) throw new Error(res.error.message);
   if (res.data == null) throw new Error("No data returned from Supabase");
@@ -99,9 +122,10 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
   }
 
   async function listTeam(): Promise<TeamMember[]> {
-    return unwrap(
-      await sb.from("team_members").select("id, name, initials, color, role").order("id"),
-    ) as TeamMember[];
+    const rows = unwrap(
+      await sb.from("team_members").select("id, name, initials, color, role, cost_per_day").order("id"),
+    ) as TeamMemberRow[];
+    return rows.map(rowToTeamMember);
   }
 
   return {
@@ -210,13 +234,26 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
     async addTeamMember(input: NewTeamMemberInput) {
       const existing = unwrap(await sb.from("team_members").select("id")) as { id: number }[];
       const id = Math.max(-1, ...existing.map((m) => m.id)) + 1;
-      const { error } = await sb.from("team_members").insert({ id, ...input });
+      const { error } = await sb.from("team_members").insert({
+        id,
+        name: input.name,
+        initials: input.initials,
+        color: input.color,
+        role: input.role,
+        cost_per_day: Math.max(0, Math.round(input.costPerDay ?? DEFAULT_COST_PER_DAY)),
+      });
       if (error) throw new Error(error.message);
       return listTeam();
     },
 
     async updateTeamMember(id, patch: TeamMemberPatch) {
-      const { error } = await sb.from("team_members").update(patch).eq("id", id);
+      const row: Record<string, unknown> = {};
+      if (patch.name !== undefined) row.name = patch.name;
+      if (patch.initials !== undefined) row.initials = patch.initials;
+      if (patch.color !== undefined) row.color = patch.color;
+      if (patch.role !== undefined) row.role = patch.role;
+      if (patch.costPerDay !== undefined) row.cost_per_day = Math.max(0, Math.round(patch.costPerDay));
+      const { error } = await sb.from("team_members").update(row).eq("id", id);
       if (error) throw new Error(error.message);
       return listTeam();
     },

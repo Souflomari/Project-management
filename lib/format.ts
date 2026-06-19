@@ -90,6 +90,17 @@ export function fmtBudget(k: number): string {
     : `${k.toLocaleString("fr-FR")}${NNBSP}k€`;
 }
 
+/** Format a raw euro amount compactly (k€ / M€), e.g. 184500 → "184,5 k€". */
+export function fmtEur(eur: number): string {
+  const neg = eur < 0;
+  const a = Math.abs(eur);
+  let body: string;
+  if (a >= 1_000_000) body = `${(a / 1_000_000).toFixed(2).replace(".", ",")}${NNBSP}M€`;
+  else if (a >= 1000) body = `${(a / 1000).toFixed(1).replace(".", ",")}${NNBSP}k€`;
+  else body = `${Math.round(a).toLocaleString("fr-FR")}${NNBSP}€`;
+  return neg ? `−${body}` : body;
+}
+
 // ----------------------------------------------------------- working days
 
 export function isWeekday(d: Date): boolean {

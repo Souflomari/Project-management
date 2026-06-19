@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef } from "react";
 
 import { FilterBar } from "../filter-bar";
 import { CaretDownIcon } from "../icons";
@@ -37,8 +37,7 @@ function compare(a: DerivedProject, b: DerivedProject, key: SortKey): number {
 }
 
 export function ProjectsTable() {
-  const { filtered, searched, team, openProject, openAdd, bulkSetStatus, bulkAdvancePhase, bulkSetResponsable, tableSort, setTableSort } = useProjects();
-  const [sel, setSel] = useState<Set<number>>(new Set());
+  const { filtered, searched, team, openProject, openAdd, bulkSetStatus, bulkAdvancePhase, bulkSetResponsable, tableSort, setTableSort, selectedIds: sel, toggleSelected, selectAll, clearSelected } = useProjects();
 
   const sort = tableSort;
   const rows = useMemo(
@@ -48,11 +47,26 @@ export function ProjectsTable() {
   const toggleSort = (key: SortKey) =>
     setTableSort(sort && sort.key === key ? { key, dir: sort.dir === 1 ? -1 : 1 } : { key, dir: 1 });
 
+  // Selection (store-backed). Bulk actions operate on the *visible* rows only.
   const selectedIds = rows.filter((r) => sel.has(r.id)).map((r) => r.id);
-  const allOn = rows.length > 0 && selectedIds.length === rows.length;
-  const toggleOne = (id: number) => setSel((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleAll = () => setSel(allOn ? new Set() : new Set(rows.map((r) => r.id)));
-  const clearSel = () => setSel(new Set());
+  const allOn = rows.length > 0 && rows.every((r) => sel.has(r.id));
+  const lastClicked = useRef<number | null>(null);
+  const clearSel = clearSelected;
+  const toggleOne = (id: number) => { toggleSelected(id); lastClicked.current = id; };
+  // Shift-click selects the contiguous range between the last clicked row and this one.
+  const rangeSelect = (id: number) => {
+    const ids = rows.map((r) => r.id);
+    const anchor = lastClicked.current;
+    const from = anchor != null ? ids.indexOf(anchor) : -1;
+    const to = ids.indexOf(id);
+    if (from === -1 || to === -1) { toggleOne(id); return; }
+    const [lo, hi] = from < to ? [from, to] : [to, from];
+    const next = new Set(sel);
+    for (let i = lo; i <= hi; i++) next.add(ids[i]);
+    selectAll([...next]);
+    lastClicked.current = id;
+  };
+  const toggleAll = () => (allOn ? clearSel() : selectAll(rows.map((r) => r.id)));
 
   return (
     <>
@@ -119,7 +133,15 @@ export function ProjectsTable() {
               className="row-hover row-focus"
               style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", minHeight: 58, padding: "10px 18px", borderTop: `1px solid ${C.line}`, cursor: "pointer", background: on ? C.brand50 : undefined }}
             >
-              <Checkbox checked={on} onChange={() => toggleOne(p.id)} label={`Sélectionner ${p.name}`} />
+              <span
+                onClickCapture={(e) => {
+                  // Shift-click range select: intercept before Checkbox toggles.
+                  if (e.shiftKey) { e.preventDefault(); e.stopPropagation(); rangeSelect(p.id); }
+                }}
+                style={{ display: "inline-flex" }}
+              >
+                <Checkbox checked={on} onChange={() => toggleOne(p.id)} label={`Sélectionner ${p.name}`} />
+              </span>
 
               <div style={{ minWidth: 0 }}>
                 <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>

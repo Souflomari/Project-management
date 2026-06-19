@@ -18,6 +18,9 @@ import type {
   TeamMemberPatch,
 } from "./repository";
 
+/** Fallback daily rate (€) when a new member is created without one. */
+const DEFAULT_COST_PER_DAY = 700;
+
 let projects: Project[] = buildSampleProjects();
 let team: TeamMember[] = buildSampleTeam();
 
@@ -133,7 +136,7 @@ export const sampleRepository: ProjectRepository = {
 
   async addTeamMember(input: NewTeamMemberInput) {
     const id = Math.max(-1, ...team.map((m) => m.id)) + 1;
-    team = [...team, { id, ...input }];
+    team = [...team, { id, ...input, costPerDay: Math.max(0, Math.round(input.costPerDay ?? DEFAULT_COST_PER_DAY)) }];
     return team.map(clone);
   },
 

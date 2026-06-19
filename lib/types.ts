@@ -25,6 +25,8 @@ export interface TeamMember {
   initials: string;
   color: string;
   role: string;
+  /** Loaded daily rate — euros per working day (drives budget / earned value). */
+  costPerDay: number;
 }
 
 /**
@@ -88,4 +90,6 @@ export interface NewTeamMemberInput {
   initials: string;
   color: string;
   role: string;
+  /** Loaded daily rate — euros per working day. Defaults applied by the repo. */
+  costPerDay?: number;
 }

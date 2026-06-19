@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
 
 import { CaretDownIcon, CheckIcon, CloseIcon } from "./icons";
-import { C, num, PHASE_COLORS, R, SH, TX } from "@/lib/tokens";
+import { C, ELEV, num, PHASE_COLORS, R, SH, SP, SURFACE, TX } from "@/lib/tokens";
 import { PHASES, PHASES_FULL } from "@/lib/types";
 
 /** Make a clickable row keyboard-operable (WCAG 2.1.1). Spread onto the row;
@@ -332,15 +332,25 @@ export function Segmented<T extends string>({
 export function Card({
   children,
   padding = "18px 20px",
+  elevation = 0,
+  radius = R.lg,
   style,
 }: {
   children: ReactNode;
   padding?: number | string;
+  /** Tonal lift via the M3 ELEV ramp (tone-first, whisper of shadow). 0 = flat
+   *  white card resting on the canvas; raise the hero, not every tile. */
+  elevation?: 0 | 1 | 2 | 3;
+  radius?: number;
   style?: CSSProperties;
 }) {
   // Surfaces rest with a soft border and no shadow (structure, not noise).
+  // When elevated, ELEV supplies a deeper tone (the lift), the border stays —
+  // border-first identity preserved, no shadow soup.
+  const lift = elevation > 0 ? ELEV[elevation] : null;
+  const border = elevation > 0 ? `1px solid ${C.lineStrong}` : `1px solid ${C.line}`;
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, padding, ...style }}>
+    <div style={{ background: C.surface, border, borderRadius: radius, padding, ...lift, ...style }}>
       {children}
     </div>
   );
@@ -392,12 +402,57 @@ export function SectionHeader({
 
 // ───────────────────────────────────────── EmptyState
 
-export function EmptyState({ title, hint }: { title: string; hint?: string }) {
+/** Illustrated empty state: a tonal disc framing a line icon, then title / hint
+ *  / optional action. Falls back to a neutral inbox glyph when no icon is given,
+ *  so existing title/hint-only call sites still render with the new warmth. */
+export function EmptyState({
+  title,
+  hint,
+  icon,
+  action,
+  compact,
+}: {
+  title: string;
+  hint?: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+  compact?: boolean;
+}) {
+  const disc = compact ? 40 : 52;
   return (
-    <div style={{ textAlign: "center", padding: "28px 16px", color: C.ink500 }}>
+    <div style={{ textAlign: "center", padding: compact ? `${SP[6]}px ${SP[5]}px` : `${SP[8]}px ${SP[5]}px`, color: C.ink500 }}>
+      <div
+        aria-hidden
+        style={{
+          width: disc,
+          height: disc,
+          borderRadius: "50%",
+          background: SURFACE.containerHigh,
+          border: `1px solid ${C.line}`,
+          color: C.ink400,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: SP[4],
+        }}
+      >
+        {icon ?? <EmptyGlyph size={compact ? 20 : 24} />}
+      </div>
       <div style={{ ...TX.bodyStrong, color: C.ink700 }}>{title}</div>
-      {hint ? <div style={{ ...TX.caption, color: C.ink400, marginTop: 4 }}>{hint}</div> : null}
+      {hint ? <div style={{ ...TX.caption, color: C.ink400, marginTop: SP[2], maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>{hint}</div> : null}
+      {action ? <div style={{ marginTop: SP[5], display: "flex", justifyContent: "center" }}>{action}</div> : null}
     </div>
+  );
+}
+
+/** Neutral default glyph for EmptyState (an empty tray) — line style to match
+ *  the icon set, currentColor so it inherits the tonal disc's muted ink. */
+function EmptyGlyph({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 13l2.2-7.2A2 2 0 0 1 8.1 4.4h7.8a2 2 0 0 1 1.9 1.4L20 13" />
+      <path d="M4 13h4l1.2 2.2h5.6L16 13h4v5.2a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 18.2Z" />
+    </svg>
   );
 }
 
@@ -593,8 +648,32 @@ export function ProgressBar({
   );
 }
 
-/** Compact trend line. Scales to its container width; non-scaling stroke. */
-export function Sparkline({ values, height = 30, color = C.brand, fill = true }: { values: number[]; height?: number; color?: string; fill?: boolean }) {
+let sparkSeq = 0;
+
+/** Compact trend line. Scales to its container width; non-scaling stroke.
+ *  `gradient` swaps the flat-opacity area for a vertical <linearGradient> fade;
+ *  `endLabel` prints the last value beside the endpoint dot (non-colour-only
+ *  legibility — the figure is always readable without relying on hue). */
+export function Sparkline({
+  values,
+  height = 30,
+  color = C.brand,
+  fill = true,
+  gradient = false,
+  endLabel,
+}: {
+  values: number[];
+  height?: number;
+  color?: string;
+  fill?: boolean;
+  gradient?: boolean;
+  endLabel?: string;
+}) {
+  // Stable id per instance (SSR-safe: assigned once at module scope counter).
+  const gidRef = useRef<string | null>(null);
+  if (!gidRef.current) gidRef.current = `spark-grad-${sparkSeq++}`;
+  const gid = gidRef.current;
+
   if (values.length < 2) return null;
   const W = 100;
   const min = Math.min(...values);
@@ -604,11 +683,111 @@ export function Sparkline({ values, height = 30, color = C.brand, fill = true }:
   const y = (v: number) => height - 3 - ((v - min) / range) * (height - 6);
   const line = values.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ");
   const area = `0,${height} ${line} ${W},${height}`;
+  const lastX = x(values.length - 1);
+  const lastY = y(values[values.length - 1]);
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" style={{ display: "block", overflow: "visible" }}>
-      {fill ? <polygon points={area} fill={color} opacity={0.08} /> : null}
-      <polyline points={line} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r={2.4} fill={color} vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div style={{ position: "relative" }}>
+      <svg width="100%" height={height} viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" style={{ display: "block", overflow: "visible" }}>
+        {gradient ? (
+          <defs>
+            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+        ) : null}
+        {fill ? <polygon points={area} fill={gradient ? `url(#${gid})` : color} opacity={gradient ? 1 : 0.08} /> : null}
+        <polyline points={line} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        <circle cx={lastX} cy={lastY} r={2.4} fill={color} stroke="#fff" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      </svg>
+      {endLabel ? (
+        <span
+          style={{
+            position: "absolute",
+            right: 0,
+            top: `${(lastY / height) * 100}%`,
+            transform: "translateY(-50%)",
+            marginTop: -1,
+            ...num(13),
+            fontSize: 12,
+            color,
+            background: "#fff",
+            padding: "0 2px",
+            borderRadius: R.xxs,
+            pointerEvents: "none",
+          }}
+        >
+          {endLabel}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────── Gauge (radial health arc)
+
+/** Radial health gauge — a 270° arc on a tonal track with a coloured progress
+ *  sweep and a tabular figure at its centre. Tone + value carry the reading; the
+ *  hue (governed green→amber→terracotta ramp via the caller) is reinforcement,
+ *  never the only signal. Reduced-motion-safe (CSS transition only; honoured by
+ *  the global prefers-reduced-motion rule, and the value can be pre-counted). */
+export function Gauge({
+  value,
+  max = 100,
+  size = 132,
+  thickness = 11,
+  color = C.brand,
+  label,
+  sublabel,
+}: {
+  value: number;
+  max?: number;
+  size?: number;
+  thickness?: number;
+  color?: string;
+  label?: ReactNode;
+  sublabel?: ReactNode;
+}) {
+  const pct = Math.min(1, Math.max(0, value / max));
+  const r = (size - thickness) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const SWEEP = 270; // degrees of visible arc
+  const GAP = (360 - SWEEP) / 2; // bottom gap, centred
+  const circ = 2 * Math.PI * r;
+  const arcLen = (SWEEP / 360) * circ;
+  const dash = `${arcLen} ${circ}`;
+  // rotate so the gap sits at the bottom: start at 90° + GAP
+  const rot = 90 + GAP;
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", transform: `rotate(${rot}deg)` }}>
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={SURFACE.containerHighest}
+          strokeWidth={thickness}
+          strokeLinecap="round"
+          strokeDasharray={dash}
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={thickness}
+          strokeLinecap="round"
+          strokeDasharray={`${arcLen * pct} ${circ}`}
+          style={{ transition: "stroke-dasharray .6s cubic-bezier(.2,0,0,1), stroke .3s" }}
+        />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
+        {label}
+        {sublabel}
+      </div>
+    </div>
   );
 }

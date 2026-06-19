@@ -73,6 +73,7 @@ interface ProjectsContextValue {
   tableSort: TableSort | null;
   savedViews: SavedView[];
   selectedId: number | null;
+  selectedIds: Set<number>;
   showAdd: boolean;
   newName: string;
   newClient: string;
@@ -95,6 +96,9 @@ interface ProjectsContextValue {
   saveView: (name: string) => void;
   applyView: (v: SavedView) => void;
   deleteView: (id: string) => void;
+  toggleSelected: (id: number) => void;
+  selectAll: (ids: number[]) => void;
+  clearSelected: () => void;
   openProject: (id: number) => void;
   closeDrawer: () => void;
   openAdd: () => void;
@@ -168,6 +172,7 @@ export function ProjectsProvider({
   const [tableSort, setTableSort] = useState<TableSort | null>(null);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
   const [newClient, setNewClient] = useState("");
@@ -443,7 +448,27 @@ export function ProjectsProvider({
   useEffect(() => {
     try {
       const raw = localStorage.getItem(VIEWS_KEY);
-      if (raw) setSavedViews(JSON.parse(raw));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Tolerate old / partial shapes: coerce each entry, drop anything unusable.
+        if (Array.isArray(parsed)) {
+          const norm: SavedView[] = parsed
+            .filter((v): v is Record<string, unknown> => v != null && typeof v === "object")
+            .map((v, i) => ({
+              id: typeof v.id === "string" ? v.id : `${Date.now()}-${i}`,
+              name: typeof v.name === "string" && v.name.trim() ? v.name : "Vue",
+              filter: (v.filter === "all" || (STATUSES as readonly string[]).includes(v.filter as string)) ? (v.filter as FilterKey) : "all",
+              search: typeof v.search === "string" ? v.search : "",
+              respFilter: typeof v.respFilter === "number" ? v.respFilter : null,
+              phaseFilter: typeof v.phaseFilter === "number" ? v.phaseFilter : null,
+              tableSort:
+                v.tableSort && typeof v.tableSort === "object" && typeof (v.tableSort as TableSort).key === "string"
+                  ? { key: (v.tableSort as TableSort).key, dir: (v.tableSort as TableSort).dir === -1 ? -1 : 1 }
+                  : null,
+            }));
+          setSavedViews(norm);
+        }
+      }
     } catch {}
     const sp = new URLSearchParams(window.location.search);
     const st = sp.get("statut");
@@ -470,6 +495,13 @@ export function ProjectsProvider({
     const qs = sp.toString();
     window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   }, [filter, search, respFilter, phaseFilter, tableSort, selectedId]);
+
+  // ---- cross-view selection (store-backed so it survives navigation) ----
+  const toggleSelected = useCallback((id: number) => {
+    setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }, []);
+  const selectAll = useCallback((ids: number[]) => setSelectedIds(new Set(ids)), []);
+  const clearSelected = useCallback(() => setSelectedIds(new Set()), []);
 
   // ---- ui actions ----
   const openProject = useCallback((id: number) => setSelectedId(id), []);
@@ -535,6 +567,7 @@ export function ProjectsProvider({
     search,
     filter,
     selectedId,
+    selectedIds,
     showAdd,
     newName,
     newClient,
@@ -558,6 +591,9 @@ export function ProjectsProvider({
     saveView,
     applyView,
     deleteView,
+    toggleSelected,
+    selectAll,
+    clearSelected,
     openProject,
     closeDrawer,
     openAdd,

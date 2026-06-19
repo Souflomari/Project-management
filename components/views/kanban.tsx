@@ -18,10 +18,15 @@ const numTab: React.CSSProperties = { fontVariantNumeric: "tabular-nums" };
 export function Kanban() {
   const { filtered, setPhase, openProject } = useProjects();
   const columns = useMemo(() => buildKanban(filtered), [filtered]);
-  const dragId = useRef<number | null>(null);
   const [overPhase, setOverPhase] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+
+  // Pointer-event drag (works on touch AND mouse; HTML5 DnD is dead on touch).
+  // We track the dragged card + the column under the pointer via a data-attr,
+  // resolved with elementFromPoint on each move. A movement threshold lets a
+  // plain tap still open the project.
+  const drag = useRef<{ id: number; startX: number; startY: number; moved: boolean; phase: number | null } | null>(null);
 
   const toggleCollapse = (i: number) =>
     setCollapsed((prev) => {
@@ -30,11 +35,45 @@ export function Kanban() {
       return next;
     });
 
-  const dropHandlers = (phaseIndex: number) => ({
-    onDragOver: (e: React.DragEvent) => { e.preventDefault(); if (overPhase !== phaseIndex) setOverPhase(phaseIndex); },
-    onDrop: (e: React.DragEvent) => {
-      e.preventDefault();
-      if (dragId.current != null) { setPhase(dragId.current, phaseIndex); dragId.current = null; }
+  /** Phase index of the kanban column under a viewport point, or null. */
+  function phaseAtPoint(x: number, y: number): number | null {
+    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-kanban-phase]");
+    if (!el) return null;
+    const v = Number(el.dataset.kanbanPhase);
+    return Number.isNaN(v) ? null : v;
+  }
+
+  const cardHandlers = (cardId: number) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.button != null && e.button !== 0) return;
+      drag.current = { id: cardId, startX: e.clientX, startY: e.clientY, moved: false, phase: null };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const d = drag.current;
+      if (!d || d.id !== cardId) return;
+      if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 5) return;
+      if (!d.moved) { d.moved = true; setDraggingId(cardId); }
+      const phase = phaseAtPoint(e.clientX, e.clientY);
+      d.phase = phase;
+      setOverPhase(phase);
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      const d = drag.current;
+      drag.current = null;
+      if (!d || d.id !== cardId) return;
+      if (d.moved) {
+        const phase = phaseAtPoint(e.clientX, e.clientY) ?? d.phase;
+        if (phase != null) setPhase(cardId, phase);
+      } else {
+        openProject(cardId);
+      }
+      setDraggingId(null);
+      setOverPhase(null);
+    },
+    onPointerCancel: () => {
+      drag.current = null;
+      setDraggingId(null);
       setOverPhase(null);
     },
   });
@@ -56,7 +95,7 @@ export function Kanban() {
             return (
               <div
                 key={col.phaseIndex}
-                {...dropHandlers(col.phaseIndex)}
+                data-kanban-phase={col.phaseIndex}
                 onClick={() => toggleCollapse(col.phaseIndex)}
                 title={`${col.full} — déplier`}
                 style={{ width: 46, flexShrink: 0, background: SV.containerHigh, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer", transition: "box-shadow .12s ease" }}
@@ -71,8 +110,8 @@ export function Kanban() {
           return (
             <div
               key={col.phaseIndex}
-              {...dropHandlers(col.phaseIndex)}
-              style={{ width: 256, flexShrink: 0, background: SV.containerHigh, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 230px)", transition: "box-shadow .12s ease" }}
+              data-kanban-phase={col.phaseIndex}
+              style={{ width: 256, flexShrink: 0, background: SV.containerHigh, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", maxHeight: "calc(100dvh - 230px)", transition: "box-shadow .12s ease" }}
             >
               <div style={{ padding: "11px 12px 9px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -97,12 +136,9 @@ export function Kanban() {
                 {col.cards.map((c) => (
                   <div
                     key={c.id}
-                    draggable
-                    onDragStart={(e) => { dragId.current = c.id; setDraggingId(c.id); e.dataTransfer.effectAllowed = "move"; }}
-                    onDragEnd={() => { dragId.current = null; setDraggingId(null); setOverPhase(null); }}
-                    onClick={() => openProject(c.id)}
+                    {...cardHandlers(c.id)}
                     className="lift-hover"
-                    style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "11px 12px", cursor: "grab", opacity: draggingId === c.id ? 0.4 : 1, boxShadow: draggingId === c.id ? SH.md : undefined, transition: "opacity .12s ease" }}
+                    style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "11px 12px", cursor: "grab", touchAction: "none", opacity: draggingId === c.id ? 0.4 : 1, boxShadow: draggingId === c.id ? SH.md : undefined, transition: "opacity .12s ease" }}
                   >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                       <div style={{ ...TX.bodyStrong, lineHeight: 1.3, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.name}</div>

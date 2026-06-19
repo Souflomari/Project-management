@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { C, R, SH, TX } from "@/lib/tokens";
+import { C, R, SH, SP, SURFACE, TX } from "@/lib/tokens";
 
 export default function LoginPage() {
   const configured = isSupabaseConfigured();
@@ -43,10 +43,21 @@ export default function LoginPage() {
     >
       <div
         style={{
-          width: 380,
+          // faint tonal panel framing the card for warmth (tone, not shadow)
+          background: SURFACE.containerLow,
+          border: `1px solid ${C.line}`,
+          borderRadius: R.xxl,
+          padding: SP[5],
+          width: 380 + SP[5] * 2,
+          maxWidth: "100%",
+        }}
+      >
+      <div
+        style={{
+          width: "100%",
           maxWidth: "100%",
           background: C.surface,
-          border: `1px solid ${C.line}`,
+          border: `1px solid ${C.lineStrong}`,
           borderRadius: R.lg,
           padding: "30px 30px 26px",
           boxShadow: SH.lg,
@@ -103,6 +114,7 @@ export default function LoginPage() {
             </Button>
           </form>
         )}
+      </div>
       </div>
     </div>
   );

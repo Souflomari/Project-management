@@ -33,8 +33,9 @@ export function CalendarView() {
   const { allDerived, calMode, calAnchor, calProjectFilter, setCalMode, calPrev, calNext, calToday, setCalProjectFilter, openProject, updateSubtask } =
     useProjects();
 
-  const dragged = useRef<TaskEvent | null>(null);
   const [pending, setPending] = useState<PendingMove | null>(null);
+  // ISO of the day cell currently under a touch/mouse drag (drop-target highlight).
+  const [overISO, setOverISO] = useState<string | null>(null);
 
   const events = useMemo(() => {
     const projects = calProjectFilter === null ? allDerived : allDerived.filter((p) => p.id === calProjectFilter);
@@ -45,16 +46,52 @@ export function CalendarView() {
   const month = anchor.getMonth();
   const label = calMode === "semaine" ? weekLabel(calAnchor) : `${MONS_LONG[month]} ${year}`;
 
-  const dnd = {
-    onStart: (e: TaskEvent) => { dragged.current = e; },
-    onDrop: (dateISO: string) => {
-      const e = dragged.current;
-      dragged.current = null;
-      // Deadlines fall on working days only; snap a weekend drop to the nearest
-      // weekday so the chip lands where the modal says it will (not the prev Fri).
-      const target = snapToWeekday(dateISO);
-      if (e && e.date !== target) setPending({ event: e, date: target });
+  // Pointer-event drag (works on touch AND mouse; HTML5 DnD is dead on touch).
+  // The chip captures the pointer; day cells expose data-cal-iso, resolved with
+  // elementFromPoint on each move. A movement threshold keeps a tap = open.
+  const drag = useRef<{ event: TaskEvent; startX: number; startY: number; moved: boolean; iso: string | null } | null>(null);
+
+  function isoAtPoint(x: number, y: number): string | null {
+    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-cal-iso]");
+    return el?.dataset.calIso ?? null;
+  }
+
+  function commitDrop(dateISO: string | null, e: TaskEvent) {
+    if (!dateISO) return;
+    // Deadlines fall on working days only; snap a weekend drop to the nearest
+    // weekday so the chip lands where the modal says it will (not the prev Fri).
+    const target = snapToWeekday(dateISO);
+    if (e.date !== target) setPending({ event: e, date: target });
+  }
+
+  const dnd: Dnd = {
+    onStart: (e, ev, onOpen) => {
+      drag.current = { event: e, startX: ev.clientX, startY: ev.clientY, moved: false, iso: null };
+      (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
     },
+    onMove: (ev) => {
+      const d = drag.current;
+      if (!d) return;
+      if (!d.moved && Math.hypot(ev.clientX - d.startX, ev.clientY - d.startY) < 5) return;
+      d.moved = true;
+      const iso = isoAtPoint(ev.clientX, ev.clientY);
+      d.iso = iso;
+      setOverISO(iso);
+    },
+    onUp: (ev, onOpen) => {
+      const d = drag.current;
+      drag.current = null;
+      setOverISO(null);
+      if (!d) return;
+      if (d.moved) {
+        const iso = isoAtPoint(ev.clientX, ev.clientY) ?? d.iso;
+        commitDrop(iso, d.event);
+      } else {
+        onOpen(d.event.projectId);
+      }
+    },
+    onCancel: () => { drag.current = null; setOverISO(null); },
+    overISO,
   };
 
   function confirmMove() {
@@ -130,8 +167,12 @@ export function CalendarView() {
 }
 
 interface Dnd {
-  onStart: (e: TaskEvent) => void;
-  onDrop: (dateISO: string) => void;
+  onStart: (e: TaskEvent, ev: React.PointerEvent, onOpen: (id: number) => void) => void;
+  onMove: (ev: React.PointerEvent) => void;
+  onUp: (ev: React.PointerEvent, onOpen: (id: number) => void) => void;
+  onCancel: () => void;
+  /** ISO of the day cell under the active drag (drop-target highlight). */
+  overISO: string | null;
 }
 
 function weekLabel(iso: string): string {
@@ -144,16 +185,17 @@ function weekLabel(iso: string): string {
 function EventChip({ e, onOpen, dnd, compact }: { e: TaskEvent; onOpen: (id: number) => void; dnd: Dnd; compact?: boolean }) {
   return (
     <div
-      draggable
-      onDragStart={() => dnd.onStart(e)}
-      onClick={(ev) => { ev.stopPropagation(); onOpen(e.projectId); }}
+      onPointerDown={(ev) => { if (ev.button != null && ev.button !== 0) return; ev.stopPropagation(); dnd.onStart(e, ev, onOpen); }}
+      onPointerMove={(ev) => dnd.onMove(ev)}
+      onPointerUp={(ev) => { ev.stopPropagation(); dnd.onUp(ev, onOpen); }}
+      onPointerCancel={dnd.onCancel}
       title={`${e.projectName} — ${e.taskName} (${PHASES[e.phaseIndex]})`}
       role="button"
       tabIndex={0}
       aria-label={`${e.projectName} — ${e.taskName}`}
       onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onOpen(e.projectId); } }}
       className="cal-chip"
-      style={{ background: C.subtle, borderLeft: `3px solid ${e.color}`, borderRadius: 4, padding: "3px 7px", cursor: "pointer", overflow: "hidden" }}
+      style={{ background: C.subtle, borderLeft: `3px solid ${e.color}`, borderRadius: 4, padding: "3px 7px", cursor: "grab", touchAction: "none", overflow: "hidden" }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
         <div style={{ flex: 1, fontSize: 11, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
@@ -165,12 +207,10 @@ function EventChip({ e, onOpen, dnd, compact }: { e: TaskEvent; onOpen: (id: num
 }
 
 function DayCell({ iso, dnd, children, style }: { iso: string; dnd: Dnd; children: React.ReactNode; style: React.CSSProperties }) {
-  const [over, setOver] = useState(false);
+  const over = dnd.overISO === iso;
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); if (!over) setOver(true); }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); dnd.onDrop(iso); }}
+      data-cal-iso={iso}
       style={{ ...style, ...(over ? { boxShadow: `inset 0 0 0 2px ${C.brand}`, background: C.brand50 } : null) }}
     >
       {children}
