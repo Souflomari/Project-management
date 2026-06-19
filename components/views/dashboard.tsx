@@ -3,20 +3,23 @@
 import { useRouter } from "next/navigation";
 
 import { FlagIcon } from "../icons";
-import { Card, ProgressBar, rowProps, Sparkline, StatusPill } from "../ui";
-import { buildHistory, computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
+import { Card, rowProps, Sparkline, StatusPill } from "../ui";
+import { buildHistory, buildKanban, computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
 import { WEEK_SHORT } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, num, R, STATUS_META, TX } from "@/lib/tokens";
+import { C, num, PHASE_COLORS, R, STATUS_META, TX } from "@/lib/tokens";
 
 const STALE_DAYS = 90;
 
 export function Dashboard() {
-  const { allDerived, openProject, setFilter, setCalMode } = useProjects();
+  const { allDerived, openProject, setFilter, setCalMode, setPhaseFilter } = useProjects();
   const router = useRouter();
 
   const goProjects = (f: "all" | "en retard" | "à risque" | "à jour" | "terminé") => { setFilter(f); router.push("/projets"); };
   const goWeek = () => { setCalMode("semaine"); router.push("/calendrier"); };
+  const goPhase = (i: number) => { setPhaseFilter(i); router.push("/projets"); };
+
+  const phaseCols = buildKanban(allDerived);
 
   const kpis = computeKpis(allDerived);
   const dist = statusDistribution(allDerived);
@@ -51,11 +54,11 @@ export function Dashboard() {
 
   return (
     <>
-      <div className="dash-top" style={{ marginBottom: 20 }}>
-        {/* portfolio-health hero (spans both rows) */}
-        <div className="dash-hero">
+      <div className="bento">
+        {/* portfolio-health hero — the 2x2 anchor tile */}
+        <div className="b-hero">
           <Card padding="18px 20px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-            <div style={{ ...TX.overline, color: C.ink400 }}>Santé du portefeuille</div>
+            <div style={{ ...TX.eyebrow, color: C.ink400 }}>Santé du portefeuille</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
               <span style={{ ...num(46), color: healthColor }}>{health}</span>
               <span style={{ ...num(18), color: C.ink400 }}>/ 100</span>
@@ -98,14 +101,15 @@ export function Dashboard() {
           </Card>
         </div>
 
-        <Kpi title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} accent={kpis.late > 0 ? STATUS_META["en retard"].color : undefined} onClick={kpis.late > 0 ? goLate : undefined} />
-        <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} delta={rendusDelta} onClick={goWeek} />
-        <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} onClick={() => goProjects("all")} />
-        <Kpi title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} onClick={() => goProjects("all")} />
-      </div>
+        <Kpi className="b-late" title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} accent={kpis.late > 0 ? STATUS_META["en retard"].color : undefined} onClick={kpis.late > 0 ? goLate : undefined} />
+        <Kpi className="b-rendus7" title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} delta={rendusDelta} onClick={goWeek} />
+        <Kpi className="b-active" title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} onClick={() => goProjects("all")} />
+        <Kpi className="b-budget" title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} onClick={() => goProjects("all")} />
 
-      <div className="dash-bottom" style={{ alignItems: "start" }}>
-        <Card padding="6px 20px 14px">
+        <PhaseStrip className="b-phase" columns={phaseCols} total={allDerived.length} onPhase={goPhase} />
+
+        <div className="b-upcoming">
+        <Card padding="6px 20px 14px" style={{ height: "100%" }}>
           <h2 style={{ ...TX.h2, margin: "14px 0 6px", display: "flex", alignItems: "baseline", gap: 8 }}>
             Prochains rendus <span style={{ ...num(13), color: C.ink400 }}>{upcoming.length}</span>
           </h2>
@@ -142,8 +146,10 @@ export function Dashboard() {
             </div>
           ) : null}
         </Card>
+        </div>
 
-        <Card padding="6px 20px 14px">
+        <div className="b-vigilance">
+        <Card padding="6px 20px 14px" style={{ height: "100%" }}>
           <h2 style={{ ...TX.h2, margin: "14px 0 6px", display: "flex", alignItems: "baseline", gap: 8 }}>
             Points de vigilance <span style={{ ...num(13), color: C.ink400 }}>{alerts.length}</span>
           </h2>
@@ -169,6 +175,7 @@ export function Dashboard() {
             </div>
           ))}
         </Card>
+        </div>
       </div>
     </>
   );
@@ -186,16 +193,56 @@ function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: 
   );
 }
 
-function Kpi({ title, value, sub, color, accent, delta, onClick }: { title: string; value: string | number; sub: string; color?: string; accent?: string; delta?: number; onClick?: () => void }) {
+function Kpi({ title, value, sub, color, accent, delta, onClick, className }: { title: string; value: string | number; sub: string; color?: string; accent?: string; delta?: number; onClick?: () => void; className?: string }) {
+  const cls = [className, onClick ? "lift-hover row-focus" : ""].filter(Boolean).join(" ") || undefined;
   return (
-    <div {...(onClick ? { ...rowProps(onClick), className: "lift-hover row-focus" } : {})} style={onClick ? { borderRadius: R.lg, cursor: "pointer" } : undefined}>
-      <Card padding="16px 18px" style={accent ? { borderTop: `2px solid ${accent}` } : undefined}>
-        <div style={{ ...TX.overline, color: C.ink400 }}>{title}</div>
+    <div className={cls} {...(onClick ? rowProps(onClick) : {})} style={{ borderRadius: R.lg, ...(onClick ? { cursor: "pointer" } : {}) }}>
+      <Card padding="16px 18px" style={{ height: "100%", ...(accent ? { borderTop: `2px solid ${accent}` } : {}) }}>
+        <div style={{ ...TX.eyebrow, color: C.ink400 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
-          <span style={{ ...num(34), color: color ?? C.ink900 }}>{value}</span>
+          <span style={{ ...num(36), color: color ?? C.ink900 }}>{value}</span>
           {delta !== undefined ? <Delta v={delta} /> : null}
         </div>
-        <div style={{ fontSize: 11.5, color: C.ink400, marginTop: 7 }}>{sub}</div>
+        <div style={{ ...TX.nano, color: C.ink400, marginTop: 7 }}>{sub}</div>
+      </Card>
+    </div>
+  );
+}
+
+/** Full-width phase-distribution strip — a stacked bar segmented by study phase,
+ *  echoing the hero's status bar. Each segment filters Projets by that phase. */
+function PhaseStrip({ className, columns, total, onPhase }: { className?: string; columns: { phaseIndex: number; label: string; full: string; count: number }[]; total: number; onPhase: (i: number) => void }) {
+  const denom = Math.max(1, total);
+  return (
+    <div className={className}>
+      <Card padding="14px 18px" style={{ height: "100%" }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ ...TX.eyebrow, color: C.ink400 }}>Répartition par phase</div>
+          <div style={{ ...TX.nano, color: C.ink400 }}>{total} projets</div>
+        </div>
+        <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 12, background: C.subtle }}>
+          {columns.map((c) =>
+            c.count > 0 ? (
+              <button
+                key={c.phaseIndex}
+                onClick={() => onPhase(c.phaseIndex)}
+                title={`${c.full} · ${c.count} — filtrer`}
+                aria-label={`Filtrer : ${c.full}`}
+                style={{ width: `${(c.count / denom) * 100}%`, background: PHASE_COLORS[c.phaseIndex], border: "none", padding: 0, cursor: "pointer" }}
+              />
+            ) : null,
+          )}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 12 }}>
+          {columns.map((c) =>
+            c.count > 0 ? (
+              <button key={c.phaseIndex} onClick={() => onPhase(c.phaseIndex)} className="soft-hover" title={c.full} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
+                <span style={{ width: 8, height: 8, borderRadius: R.xs, background: PHASE_COLORS[c.phaseIndex], flexShrink: 0 }} />
+                {c.label} <span style={{ ...num(13), color: C.ink900 }}>{c.count}</span>
+              </button>
+            ) : null,
+          )}
+        </div>
       </Card>
     </div>
   );
