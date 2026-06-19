@@ -1,19 +1,55 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { PlusIcon, SearchIcon } from "./icons";
 import { Button } from "./ui";
 import { openCommandPalette } from "./command-palette";
-import { navItemForPath } from "@/lib/nav";
+import { isWorkspacePath, navItemForPath, WORKSPACE_VIEWS } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, R, SH, TX } from "@/lib/tokens";
+
+/** Segmented links switching the lens of the Projets workspace. */
+function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
+  return (
+    <div role="tablist" aria-label="Vue des projets" className="ws-switcher" style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3 }}>
+      {WORKSPACE_VIEWS.map((v) => {
+        const active = v.key === activeKey;
+        return (
+          <Link
+            key={v.key}
+            href={v.href}
+            role="tab"
+            aria-selected={active}
+            style={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              padding: "5px 12px",
+              borderRadius: R.sm,
+              background: active ? C.surface : "transparent",
+              color: active ? C.ink900 : C.ink500,
+              boxShadow: active ? SH.sm : "none",
+              transition: "background .12s, color .12s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {v.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 export function Header() {
   const pathname = usePathname();
   const item = navItemForPath(pathname);
+  const inWorkspace = isWorkspacePath(pathname);
+  const isListe = item.key === "projets";
   const { search, setSearch, searched, filtered, openAdd } = useProjects();
+
   const [kbd, setKbd] = useState("⌘K");
   useEffect(() => {
     if (!/Mac|iPhone|iPad/.test(navigator.platform)) setKbd("Ctrl K");
@@ -32,10 +68,8 @@ export function Header() {
     return () => { window.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
   }, []);
 
-  const subtitle =
-    item.key === "projets"
-      ? `${filtered.length} affiché${filtered.length > 1 ? "s" : ""} sur ${searched.length}`
-      : item.sub;
+  const title = inWorkspace ? "Projets" : item.label;
+  const count = `${filtered.length} affiché${filtered.length > 1 ? "s" : ""} sur ${searched.length}`;
 
   return (
     <header
@@ -57,13 +91,14 @@ export function Header() {
         zIndex: 30,
       }}
     >
-      <div style={{ minWidth: 0 }}>
-        <h1 style={{ ...TX.h1, margin: 0 }}>{item.label}</h1>
-        {subtitle ? <div style={{ ...TX.caption, color: C.ink400, marginTop: 3 }}>{subtitle}</div> : null}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
+        <h1 style={{ ...TX.h1, margin: 0, whiteSpace: "nowrap" }}>{title}</h1>
+        {inWorkspace ? <WorkspaceSwitcher activeKey={item.key} /> : null}
+        {isListe ? <span className="header-search" style={{ ...TX.caption, color: C.ink400, whiteSpace: "nowrap" }}>{count}</span> : null}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {item.key === "projets" ? (
+        {isListe ? (
           <div
             className="ui-field header-search"
             style={{

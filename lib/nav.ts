@@ -25,9 +25,35 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "equipe", href: "/equipe", label: "Équipe", sub: "" },
 ];
 
+// The four dataset views are lenses on ONE "Projets" workspace, not separate
+// destinations. The sidebar shows three top-level entries; the workspace's
+// lenses are switched from a header control.
+export const WORKSPACE_KEYS: ViewKey[] = ["projets", "planning", "calendrier", "kanban"];
+
+/** Top-level sidebar entries (the four dataset views collapse under "Projets"). */
+export const SIDEBAR_ITEMS: NavItem[] = NAV_ITEMS.filter((n) => ["dash", "projets", "equipe"].includes(n.key));
+
+/** Lenses of the Projets workspace, for the header view-switcher. */
+export const WORKSPACE_VIEWS: { key: ViewKey; href: string; label: string }[] = [
+  { key: "projets", href: "/projets", label: "Liste" },
+  { key: "planning", href: "/planning", label: "Planning" },
+  { key: "calendrier", href: "/calendrier", label: "Calendrier" },
+  { key: "kanban", href: "/kanban", label: "Kanban" },
+];
+
 export function navItemForPath(pathname: string): NavItem {
   const exact = NAV_ITEMS.find((n) => n.href === pathname);
   if (exact) return exact;
   const match = NAV_ITEMS.find((n) => n.href !== "/" && pathname.startsWith(n.href));
   return match ?? NAV_ITEMS[0];
+}
+
+/** True when the path is one of the Projets workspace lenses. */
+export function isWorkspacePath(pathname: string): boolean {
+  return WORKSPACE_KEYS.includes(navItemForPath(pathname).key);
+}
+
+/** Which top-level sidebar entry should read as active for a path. */
+export function sidebarKeyForPath(pathname: string): ViewKey {
+  return isWorkspacePath(pathname) ? "projets" : navItemForPath(pathname).key;
 }

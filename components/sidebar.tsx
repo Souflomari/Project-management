@@ -6,13 +6,13 @@ import { usePathname } from "next/navigation";
 import { NAV_ICONS } from "./icons";
 import { signOutAction } from "@/app/actions";
 import { WEEK_SHORT } from "@/lib/format";
-import { NAV_ITEMS, navItemForPath } from "@/lib/nav";
+import { SIDEBAR_ITEMS, sidebarKeyForPath } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, FONT_DISPLAY, R } from "@/lib/tokens";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const activeKey = navItemForPath(pathname).key;
+  const activeKey = sidebarKeyForPath(pathname);
   const { serverBacked } = useProjects();
 
   return (
@@ -39,7 +39,7 @@ export function Sidebar() {
       <div className="rail-hide" style={{ fontSize: 11.5, color: C.ink500, fontWeight: 440, padding: "2px 10px 22px" }}>Direction technique</div>
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {NAV_ITEMS.map((item) => {
+        {SIDEBAR_ITEMS.map((item) => {
           const active = item.key === activeKey;
           const Icon = NAV_ICONS[item.key];
           return (

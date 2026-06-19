@@ -453,6 +453,8 @@ export function ProjectsProvider({
     const ph = sp.get("phase"); if (ph != null && ph !== "") setPhaseFilter(Number(ph));
     const tri = sp.get("tri");
     if (tri) { const [k, d] = tri.split("."); if (k) setTableSort({ key: k, dir: d === "-1" ? -1 : 1 }); }
+    const pj = sp.get("projet");
+    if (pj && /^\d+$/.test(pj)) setSelectedId(Number(pj));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -464,9 +466,10 @@ export function ProjectsProvider({
     if (respFilter != null) sp.set("resp", String(respFilter));
     if (phaseFilter != null) sp.set("phase", String(phaseFilter));
     if (tableSort) sp.set("tri", `${tableSort.key}.${tableSort.dir}`);
+    if (selectedId != null) sp.set("projet", String(selectedId));
     const qs = sp.toString();
     window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
-  }, [filter, search, respFilter, phaseFilter, tableSort]);
+  }, [filter, search, respFilter, phaseFilter, tableSort, selectedId]);
 
   // ---- ui actions ----
   const openProject = useCallback((id: number) => setSelectedId(id), []);
