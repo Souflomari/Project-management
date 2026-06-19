@@ -98,8 +98,8 @@ export const sampleRepository: ProjectRepository = {
     const trimmed = text.trim();
     if (!trimmed) return clone(p);
     const comment = {
-      author: "P. Dubois",
-      initials: "PD",
+      author: "Mehrnaz",
+      initials: "ME",
       color: "#2F4A63",
       text: trimmed,
       when: "à l'instant",

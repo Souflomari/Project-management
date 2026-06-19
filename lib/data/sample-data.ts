@@ -8,14 +8,12 @@ import type { Project, Status, Subtask, TeamMember } from "../types";
 // costPerDay = loaded daily rate in € (charge journalière) — seniors/directors
 // command higher rates than engineers, in line with French engineering-firm TJM.
 export const TEAM: TeamMember[] = [
-  { id: 0, name: "C. Mercier", initials: "CM", color: "#15803D", role: "Cheffe de projet senior", costPerDay: 920 },
-  { id: 1, name: "A. Lefèvre", initials: "AL", color: "#2C7A8C", role: "Ingénieur OA", costPerDay: 680 },
-  { id: 2, name: "N. Diallo", initials: "ND", color: "#4C8AA3", role: "Ingénieure hydraulique", costPerDay: 660 },
-  { id: 3, name: "M. Caron", initials: "MC", color: "#B45309", role: "Chef de projet géotech.", costPerDay: 850 },
-  { id: 4, name: "L. Petit", initials: "LP", color: "#B5392E", role: "Ingénieure VRD", costPerDay: 640 },
-  { id: 5, name: "S. Roux", initials: "SR", color: "#3B7179", role: "Chef de projet énergie", costPerDay: 870 },
-  { id: 6, name: "H. Bonnet", initials: "HB", color: "#8A6F5C", role: "Architecte bâtiment", costPerDay: 760 },
-  { id: 7, name: "F. Aubry", initials: "FA", color: "#2F4A63", role: "Directeur ferroviaire", costPerDay: 1150 },
+  { id: 0, name: "Arthur", initials: "AR", color: "#136B33", role: "Responsable technique", costPerDay: 950 },
+  { id: 1, name: "Paul", initials: "PL", color: "#236877", role: "Ingénieur d’affaires", costPerDay: 880 },
+  { id: 2, name: "Arnaud", initials: "AD", color: "#37718A", role: "Ingénieur d’affaires", costPerDay: 720 },
+  { id: 3, name: "Ndeye", initials: "ND", color: "#9A4708", role: "Ingénieure d’affaires", costPerDay: 720 },
+  { id: 4, name: "Soufiane", initials: "SF", color: "#B5392E", role: "Ingénieur d’affaires", costPerDay: 650 },
+  { id: 5, name: "Fabio", initials: "FB", color: "#356A72", role: "Ingénieur d’affaires (externe)", costPerDay: 700 },
 ];
 
 // [name, client, discipline, leadIdx, phaseIndex, progress, status, budget(k€), start, deadline, renduLabel, renduDate]
@@ -41,23 +39,23 @@ const ROWS: Row[] = [
   ["Digue maritime Port-Vendres", "Grand Port Maritime", "Maritime / Hydraulique", 3, 3, 53, "à jour", 375, "2025-07-01", "2026-09-18", "Dossier PRO", "2026-06-30"],
   ["Requalification Bd Sud", "Ville de Nantes", "VRD", 4, 6, 100, "terminé", 285, "2024-06-01", "2026-06-10", "DOE", "2026-06-05"],
   ["Pôle hospitalier Est", "CHU de Bordeaux", "Bâtiment", 5, 5, 81, "à jour", 515, "2024-11-01", "2026-12-15", "Visa exécution", "2026-06-17"],
-  ["LGV Sud-Ouest — Section 3", "SNCF Réseau", "Infrastructure ferroviaire", 7, 2, 38, "à jour", 540, "2025-09-15", "2027-03-30", "Rapport APD", "2026-07-22"],
+  ["LGV Sud-Ouest — Section 3", "SNCF Réseau", "Infrastructure ferroviaire", 2, 2, 38, "à jour", 540, "2025-09-15", "2027-03-30", "Rapport APD", "2026-07-22"],
   ["Passerelle Confluence", "Métropole de Lyon", "Ouvrages d'art", 0, 4, 64, "à jour", 345, "2025-08-01", "2026-08-05", "DCE", "2026-06-29"],
   ["Station épuration Garonne", "Bordeaux Métropole", "Hydraulique", 2, 1, 22, "à risque", 380, "2026-02-01", "2026-10-30", "Rapport APS", "2026-06-24"],
   ["Tramway T9 — Extension", "Île-de-France Mobilités", "Mobilités", 1, 3, 58, "à jour", 405, "2025-04-01", "2026-11-15", "Dossier PRO", "2026-07-06"],
   ["Barrage de Serre — Réfection", "EDF", "Hydraulique / Géotech.", 3, 5, 76, "à risque", 550, "2024-12-01", "2026-09-25", "Visa note de calcul EXE", "2026-06-23"],
-  ["Centre logistique A7", "Groupe Argan", "Bâtiment / VRD", 6, 4, 71, "à jour", 395, "2025-06-01", "2026-07-30", "DCE", "2026-07-01"],
-  ["Échangeur ferroviaire Est", "SNCF Réseau", "Infrastructure ferroviaire", 7, 2, 44, "à jour", 505, "2025-10-15", "2026-12-20", "Rapport APD", "2026-07-13"],
+  ["Centre logistique A7", "Groupe Argan", "Bâtiment / VRD", 1, 4, 71, "à jour", 395, "2025-06-01", "2026-07-30", "DCE", "2026-07-01"],
+  ["Échangeur ferroviaire Est", "SNCF Réseau", "Infrastructure ferroviaire", 0, 2, 44, "à jour", 505, "2025-10-15", "2026-12-20", "Rapport APD", "2026-07-13"],
   ["Front de mer La Rochelle", "Ville de La Rochelle", "Aménagement urbain", 4, 1, 19, "à jour", 250, "2026-03-01", "2026-10-10", "Rapport APS", "2026-07-18"],
   ["Usine hydroélectrique Drac", "EDF", "Énergie / Hydraulique", 5, 3, 70, "en retard", 540, "2025-02-01", "2026-06-05", "Dossier PRO", "2026-05-20"],
-  ["Hôtel de Région — Réhab", "Région Occitanie", "Bâtiment", 6, 4, 67, "à jour", 405, "2025-07-15", "2026-08-20", "DCE", "2026-07-04"],
+  ["Hôtel de Région — Réhab", "Région Occitanie", "Bâtiment", 5, 4, 67, "à jour", 405, "2025-07-15", "2026-08-20", "DCE", "2026-07-04"],
   ["Voie verte des Gaves", "Département 64", "VRD / Aménagement", 1, 0, 8, "à jour", 205, "2026-05-01", "2027-01-15", "Étude de faisabilité", "2026-08-05"],
   ["Pont levant du Port", "Grand Port Maritime", "Ouvrages d'art", 0, 6, 100, "terminé", 420, "2024-03-01", "2026-05-20", "DOE", "2026-05-15"],
   ["Data center Sud — Lot CVC", "OVHcloud", "Bâtiment / Énergie", 3, 5, 84, "à jour", 460, "2025-01-01", "2026-09-05", "Visa exécution", "2026-06-21"],
 ];
 
 const SEED_COMMENTS: Record<number, { ri: number; text: string; when: string }[]> = {
-  1: [{ ri: 7, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", when: "il y a 2 j" }],
+  1: [{ ri: 0, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", when: "il y a 2 j" }],
   6: [{ ri: 1, text: "Accès à l'ouvrage soumis à autorisation — relance du MOA en cours.", when: "hier" }],
   21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", when: "il y a 4 j" }],
 };

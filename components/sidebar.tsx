@@ -179,9 +179,9 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
   // available server-side (getServerContext().user) but isn't threaded through
   // ProjectsProvider yet — wire `user` into the provider and read it here to
   // replace the placeholder identity below.
-  const name = "P. Dubois";
-  const role = "Directrice de projets";
-  const initials = "PD";
+  const name = "Mehrnaz";
+  const role = "Responsable du département";
+  const initials = "ME";
 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
