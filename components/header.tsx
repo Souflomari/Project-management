@@ -1,93 +1,149 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
-import { SearchIcon } from "./icons";
-import { navItemForPath } from "@/lib/nav";
+import { PlusIcon, SearchIcon } from "./icons";
+import { Button } from "./ui";
+import { openCommandPalette } from "./command-palette";
+import { isWorkspacePath, navItemForPath, WORKSPACE_VIEWS } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
+import { C, DUR, EASE, R, SH, TX } from "@/lib/tokens";
+
+/** Segmented links switching the lens of the Projets workspace. */
+function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
+  return (
+    <div role="tablist" aria-label="Vue des projets" className="ws-switcher" style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3, maxWidth: "100%", overflowX: "auto" }}>
+      {WORKSPACE_VIEWS.map((v) => {
+        const active = v.key === activeKey;
+        return (
+          <Link
+            key={v.key}
+            href={v.href}
+            role="tab"
+            aria-selected={active}
+            style={{
+              fontSize: 12.5,
+              fontWeight: active ? 640 : 600,
+              padding: "5px 12px",
+              borderRadius: R.sm,
+              // Active lens carries a faint green-tint pill + green text so the
+              // switcher reads as part of the brand identity, not just a neutral toggle.
+              background: active ? C.brand50 : "transparent",
+              color: active ? C.brandText : C.ink500,
+              boxShadow: active ? SH.sm : "none",
+              transition: `background ${DUR.fast} ${EASE.standard}, color ${DUR.fast} ${EASE.standard}, box-shadow ${DUR.fast} ${EASE.standard}`,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {v.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 export function Header() {
   const pathname = usePathname();
   const item = navItemForPath(pathname);
+  const inWorkspace = isWorkspacePath(pathname);
+  const isListe = item.key === "projets";
   const { search, setSearch, searched, filtered, openAdd } = useProjects();
 
-  const subtitle =
-    item.key === "projets"
-      ? `${searched.length} projets · ${filtered.length} affichés`
-      : item.sub;
+  // Resolve the platform-specific hint only after mount to avoid a visible swap
+  // from the SSR/first-paint guess. `null` until then renders a stable-width
+  // placeholder so the launcher layout doesn't shift.
+  const [kbd, setKbd] = useState<string | null>(null);
+  useEffect(() => {
+    setKbd(/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K");
+  }, []);
+
+  // Lift the sticky header (shadow + denser glass) once content scrolls under it.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setScrolled(window.scrollY > 4));
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => { window.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
+  }, []);
+
+  const title = inWorkspace ? "Projets" : item.label;
+  const count = `${filtered.length} affiché${filtered.length > 1 ? "s" : ""} sur ${searched.length}`;
 
   return (
     <header
       style={{
-        minHeight: 54,
-        background: "#fff",
-        borderBottom: "1px solid #D7DDD3",
+        minHeight: 64,
+        background: scrolled ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.72)",
+        backdropFilter: scrolled ? "blur(10px)" : "blur(6px)",
+        WebkitBackdropFilter: scrolled ? "blur(10px)" : "blur(6px)",
+        borderBottom: `1px solid ${C.line}`,
+        boxShadow: scrolled ? SH.sm : "none",
+        transition: "box-shadow .16s ease, background .16s ease",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 18,
-        padding: "9px 22px",
+        padding: "12px 28px",
         position: "sticky",
-        top: 46,
+        top: 0,
         zIndex: 30,
       }}
     >
-      <div style={{ minWidth: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 19, fontWeight: 700, letterSpacing: "-.01em" }}>
-          {item.label}
-        </h1>
-        <div style={{ fontSize: 12, color: "#6F6F6F", marginTop: 1 }}>{subtitle}</div>
+      <div className="header-lead" style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
+        <h1 style={{ ...TX.h1, margin: 0, whiteSpace: "nowrap" }}>{title}</h1>
+        {inWorkspace ? <WorkspaceSwitcher activeKey={item.key} /> : null}
+        {isListe ? <span className="header-search" style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap" }}>{count}</span> : null}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            background: "#F1F3EF",
-            border: "1px solid #E2E6E0",
-            borderRadius: 3,
-            padding: "8px 12px",
-            width: 230,
-          }}
-        >
-          <SearchIcon />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un projet…"
+        {isListe ? (
+          <div
+            className="ui-field header-search"
             style={{
-              border: "none",
-              background: "transparent",
-              outline: "none",
-              font: "inherit",
-              fontSize: 13,
-              color: "#233038",
-              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: C.surface,
+              border: `1px solid ${C.line}`,
+              borderRadius: R.sm,
+              padding: "0 12px",
+              height: 36,
+              width: 280,
+              color: C.ink400,
             }}
-          />
-        </div>
-        <button
-          onClick={openAdd}
-          style={{
-            border: "none",
-            cursor: "pointer",
-            background: "#17823D",
-            color: "#fff",
-            font: "inherit",
-            fontWeight: 600,
-            fontSize: 13,
-            padding: "8px 13px",
-            borderRadius: 3,
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            whiteSpace: "nowrap",
-          }}
-        >
-          <span style={{ fontSize: 16, lineHeight: 0 }}>+</span>Nouveau projet
-        </button>
+          >
+            <SearchIcon />
+            <input
+              data-projets-search
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher un projet…"
+              aria-label="Rechercher un projet"
+              style={{ border: "none", background: "transparent", outline: "none", font: "inherit", fontSize: 14, color: C.ink900, width: "100%" }}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={openCommandPalette}
+            className="ui-field header-search lift-hover"
+            aria-label="Recherche rapide"
+            style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.sm, padding: "0 10px 0 12px", height: 36, width: 240, color: C.ink500, cursor: "pointer", font: "inherit" }}
+          >
+            <SearchIcon />
+            <span style={{ fontSize: 14, flex: 1, textAlign: "left" }}>Rechercher…</span>
+            <kbd style={{ ...TX.nano, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit", minWidth: "3ch", textAlign: "center", visibility: kbd ? "visible" : "hidden" }}>{kbd ?? " "}</kbd>
+          </button>
+        )}
+        <Button onClick={openAdd} icon={<PlusIcon size={15} />} aria-label="Nouveau projet">
+          <span className="btn-label-collapsible">Nouveau projet</span>
+        </Button>
       </div>
     </header>
   );

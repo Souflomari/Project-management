@@ -1,20 +1,27 @@
-// Supabase-backed implementation of ProjectRepository.
-//
-// Implements exactly the same interface as the sample repository, so switching
-// to it (see index.ts) requires no changes anywhere in app/ or components/.
+// Supabase-backed implementation of ProjectRepository (task model).
 
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 
-import type { Project, Status, TeamMember } from "../types";
-import { STD_RENDUS } from "./sample-data";
-import type { NewProjectInput, ProjectRepository } from "./repository";
+import type {
+  NewSubtaskInput,
+  NewTeamMemberInput,
+  Project,
+  Status,
+  Subtask,
+  TeamMember,
+} from "../types";
+import type {
+  NewProjectInput,
+  ProjectPatch,
+  ProjectRepository,
+  SubtaskPatch,
+  TeamMemberPatch,
+} from "./repository";
 
 const PROJECT_SELECT = `
-  id, name, client, discipline, responsable_id, phase_index, progress, status,
-  budget, start, deadline, rendu_label, rendu_date, rendu_done,
-  deliverables ( label, done, position ),
-  comments ( author, initials, color, text, when_label, created_at ),
-  project_members ( member_id )
+  id, name, client, discipline, responsable_id, phase_index, status, budget, start, deadline,
+  subtasks ( id, name, assignee_id, start, planned_days, done, depends_on ),
+  comments ( author, initials, color, text, when_label, created_at )
 `;
 
 interface ProjectRow {
@@ -24,24 +31,37 @@ interface ProjectRow {
   discipline: string;
   responsable_id: number;
   phase_index: number;
-  progress: number;
   status: Status;
   budget: number;
   start: string;
   deadline: string;
-  rendu_label: string;
-  rendu_date: string;
-  rendu_done: boolean;
-  deliverables: { label: string; done: boolean; position: number }[];
+  subtasks: { id: number; name: string; assignee_id: number; start: string; planned_days: number; done: boolean; depends_on: number[] | null }[];
   comments: {
-    author: string;
-    initials: string;
-    color: string;
-    text: string;
-    when_label: string;
-    created_at: string;
+    author: string; initials: string; color: string; text: string; when_label: string; created_at: string;
   }[];
-  project_members: { member_id: number }[];
+}
+
+/** Fallback daily rate (€) when a row/insert omits one. */
+const DEFAULT_COST_PER_DAY = 700;
+
+interface TeamMemberRow {
+  id: number;
+  name: string;
+  initials: string;
+  color: string;
+  role: string;
+  cost_per_day: number | null;
+}
+
+function rowToTeamMember(row: TeamMemberRow): TeamMember {
+  return {
+    id: row.id,
+    name: row.name,
+    initials: row.initials,
+    color: row.color,
+    role: row.role,
+    costPerDay: row.cost_per_day ?? DEFAULT_COST_PER_DAY,
+  };
 }
 
 function unwrap<T>(res: { data: T | null; error: PostgrestError | null }): T {
@@ -51,6 +71,17 @@ function unwrap<T>(res: { data: T | null; error: PostgrestError | null }): T {
 }
 
 function rowToProject(row: ProjectRow): Project {
+  const subtasks: Subtask[] = [...row.subtasks]
+    .sort((a, b) => a.start.localeCompare(b.start) || a.id - b.id)
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      assigneeId: s.assignee_id,
+      start: s.start,
+      plannedDays: s.planned_days,
+      done: s.done,
+      dependsOn: s.depends_on ?? [],
+    }));
   return {
     id: row.id,
     name: row.name,
@@ -58,27 +89,28 @@ function rowToProject(row: ProjectRow): Project {
     discipline: row.discipline,
     responsableId: row.responsable_id,
     phaseIndex: row.phase_index,
-    progress: row.progress,
     status: row.status,
     budget: row.budget,
     start: row.start,
     deadline: row.deadline,
-    rendu: { label: row.rendu_label, date: row.rendu_date },
-    renduDone: row.rendu_done,
-    memberIds: row.project_members.map((m) => m.member_id),
-    checklist: [...row.deliverables]
-      .sort((a, b) => a.position - b.position)
-      .map((d) => ({ label: d.label, done: d.done })),
+    subtasks,
     comments: [...row.comments]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((c) => ({
-        author: c.author,
-        initials: c.initials,
-        color: c.color,
-        text: c.text,
-        when: c.when_label,
+        author: c.author, initials: c.initials, color: c.color, text: c.text, when: c.when_label,
       })),
   };
+}
+
+function subtaskPatchToRow(patch: SubtaskPatch): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.assigneeId !== undefined) row.assignee_id = patch.assigneeId;
+  if (patch.start !== undefined) row.start = patch.start;
+  if (patch.plannedDays !== undefined) row.planned_days = patch.plannedDays;
+  if (patch.done !== undefined) row.done = patch.done;
+  if (patch.dependsOn !== undefined) row.depends_on = patch.dependsOn;
+  return row;
 }
 
 export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository {
@@ -87,6 +119,13 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
       await sb.from("projects").select(PROJECT_SELECT).eq("id", id).single(),
     ) as unknown as ProjectRow;
     return rowToProject(row);
+  }
+
+  async function listTeam(): Promise<TeamMember[]> {
+    const rows = unwrap(
+      await sb.from("team_members").select("id, name, initials, color, role, cost_per_day").order("id"),
+    ) as TeamMemberRow[];
+    return rows.map(rowToTeamMember);
   }
 
   return {
@@ -98,21 +137,12 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
     },
 
     async getProject(id) {
-      const { data, error } = await sb
-        .from("projects")
-        .select(PROJECT_SELECT)
-        .eq("id", id)
-        .maybeSingle();
+      const { data, error } = await sb.from("projects").select(PROJECT_SELECT).eq("id", id).maybeSingle();
       if (error) throw new Error(error.message);
       return data ? rowToProject(data as unknown as ProjectRow) : null;
     },
 
-    async listTeam() {
-      const data = unwrap(
-        await sb.from("team_members").select("id, name, initials, color, role").order("id"),
-      );
-      return data as TeamMember[];
-    },
+    listTeam,
 
     async createProject(input: NewProjectInput) {
       const inserted = unwrap(
@@ -124,37 +154,34 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
             discipline: "À définir",
             responsable_id: input.responsableId,
             phase_index: 0,
-            progress: 0,
             status: "à jour",
             budget: 0,
             start: "2026-06-15",
             deadline: "2027-06-30",
-            rendu_label: "Note de cadrage",
-            rendu_date: "2026-09-30",
-            rendu_done: false,
           })
           .select("id")
           .single(),
       ) as { id: number };
+      return fetchProject(inserted.id);
+    },
 
-      const id = inserted.id;
-      await sb.from("deliverables").insert(
-        STD_RENDUS.map((label, position) => ({ project_id: id, position, label, done: false })),
-      );
-      await sb.from("project_members").insert({ project_id: id, member_id: input.responsableId });
+    async updateProject(id, patch: ProjectPatch) {
+      const row: Record<string, unknown> = {};
+      if (patch.name !== undefined) row.name = patch.name.trim();
+      if (patch.client !== undefined) row.client = patch.client.trim();
+      if (patch.discipline !== undefined) row.discipline = patch.discipline.trim();
+      if (patch.budget !== undefined) row.budget = Math.max(0, Math.round(patch.budget));
+      if (patch.deadline !== undefined) row.deadline = patch.deadline;
+      if (patch.start !== undefined) row.start = patch.start;
+      if (patch.responsableId !== undefined) row.responsable_id = patch.responsableId;
+      const { error } = await sb.from("projects").update(row).eq("id", id);
+      if (error) throw new Error(error.message);
       return fetchProject(id);
     },
 
     async setPhase(id, phaseIndex) {
-      const r1 = await sb.from("projects").update({ phase_index: phaseIndex }).eq("id", id);
-      if (r1.error) throw new Error(r1.error.message);
-      // Keep finished phases ticked (mirrors the design's recalcCheck).
-      const r2 = await sb
-        .from("deliverables")
-        .update({ done: true })
-        .eq("project_id", id)
-        .lt("position", phaseIndex);
-      if (r2.error) throw new Error(r2.error.message);
+      const { error } = await sb.from("projects").update({ phase_index: phaseIndex }).eq("id", id);
+      if (error) throw new Error(error.message);
       return fetchProject(id);
     },
 
@@ -164,48 +191,77 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
       return fetchProject(id);
     },
 
-    async toggleRendu(id) {
-      const cur = unwrap(
-        await sb.from("projects").select("rendu_done").eq("id", id).single(),
-      ) as { rendu_done: boolean };
-      const { error } = await sb
-        .from("projects")
-        .update({ rendu_done: !cur.rendu_done })
-        .eq("id", id);
-      if (error) throw new Error(error.message);
-      return fetchProject(id);
-    },
-
-    async toggleDeliverable(id, index) {
-      const cur = unwrap(
-        await sb
-          .from("deliverables")
-          .select("id, done")
-          .eq("project_id", id)
-          .eq("position", index)
-          .single(),
-      ) as { id: number; done: boolean };
-      const { error } = await sb
-        .from("deliverables")
-        .update({ done: !cur.done })
-        .eq("id", cur.id);
-      if (error) throw new Error(error.message);
-      return fetchProject(id);
-    },
-
     async addComment(id, text) {
       const trimmed = text.trim();
       if (!trimmed) return fetchProject(id);
       const { error } = await sb.from("comments").insert({
-        project_id: id,
-        author: "P. Dubois",
-        initials: "PD",
-        color: "#1D4459",
-        text: trimmed,
-        when_label: "à l'instant",
+        project_id: id, author: "P. Dubois", initials: "PD", color: "#2F4A63", text: trimmed, when_label: "à l'instant",
       });
       if (error) throw new Error(error.message);
       return fetchProject(id);
+    },
+
+    async addSubtask(projectId, input: NewSubtaskInput) {
+      const { error } = await sb.from("subtasks").insert({
+        project_id: projectId,
+        name: input.name.trim() || "Nouvelle tâche",
+        assignee_id: input.assigneeId,
+        start: input.start,
+        planned_days: Math.max(1, Math.floor(input.plannedDays)),
+        done: false,
+        depends_on: input.dependsOn ?? [],
+      });
+      if (error) throw new Error(error.message);
+      return fetchProject(projectId);
+    },
+
+    async updateSubtask(projectId, subtaskId, patch: SubtaskPatch) {
+      const { error } = await sb
+        .from("subtasks")
+        .update(subtaskPatchToRow(patch))
+        .eq("id", subtaskId)
+        .eq("project_id", projectId);
+      if (error) throw new Error(error.message);
+      return fetchProject(projectId);
+    },
+
+    async deleteSubtask(projectId, subtaskId) {
+      const { error } = await sb.from("subtasks").delete().eq("id", subtaskId).eq("project_id", projectId);
+      if (error) throw new Error(error.message);
+      return fetchProject(projectId);
+    },
+
+    async addTeamMember(input: NewTeamMemberInput) {
+      const existing = unwrap(await sb.from("team_members").select("id")) as { id: number }[];
+      const id = Math.max(-1, ...existing.map((m) => m.id)) + 1;
+      const { error } = await sb.from("team_members").insert({
+        id,
+        name: input.name,
+        initials: input.initials,
+        color: input.color,
+        role: input.role,
+        cost_per_day: Math.max(0, Math.round(input.costPerDay ?? DEFAULT_COST_PER_DAY)),
+      });
+      if (error) throw new Error(error.message);
+      return listTeam();
+    },
+
+    async updateTeamMember(id, patch: TeamMemberPatch) {
+      const row: Record<string, unknown> = {};
+      if (patch.name !== undefined) row.name = patch.name;
+      if (patch.initials !== undefined) row.initials = patch.initials;
+      if (patch.color !== undefined) row.color = patch.color;
+      if (patch.role !== undefined) row.role = patch.role;
+      if (patch.costPerDay !== undefined) row.cost_per_day = Math.max(0, Math.round(patch.costPerDay));
+      const { error } = await sb.from("team_members").update(row).eq("id", id);
+      if (error) throw new Error(error.message);
+      return listTeam();
+    },
+
+    async deleteTeamMember(id) {
+      const { error } = await sb.from("team_members").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+      return listTeam();
     },
   };
 }

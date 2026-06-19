@@ -5,135 +5,108 @@ import { usePathname } from "next/navigation";
 
 import { NAV_ICONS } from "./icons";
 import { signOutAction } from "@/app/actions";
-import { NAV_ITEMS, navItemForPath } from "@/lib/nav";
+import { WEEK_SHORT } from "@/lib/format";
+import { SIDEBAR_ITEMS, sidebarKeyForPath } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
+import { C, DUR, EASE, FONT_DISPLAY, R, SP, TX } from "@/lib/tokens";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const activeKey = navItemForPath(pathname).key;
+  const activeKey = sidebarKeyForPath(pathname);
   const { serverBacked } = useProjects();
 
   return (
     <aside
+      className="app-sidebar"
       style={{
         width: 232,
         flexShrink: 0,
-        background: "#1D4459",
-        color: "#fff",
+        background: C.canvas,
+        borderRight: `1px solid ${C.line}`,
         display: "flex",
         flexDirection: "column",
-        padding: "20px 14px",
+        padding: "20px 12px 16px",
         position: "sticky",
-        top: 46,
-        height: "calc(100vh - 46px)",
+        top: 0,
+        height: "100dvh",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          gap: 1,
-          fontSize: 26,
-          fontWeight: 800,
-          letterSpacing: "-.03em",
-          padding: "4px 8px 2px",
-        }}
-      >
-        <span>setec</span>
-        <span style={{ color: "#3FA535" }}>.</span>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 19, fontWeight: 600, fontFamily: FONT_DISPLAY, letterSpacing: "-.02em", color: C.ink900, padding: "2px 10px 0" }}>
+        <span className="rail-hide">setec</span>
+        <span className="rail-only" style={{ fontFamily: FONT_DISPLAY }}>s</span>
+        <span style={{ color: C.brandDot }}>.</span>
       </div>
-      <div
-        style={{
-          fontSize: 9.5,
-          letterSpacing: ".18em",
-          textTransform: "uppercase",
-          color: "#7FA0A3",
-          fontWeight: 600,
-          padding: "0 8px 18px",
-        }}
-      >
-        Direction technique
-      </div>
+      <div className="rail-hide" style={{ ...TX.caption, fontSize: 11.5, color: C.ink500, fontWeight: 440, padding: "2px 10px 22px" }}>Direction technique</div>
 
-      <nav style={{ display: "flex", flexDirection: "column" }}>
-        {NAV_ITEMS.map((item) => {
+      <nav style={{ display: "flex", flexDirection: "column", gap: SP[1] }}>
+        {SIDEBAR_ITEMS.map((item) => {
           const active = item.key === activeKey;
           const Icon = NAV_ICONS[item.key];
           return (
             <Link
               key={item.key}
               href={item.href}
+              title={item.label}
+              aria-current={active ? "page" : undefined}
+              className="app-nav-link state-layer"
               style={{
+                position: "relative",
                 display: "flex",
                 alignItems: "center",
                 gap: 11,
                 width: "100%",
-                textAlign: "left",
                 fontSize: 13.5,
-                fontWeight: active ? 600 : 500,
-                padding: "8px 10px",
-                borderRadius: 3,
-                marginBottom: 2,
-                color: active ? "#fff" : "#A9C2C2",
-                background: active ? "rgba(255,255,255,.13)" : "transparent",
-                borderLeft: `3px solid ${active ? "#3FA535" : "transparent"}`,
+                fontWeight: active ? 540 : 450,
+                padding: "9px 10px",
+                borderRadius: R.sm,
+                color: active ? C.brandText : C.ink500,
+                background: active ? C.brand50 : "transparent",
+                transition: `background ${DUR.base} ${EASE.standard}, color ${DUR.base} ${EASE.standard}`,
               }}
             >
-              <Icon />
-              {item.label}
+              {/* green left-indicator bar gives the brand colour a deliberate active role */}
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  left: 2,
+                  top: "50%",
+                  transform: `translateY(-50%) scaleY(${active ? 1 : 0})`,
+                  width: 3,
+                  height: 18,
+                  borderRadius: R.pill,
+                  background: C.brand,
+                  transition: `transform ${DUR.base} ${EASE.out}`,
+                }}
+              />
+              <span style={{ color: active ? C.brand : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
+                <Icon />
+              </span>
+              <span className="rail-hide">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div
-        style={{
-          marginTop: "auto",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "12px 8px 4px",
-          borderTop: "1px solid rgba(255,255,255,.12)",
-        }}
-      >
-        <div
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: "50%",
-            background: "#3FA535",
-            color: "#0E2A18",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 700,
-            fontSize: 13,
-          }}
-        >
+      {/* quiet live-week context */}
+      <div className="rail-hide" style={{ display: "flex", alignItems: "center", gap: SP[3], margin: "16px 10px 0", color: C.ink500, ...TX.micro }}>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.brandDot, flexShrink: 0 }} />
+        Semaine {WEEK_SHORT}
+      </div>
+
+      <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, padding: "16px 10px 4px", borderTop: `1px solid ${C.line}` }}>
+        <div title="P. Dubois · Directrice de projets" style={{ width: 30, height: 30, borderRadius: "50%", background: C.subtle, border: `1px solid ${C.line}`, color: C.ink700, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
           PD
         </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>P. Dubois</div>
-          <div style={{ fontSize: 11, color: "#7FA0A3" }}>Directrice de projets</div>
+        <div className="rail-hide" style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 540, color: C.ink900 }}>P. Dubois</div>
+          <div style={{ fontSize: 11.5, color: C.ink500 }}>Directrice de projets</div>
         </div>
       </div>
 
       {serverBacked ? (
-        <form action={signOutAction} style={{ padding: "2px 8px 0" }}>
-          <button
-            type="submit"
-            style={{
-              width: "100%",
-              textAlign: "left",
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: "#7FA0A3",
-              fontSize: 12,
-              fontWeight: 500,
-              padding: "6px 0",
-            }}
-          >
+        <form action={signOutAction} className="rail-hide" style={{ padding: "4px 10px 0" }}>
+          <button type="submit" className="nav-hover" style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: C.ink500, fontSize: 12, fontWeight: 450, padding: "6px 10px", borderRadius: R.sm }}>
             Se déconnecter
           </button>
         </form>

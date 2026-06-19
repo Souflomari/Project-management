@@ -1,97 +1,186 @@
 "use client";
 
-import { FilterBar } from "../filter-bar";
-import { Avatar, PhaseBadge, ProgressBar, StatusPill } from "../ui";
-import { useProjects } from "@/lib/store/projects-context";
-import { FONT_NUM } from "@/lib/tokens";
+import { useMemo, useRef } from "react";
 
-const COLS = "2.5fr .7fr 1.4fr 1.3fr .9fr 46px 1fr";
+import { FilterBar } from "../filter-bar";
+import { CaretDownIcon } from "../icons";
+import { Avatar, Button, Checkbox, PhaseBadge, ProgressBar, rowProps, Select, StatusPill } from "../ui";
+import type { DerivedProject } from "@/lib/derive";
+import { useProjects } from "@/lib/store/projects-context";
+import { C, num, R, SH, TX } from "@/lib/tokens";
+import { STATUSES, type Status } from "@/lib/types";
+
+const COLS = "34px 2.4fr 64px 1.4fr 1.2fr .9fr 46px 116px";
+
+type SortKey = "name" | "phase" | "rendu" | "progress" | "budget" | "resp" | "status";
+
+const HEADERS: { key: SortKey; label: string }[] = [
+  { key: "name", label: "Projet · maître d'ouvrage" },
+  { key: "phase", label: "Phase" },
+  { key: "rendu", label: "Prochain rendu" },
+  { key: "progress", label: "Avancement" },
+  { key: "budget", label: "Honoraires" },
+  { key: "resp", label: "Resp." },
+  { key: "status", label: "Statut" },
+];
+
+function compare(a: DerivedProject, b: DerivedProject, key: SortKey): number {
+  switch (key) {
+    case "name": return a.name.localeCompare(b.name);
+    case "phase": return a.phaseIndex - b.phaseIndex;
+    case "rendu": return (a.nextTask?.end ?? "9999").localeCompare(b.nextTask?.end ?? "9999");
+    case "progress": return a.progress - b.progress;
+    case "budget": return a.budget - b.budget;
+    case "resp": return a.responsable.name.localeCompare(b.responsable.name);
+    case "status": return STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status);
+  }
+}
 
 export function ProjectsTable() {
-  const { filtered, openProject } = useProjects();
+  const { filtered, searched, team, openProject, openAdd, bulkSetStatus, bulkAdvancePhase, bulkSetResponsable, tableSort, setTableSort, selectedIds: sel, toggleSelected, selectAll, clearSelected } = useProjects();
+
+  const sort = tableSort;
+  const rows = useMemo(
+    () => (sort ? [...filtered].sort((a, b) => compare(a, b, sort.key as SortKey) * sort.dir) : filtered),
+    [filtered, sort],
+  );
+  const toggleSort = (key: SortKey) =>
+    setTableSort(sort && sort.key === key ? { key, dir: sort.dir === 1 ? -1 : 1 } : { key, dir: 1 });
+
+  // Selection (store-backed). Bulk actions operate on the *visible* rows only.
+  const selectedIds = rows.filter((r) => sel.has(r.id)).map((r) => r.id);
+  const allOn = rows.length > 0 && rows.every((r) => sel.has(r.id));
+  const lastClicked = useRef<number | null>(null);
+  const clearSel = clearSelected;
+  const toggleOne = (id: number) => { toggleSelected(id); lastClicked.current = id; };
+  // Shift-click selects the contiguous range between the last clicked row and this one.
+  const rangeSelect = (id: number) => {
+    const ids = rows.map((r) => r.id);
+    const anchor = lastClicked.current;
+    const from = anchor != null ? ids.indexOf(anchor) : -1;
+    const to = ids.indexOf(id);
+    if (from === -1 || to === -1) { toggleOne(id); return; }
+    const [lo, hi] = from < to ? [from, to] : [to, from];
+    const next = new Set(sel);
+    for (let i = lo; i <= hi; i++) next.add(ids[i]);
+    selectAll([...next]);
+    lastClicked.current = id;
+  };
+  const toggleAll = () => (allOn ? clearSel() : selectAll(rows.map((r) => r.id)));
 
   return (
     <>
-      <FilterBar />
-      <div style={{ background: "#fff", border: "1px solid #E2E6E0", borderRadius: 4, overflow: "hidden" }}>
+      <FilterBar showViews />
+
+      {selectedIds.length > 0 ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px 9px 16px", marginBottom: 12, background: C.ink900, color: C.surface, borderRadius: R.md, boxShadow: SH.md, flexWrap: "wrap" }}>
+          <span style={{ ...TX.bodyStrong, color: C.surface }}>{selectedIds.length} sélectionné{selectedIds.length > 1 ? "s" : ""}</span>
+          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,.16)" }} />
+          <Select size="sm" value="" aria-label="Changer le statut" onChange={(e) => { if (e.target.value) { bulkSetStatus(selectedIds, e.target.value as Status); clearSel(); } }} style={{ width: 150 }}>
+            <option value="">Changer le statut…</option>
+            {STATUSES.map((s) => (<option key={s} value={s}>{s}</option>))}
+          </Select>
+          <Select size="sm" value="" aria-label="Réassigner" onChange={(e) => { if (e.target.value) { bulkSetResponsable(selectedIds, Number(e.target.value)); clearSel(); } }} style={{ width: 160 }}>
+            <option value="">Réassigner à…</option>
+            {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
+          </Select>
+          <Button size="sm" variant="secondary" onClick={() => { bulkAdvancePhase(selectedIds); clearSel(); }}>Avancer la phase</Button>
+          <button onClick={clearSel} style={{ marginLeft: "auto", background: "transparent", border: "none", color: "rgba(255,255,255,.7)", ...TX.bodyStrong, cursor: "pointer", padding: "4px 6px", transition: "color var(--dur-fast) var(--ease-standard)" }}>Désélectionner</button>
+        </div>
+      ) : null}
+
+      <div className="table-scroll">
+      <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760, boxShadow: SH.sm }}>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: COLS,
             gap: 12,
-            padding: "6px 13px",
-            background: "#F6F8F4",
-            borderBottom: "1px solid #E2E6E0",
-            fontSize: 10,
-            letterSpacing: ".07em",
-            textTransform: "uppercase",
-            color: "#6F6F6F",
-            fontWeight: 700,
+            padding: "11px 18px",
+            borderBottom: `1px solid ${C.line}`,
+            ...TX.overline,
+            color: C.ink500,
+            alignItems: "center",
           }}
         >
-          <div>Projet · maître d&apos;ouvrage</div>
-          <div>Phase</div>
-          <div>Prochain rendu</div>
-          <div>Avancement</div>
-          <div>Honoraires</div>
-          <div>Resp.</div>
-          <div>Statut</div>
+          <Checkbox checked={allOn} onChange={toggleAll} label="Tout sélectionner" />
+          {HEADERS.map((h) => {
+            const active = sort?.key === h.key;
+            const right = h.key === "budget";
+            return (
+              <button
+                key={h.key}
+                className="sortable"
+                onClick={() => toggleSort(h.key)}
+                aria-sort={active ? (sort!.dir === 1 ? "ascending" : "descending") : "none"}
+                style={{ display: "flex", alignItems: "center", justifyContent: right ? "flex-end" : "flex-start", gap: 3, color: active ? C.brandText : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.overline, transition: "color var(--dur-fast) var(--ease-standard)" }}
+              >
+                {h.label}
+                <span className="sort-caret" style={{ display: "inline-flex", opacity: active ? 1 : 0, transform: active && sort!.dir === -1 ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)" }}>
+                  <CaretDownIcon size={11} />
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {filtered.map((p) => (
-          <div
-            key={p.id}
-            onClick={() => openProject(p.id)}
-            style={{
-              display: "grid",
-              gridTemplateColumns: COLS,
-              gap: 12,
-              alignItems: "center",
-              padding: "6px 13px",
-              borderTop: "1px solid #EEF1EC",
-              cursor: "pointer",
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {p.name}
-              </div>
-              <div style={{ fontSize: 11.5, color: "#6F6F6F", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {p.client} · {p.discipline}
-              </div>
-            </div>
-
-            <div>
-              <PhaseBadge label={p.phaseLabel} />
-            </div>
-
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {p.rendu.label}
-              </div>
-              <div style={{ fontSize: 10.5 }}>
-                {p.renduFmt} · <span style={{ color: p.renduDueColor, fontWeight: 600 }}>{p.renduDaysLabel}</span>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <ProgressBar pct={p.progress} color={p.ring} />
-              <span style={{ fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, width: 32, textAlign: "right" }}>
-                {p.progress}%
+        {rows.map((p) => {
+          const on = sel.has(p.id);
+          return (
+            <div
+              key={p.id}
+              {...rowProps(() => openProject(p.id))}
+              className="row-hover row-focus"
+              style={{ display: "grid", gridTemplateColumns: COLS, gap: 12, alignItems: "center", minHeight: 58, padding: "10px 18px", borderTop: `1px solid ${C.line}`, cursor: "pointer", background: on ? C.brand50 : undefined, boxShadow: on ? `inset 3px 0 0 ${C.brand}` : undefined, transition: "background var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard)" }}
+            >
+              <span
+                onClickCapture={(e) => {
+                  // Shift-click range select: intercept before Checkbox toggles.
+                  if (e.shiftKey) { e.preventDefault(); e.stopPropagation(); rangeSelect(p.id); }
+                }}
+                style={{ display: "inline-flex" }}
+              >
+                <Checkbox checked={on} onChange={() => toggleOne(p.id)} label={`Sélectionner ${p.name}`} />
               </span>
+
+              <div style={{ minWidth: 0 }}>
+                <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.client} · {p.discipline}</div>
+              </div>
+
+              <div><PhaseBadge label={p.phaseLabel} /></div>
+
+              <div style={{ minWidth: 0 }}>
+                <div style={{ ...TX.caption, fontWeight: 540, color: C.ink800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.renduLabel}</div>
+                <div style={{ ...TX.caption, color: C.ink500 }}>
+                  {p.renduFmt} · <span style={{ color: p.renduDueColor, fontWeight: 600 }}>{p.renduDaysLabel}</span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <ProgressBar pct={p.progress} color={p.ring} />
+                <span style={{ ...num(13), width: 38, textAlign: "right", color: p.status === "à jour" ? C.brandText : C.ink700 }}>{p.progress}&#8239;%</span>
+              </div>
+
+              <div style={{ ...num(14), fontWeight: 500, color: C.ink700, textAlign: "right" }}>{p.budgetFmt}</div>
+
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <Avatar initials={p.responsable.initials} color={p.responsable.color} size={30} fontSize={11} title={`${p.responsable.name} · ${p.responsable.role}`} />
+              </div>
+
+              <div><StatusPill color={p.statusColor} bg={p.statusBg} label={p.statusLabel} filled /></div>
             </div>
-
-            <div style={{ fontFamily: FONT_NUM, fontSize: 13, fontWeight: 500, color: "#3B5560" }}>{p.budgetFmt}</div>
-
-            <div>
-              <Avatar initials={p.responsable.initials} color={p.responsable.color} size={30} fontSize={10.5} />
-            </div>
-
-            <div>
-              <StatusPill color={p.statusColor} label={p.statusLabel} />
+          );
+        })}
+        {rows.length === 0 ? (
+          <div style={{ padding: "40px 18px", textAlign: "center", borderTop: `1px solid ${C.line}` }}>
+            <div style={{ ...TX.caption, color: C.ink500 }}>{searched.length === 0 ? "Aucun projet pour l’instant." : "Aucun projet ne correspond à ce filtre."}</div>
+            <div style={{ marginTop: 12 }}>
+              <Button variant="secondary" onClick={openAdd} style={{ margin: "0 auto" }}>Nouveau projet</Button>
             </div>
           </div>
-        ))}
+        ) : null}
+      </div>
       </div>
     </>
   );

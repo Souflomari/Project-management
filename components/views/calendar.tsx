@@ -1,106 +1,382 @@
 "use client";
 
-import { buildCalendar } from "@/lib/derive";
-import { WEEKDAYS } from "@/lib/format";
-import { useProjects } from "@/lib/store/projects-context";
-import { FONT_NUM } from "@/lib/tokens";
+import { useMemo, useRef, useState } from "react";
 
-const navBtn: React.CSSProperties = {
-  border: "1px solid #E2E6E0",
-  background: "#fff",
-  cursor: "pointer",
-  width: 34,
-  height: 34,
-  borderRadius: 3,
-  fontSize: 16,
-  color: "#3B5560",
-};
+import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
+import { Button, IconButton, Modal, rowProps, Segmented, Select, Toolbar } from "../ui";
+import { buildMonthGrid, buildTaskEvents, eventsInRange, type TaskEvent } from "@/lib/derive";
+import { fmtFull, isToday, MONS_LONG, MONTHS_FULL, shiftISO, taskStartForEnd, toDate, monthRange, weekRange } from "@/lib/format";
+import { useProjects, type CalMode } from "@/lib/store/projects-context";
+import { C, num, PHASE_COLORS, SH, SURFACE, TX } from "@/lib/tokens";
+import { PHASES } from "@/lib/types";
+
+const MODE_OPTS: { value: CalMode; label: string }[] = [
+  { value: "mois", label: "Mois" },
+  { value: "semaine", label: "Semaine" },
+  { value: "agenda", label: "Agenda" },
+];
+
+// Unambiguous, sentence-case weekday header abbreviations (vs "L M M J V S D",
+// where three are 'M'/'J' look-alikes). Index = Monday-first, matching WEEKDAYS.
+const WEEKDAYS_SHORT = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"];
+const WEEKDAYS_LONG = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+
+interface PendingMove {
+  event: TaskEvent;
+  date: string;
+}
+
+/** Saturday → Friday, Sunday → Monday; weekdays unchanged. */
+function snapToWeekday(iso: string): string {
+  const dow = toDate(iso).getDay();
+  if (dow === 6) return shiftISO(iso, -1);
+  if (dow === 0) return shiftISO(iso, 1);
+  return iso;
+}
 
 export function CalendarView() {
-  const { allDerived, calYear, calMonth, calPrev, calNext, openProject } = useProjects();
-  const { cells, label } = buildCalendar(calYear, calMonth, allDerived);
+  const { allDerived, calMode, calAnchor, calProjectFilter, setCalMode, calPrev, calNext, calToday, setCalProjectFilter, openProject, updateSubtask } =
+    useProjects();
+
+  const [pending, setPending] = useState<PendingMove | null>(null);
+  // ISO of the day cell currently under a touch/mouse drag (drop-target highlight).
+  const [overISO, setOverISO] = useState<string | null>(null);
+
+  const events = useMemo(() => {
+    const projects = calProjectFilter === null ? allDerived : allDerived.filter((p) => p.id === calProjectFilter);
+    return buildTaskEvents(projects);
+  }, [allDerived, calProjectFilter]);
+  const anchor = toDate(calAnchor);
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth();
+  const label = calMode === "semaine" ? weekLabel(calAnchor) : `${MONS_LONG[month]} ${year}`;
+
+  // Pointer-event drag (works on touch AND mouse; HTML5 DnD is dead on touch).
+  // The chip captures the pointer; day cells expose data-cal-iso, resolved with
+  // elementFromPoint on each move. A movement threshold keeps a tap = open.
+  const drag = useRef<{ event: TaskEvent; startX: number; startY: number; moved: boolean; iso: string | null } | null>(null);
+
+  function isoAtPoint(x: number, y: number): string | null {
+    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-cal-iso]");
+    return el?.dataset.calIso ?? null;
+  }
+
+  function commitDrop(dateISO: string | null, e: TaskEvent) {
+    if (!dateISO) return;
+    // Deadlines fall on working days only; snap a weekend drop to the nearest
+    // weekday so the chip lands where the modal says it will (not the prev Fri).
+    const target = snapToWeekday(dateISO);
+    if (e.date !== target) setPending({ event: e, date: target });
+  }
+
+  const dnd: Dnd = {
+    onStart: (e, ev, onOpen) => {
+      drag.current = { event: e, startX: ev.clientX, startY: ev.clientY, moved: false, iso: null };
+      (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
+    },
+    onMove: (ev) => {
+      const d = drag.current;
+      if (!d) return;
+      if (!d.moved && Math.hypot(ev.clientX - d.startX, ev.clientY - d.startY) < 5) return;
+      d.moved = true;
+      const iso = isoAtPoint(ev.clientX, ev.clientY);
+      d.iso = iso;
+      setOverISO(iso);
+    },
+    onUp: (ev, onOpen) => {
+      const d = drag.current;
+      drag.current = null;
+      setOverISO(null);
+      if (!d) return;
+      if (d.moved) {
+        const iso = isoAtPoint(ev.clientX, ev.clientY) ?? d.iso;
+        commitDrop(iso, d.event);
+      } else {
+        onOpen(d.event.projectId);
+      }
+    },
+    onCancel: () => { drag.current = null; setOverISO(null); },
+    overISO,
+  };
+
+  function confirmMove() {
+    if (!pending) return;
+    updateSubtask(pending.event.projectId, pending.event.subtaskId, { start: taskStartForEnd(pending.date, pending.event.plannedDays) });
+    setPending(null);
+  }
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-        <button onClick={calPrev} style={navBtn} aria-label="Mois précédent">
-          ‹
-        </button>
-        <h2 style={{ margin: 0, fontFamily: FONT_NUM, fontSize: 21, fontWeight: 600, letterSpacing: ".02em", minWidth: 200 }}>
-          {label}
-        </h2>
-        <button onClick={calNext} style={navBtn} aria-label="Mois suivant">
-          ›
-        </button>
+      <Toolbar>
+        <IconButton onClick={calPrev} size={34} aria-label="Précédent"><ChevronLeftIcon /></IconButton>
+        <h2 style={{ ...num(21), minWidth: 210 }}>{label}</h2>
+        <IconButton onClick={calNext} size={34} aria-label="Suivant"><ChevronRightIcon /></IconButton>
+        <Button variant="secondary" size="sm" onClick={calToday}>Aujourd&apos;hui</Button>
+        <div style={{ marginLeft: 4 }}>
+          <Segmented value={calMode} options={MODE_OPTS} onChange={setCalMode} />
+        </div>
+        <div style={{ marginLeft: "auto" }}>
+          <Select
+            value={calProjectFilter ?? ""}
+            onChange={(e) => setCalProjectFilter(e.target.value ? Number(e.target.value) : null)}
+            style={{ width: 240 }}
+          >
+            <option value="">Tous les projets</option>
+            {allDerived.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+          </Select>
+        </div>
+      </Toolbar>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginBottom: 12 }}>
+        {PHASES.map((ph, i) => (
+          <span key={ph} style={{ display: "inline-flex", alignItems: "center", gap: 5, ...TX.caption, color: C.ink500 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: PHASE_COLORS[i] }} />
+            {ph}
+          </span>
+        ))}
+        <span style={{ ...TX.caption, color: C.ink500 }}>· glissez un rendu pour le replanifier</span>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #E2E6E0", borderRadius: 4, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: "#F6F8F4", borderBottom: "1px solid #E2E6E0" }}>
-          {WEEKDAYS.map((w) => (
+      {calMode === "agenda" ? (
+        <AgendaView year={year} month={month} events={events} onOpen={openProject} />
+      ) : (
+        <div className="cal-scroll">
+          {calMode === "mois" ? (
+            <MonthView year={year} month={month} events={events} onOpen={openProject} dnd={dnd} />
+          ) : (
+            <WeekView anchorISO={calAnchor} events={events} onOpen={openProject} dnd={dnd} />
+          )}
+        </div>
+      )}
+
+      {pending ? (
+        <Modal
+          title="Replanifier le rendu"
+          width={400}
+          onClose={() => setPending(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setPending(null)}>Annuler</Button>
+              <Button onClick={confirmMove}>Décaler</Button>
+            </>
+          }
+        >
+          <p style={{ ...TX.body, color: C.ink700, margin: 0 }}>
+            Décaler <strong>{pending.event.taskName}</strong> ({pending.event.projectName}) au{" "}
+            <strong>{fmtFull(pending.date)}</strong> ? La durée planifiée ({pending.event.plannedDays} j) est conservée.
+          </p>
+        </Modal>
+      ) : null}
+    </>
+  );
+}
+
+interface Dnd {
+  onStart: (e: TaskEvent, ev: React.PointerEvent, onOpen: (id: number) => void) => void;
+  onMove: (ev: React.PointerEvent) => void;
+  onUp: (ev: React.PointerEvent, onOpen: (id: number) => void) => void;
+  onCancel: () => void;
+  /** ISO of the day cell under the active drag (drop-target highlight). */
+  overISO: string | null;
+}
+
+function weekLabel(iso: string): string {
+  const { start, end } = weekRange(iso);
+  const a = toDate(start);
+  const b = toDate(end);
+  return `${a.getDate()} – ${b.getDate()} ${MONTHS_FULL[b.getMonth()]} ${b.getFullYear()}`;
+}
+
+function EventChip({ e, onOpen, dnd, compact }: { e: TaskEvent; onOpen: (id: number) => void; dnd: Dnd; compact?: boolean }) {
+  return (
+    <div
+      onPointerDown={(ev) => { if (ev.button != null && ev.button !== 0) return; ev.stopPropagation(); dnd.onStart(e, ev, onOpen); }}
+      onPointerMove={(ev) => dnd.onMove(ev)}
+      onPointerUp={(ev) => { ev.stopPropagation(); dnd.onUp(ev, onOpen); }}
+      onPointerCancel={dnd.onCancel}
+      title={`${e.projectName} — ${e.taskName} (${PHASES[e.phaseIndex]})`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${e.projectName} — ${e.taskName}`}
+      onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onOpen(e.projectId); } }}
+      className="cal-chip"
+      style={{ background: C.subtle, borderLeft: `3px solid ${e.color}`, borderRadius: 4, padding: "3px 7px", cursor: "grab", touchAction: "none", overflow: "hidden", minWidth: 0, maxWidth: "100%", transition: "box-shadow var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard)" }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: e.statusColor, flexShrink: 0 }} />
+      </div>
+      {!compact ? <div style={{ fontSize: 10.5, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.taskName}</div> : null}
+    </div>
+  );
+}
+
+function DayCell({ iso, dnd, children, style }: { iso: string; dnd: Dnd; children: React.ReactNode; style: React.CSSProperties }) {
+  const over = dnd.overISO === iso;
+  return (
+    <div
+      data-cal-iso={iso}
+      style={{ ...style, ...(over ? { boxShadow: `inset 0 0 0 2px ${C.brand}`, background: C.brand50 } : null) }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: number; events: TaskEvent[]; onOpen: (id: number) => void; dnd: Dnd }) {
+  const cells = buildMonthGrid(year, month, events);
+  // ISOs of day cells the user has expanded to reveal events beyond the first 3.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (iso: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(iso) ? next.delete(iso) : next.add(iso);
+      return next;
+    });
+
+  return (
+    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.subtle, borderBottom: `1px solid ${C.line}` }}>
+        {WEEKDAYS_SHORT.map((w, i) => {
+          const weekend = i >= 5;
+          return (
             <div
               key={w}
-              style={{
-                padding: "9px 12px",
-                fontSize: 10.5,
-                letterSpacing: ".06em",
-                textTransform: "uppercase",
-                color: "#6F6F6F",
-                fontWeight: 700,
-              }}
+              title={WEEKDAYS_LONG[i]}
+              aria-label={WEEKDAYS_LONG[i]}
+              style={{ padding: "9px 12px", ...TX.overline, color: weekend ? C.ink400 : C.ink500 }}
             >
               {w}
             </div>
-          ))}
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
-          {cells.map((c, i) => (
-            <div
-              key={i}
-              style={{
-                minHeight: 74,
-                borderRight: "1px solid #EEF1EC",
-                borderBottom: "1px solid #EEF1EC",
-                padding: "5px 7px",
-                background: c.day === null ? "#FAFBF9" : c.isToday ? "#E6F1E9" : "#fff",
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: FONT_NUM,
-                  fontSize: 13,
-                  fontWeight: c.isToday ? 700 : 500,
-                  color: c.day === null ? "transparent" : c.isToday ? "#17823D" : "#3B5560",
-                }}
-              >
-                {c.day ?? "·"}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
-                {c.events.map((e, j) => (
-                  <div
-                    key={j}
-                    onClick={() => openProject(e.projectId)}
+          );
+        })}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
+        {cells.map((c, i) => {
+          const weekend = i % 7 >= 5;
+          const isExpanded = c.iso ? expanded.has(c.iso) : false;
+          const base: React.CSSProperties = {
+            minWidth: 0,
+            minHeight: 98,
+            borderRight: `1px solid ${C.line}`,
+            borderBottom: `1px solid ${C.line}`,
+            padding: "5px 6px",
+            // Unified white field: weekday cells are white; weekends + empty
+            // (other-month) cells recede onto the neutral inset so the grid still
+            // reads distinct on white (the old warm C.canvas tint is gone).
+            background: c.day === null ? SURFACE.container : weekend ? SURFACE.container : C.surface,
+            overflow: "hidden",
+          };
+          const shown = isExpanded ? c.events : c.events.slice(0, 3);
+          const hidden = c.events.length - shown.length;
+          const inner = (
+            <>
+              {c.day !== null ? (
+                c.isToday ? (
+                  <div style={{ ...num(13), width: 22, height: 22, borderRadius: "50%", background: C.brand, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>{c.day}</div>
+                ) : (
+                  <div style={{ ...num(13), color: C.ink600, padding: "1px 2px" }}>{c.day}</div>
+                )
+              ) : null}
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4, minWidth: 0 }}>
+                {shown.map((e) => (<EventChip key={`${e.projectId}-${e.subtaskId}`} e={e} onOpen={onOpen} dnd={dnd} />))}
+                {hidden > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => c.iso && toggle(c.iso)}
+                    className="cal-more row-focus"
                     style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      padding: "2px 6px",
-                      borderRadius: 3,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      background: e.bg,
-                      color: e.color,
+                      appearance: "none", border: "none", background: "transparent", cursor: "pointer",
+                      textAlign: "left", padding: "1px 4px", borderRadius: 4, font: "inherit",
+                      fontSize: 11, fontWeight: 600, color: C.brand, width: "fit-content", maxWidth: "100%",
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                     }}
                   >
-                    {e.label}
-                  </div>
-                ))}
+                    +{hidden} autres
+                  </button>
+                ) : isExpanded && c.events.length > 3 ? (
+                  <button
+                    type="button"
+                    onClick={() => c.iso && toggle(c.iso)}
+                    className="cal-more row-focus"
+                    style={{
+                      appearance: "none", border: "none", background: "transparent", cursor: "pointer",
+                      textAlign: "left", padding: "1px 4px", borderRadius: 4, font: "inherit",
+                      fontSize: 11, fontWeight: 600, color: C.ink500, width: "fit-content", maxWidth: "100%",
+                    }}
+                  >
+                    Réduire
+                  </button>
+                ) : null}
+              </div>
+            </>
+          );
+          return c.iso ? <DayCell key={i} iso={c.iso} dnd={dnd} style={base}>{inner}</DayCell> : <div key={i} style={base}>{inner}</div>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; events: TaskEvent[]; onOpen: (id: number) => void; dnd: Dnd }) {
+  const { start } = weekRange(anchorISO);
+  const startD = toDate(start);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startD);
+    d.setDate(startD.getDate() + i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return { iso, dow: WEEKDAYS_SHORT[i], dowLong: WEEKDAYS_LONG[i], weekend: i >= 5, num: d.getDate(), isToday: isToday(iso), events: events.filter((e) => e.date === iso) };
+  });
+
+  return (
+    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(7,1fr)", minWidth: 640, boxShadow: SH.sm }}>
+      {days.map((d) => (
+        <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320, minWidth: 0, overflow: "hidden", background: d.weekend ? SURFACE.container : C.surface }}>
+          <div style={{ padding: "9px 10px", background: d.isToday ? C.brand50 : C.subtle, borderBottom: `1px solid ${C.line}` }}>
+            <div title={d.dowLong} style={{ ...TX.overline, color: d.weekend ? C.ink400 : C.ink500 }}>{d.dow}</div>
+            <div style={{ ...num(18), color: d.isToday ? C.brand : C.ink900 }}>{d.num}</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 6, minWidth: 0 }}>
+            {d.events.map((e) => (<EventChip key={`${e.projectId}-${e.subtaskId}`} e={e} onOpen={onOpen} dnd={dnd} />))}
+          </div>
+        </DayCell>
+      ))}
+    </div>
+  );
+}
+
+function AgendaView({ year, month, events, onOpen }: { year: number; month: number; events: TaskEvent[]; onOpen: (id: number) => void }) {
+  const list = eventsInRange(events, monthRange(year, month));
+  return (
+    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", boxShadow: SH.sm }}>
+      {list.length === 0 ? (
+        <div style={{ padding: 24, ...TX.body, color: C.ink500 }}>Aucune échéance ce mois-ci.</div>
+      ) : (
+        list.map((e, i) => {
+          const d = toDate(e.date);
+          return (
+            <div
+              key={i}
+              {...rowProps(() => onOpen(e.projectId))}
+              className="row-hover row-focus"
+              style={{ display: "flex", gap: 14, alignItems: "center", padding: "10px 16px", borderTop: i ? `1px solid ${C.line}` : "none", cursor: "pointer" }}
+            >
+              <div style={{ textAlign: "center", minWidth: 44 }}>
+                <div style={num(18)}>{d.getDate()}</div>
+                <div title={WEEKDAYS_LONG[(d.getDay() + 6) % 7]} style={{ ...TX.overline, color: C.ink500 }}>{WEEKDAYS_SHORT[(d.getDay() + 6) % 7]}</div>
+              </div>
+              <div style={{ width: 3, alignSelf: "stretch", borderRadius: 2, background: e.color }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ ...TX.bodyStrong, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
+                <div style={{ ...TX.caption, color: C.ink500 }}>{e.taskName}</div>
+              </div>
+              <div title={e.assigneeInitials} style={{ width: 26, height: 26, borderRadius: "50%", background: e.assigneeColor, color: C.surface, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {e.assigneeInitials}
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-    </>
+          );
+        })
+      )}
+    </div>
   );
 }

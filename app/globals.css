@@ -9,12 +9,17 @@ body {
 }
 
 body {
-  background: #0e0f12;
-  color: #233038;
-  font-family: "Montserrat", sans-serif;
-  font-variant-numeric: tabular-nums;
+  background: #ffffff;
+  color: #1c1917;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Brand-tinted text selection — gives the governed green a presence beyond
+   semantics (it was effectively benched, leaving a grayscale identity). */
+::selection {
+  background: rgba(21, 128, 61, 0.16);
 }
 
 button {
@@ -31,8 +36,8 @@ a {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(120, 130, 150, 0.32);
-  border-radius: 3px;
+  background: rgba(120, 113, 108, 0.28);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -40,15 +45,211 @@ a {
 
 input::placeholder,
 textarea::placeholder {
-  color: #a7b0a8;
+  color: #6e6661;
+}
+
+/* Interaction affordances (inline styles can't express :hover).
+   Hover is brand-tinted: a faint green wash (--c-hover) so pointing at anything
+   interactive reads as "live" in the Setec green. */
+.row-hover {
+  transition: background 0.12s var(--ease-standard);
+}
+.row-hover:hover {
+  background: var(--c-hover) !important;
+}
+.soft-hover {
+  transition: background 0.12s var(--ease-standard);
+}
+.soft-hover:hover {
+  background: var(--c-hover) !important;
+}
+.lift-hover {
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.lift-hover:hover {
+  border-color: var(--c-hover-border) !important;
+  box-shadow: 0 4px 16px -4px rgba(21, 128, 61, 0.12), 0 2px 4px -2px rgba(21, 128, 61, 0.08);
+}
+.nav-hover {
+  transition: background 0.12s var(--ease-standard), color 0.12s var(--ease-standard);
+}
+.nav-hover:hover {
+  background: var(--c-hover) !important;
+  color: var(--c-ink900) !important;
+}
+/* inline click-to-edit text (drawer title, client, discipline) */
+.inline-edit {
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+  cursor: text;
+}
+.inline-edit:hover {
+  background: var(--c-hover) !important;
+}
+.inline-edit:focus {
+  background: #fff !important;
+  box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.2);
+}
+.cal-chip {
+  transition: box-shadow 0.12s ease, background 0.12s ease;
+}
+.cal-chip:hover {
+  background: var(--c-hover-strong) !important;
+  box-shadow: 0 1px 2px rgba(21, 128, 61, 0.1);
+}
+.cal-chip:active {
+  cursor: grabbing;
+}
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.12s ease;
+}
+.sortable:hover {
+  color: var(--c-brand-text) !important;
+}
+.sortable:hover .sort-caret {
+  opacity: 0.4 !important;
+}
+.row-focus:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(28, 25, 23, 0.32);
+  border-radius: 8px;
+}
+.pan {
+  cursor: grab;
+}
+.pan.is-panning {
+  cursor: grabbing;
+}
+.pan.is-panning * {
+  cursor: grabbing !important;
+}
+
+/* primitives */
+.btn {
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s var(--ease-standard), box-shadow 0.12s;
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.22);
+}
+.btn:hover {
+  transform: translateY(-1px);
+}
+.btn:active {
+  transform: scale(0.96);
+}
+.btn-primary:hover {
+  background: var(--c-solid-hover) !important;
+}
+.btn-primary:active {
+  background: var(--c-solid-hover) !important;
+  filter: brightness(0.9);
+}
+.btn-secondary:hover {
+  background: var(--c-hover) !important;
+  border-color: var(--c-hover-border) !important;
+}
+.btn-secondary:active,
+.icon-btn:active {
+  background: var(--c-hover-strong) !important;
+}
+.btn-ghost:hover {
+  background: var(--c-hover) !important;
+  color: var(--c-brand-text) !important;
+}
+.btn-tonal:hover {
+  background: var(--c-hover-strong) !important;
+}
+.btn-outlined:hover {
+  background: var(--c-hover) !important;
+  border-color: var(--c-hover-border) !important;
+}
+.btn-danger:hover {
+  background: #9f3227 !important;
+}
+.icon-btn:hover {
+  background: var(--c-hover) !important;
+  border-color: var(--c-hover-border) !important;
+  color: var(--c-brand) !important;
+}
+.icon-btn.icon-danger:hover {
+  background: #faeeeb !important;
+  border-color: #eccfc9 !important;
+  color: var(--c-danger) !important;
+}
+.ui-field:focus-visible,
+.ui-field:focus-within {
+  border-color: var(--c-brand) !important;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.18);
+}
+
+/* Global focus fallback for any interactive element that doesn't set its own. */
+a:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+.sortable:focus-visible {
+  outline: 2px solid var(--c-ink900);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---- M3 state-layer model ----
+   A translucent overlay of an "on" colour, at a fixed opacity per interaction
+   state, so hover/focus/press/drag feedback is uniform across any surface.
+   Tint defaults to ink; `.state-on-light` flips it for dark/coloured surfaces. */
+.state-layer {
+  position: relative;
+}
+.state-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--state-on, var(--c-ink900));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.state-layer:hover::after {
+  opacity: var(--state-hover);
+}
+.state-layer:focus-visible::after {
+  opacity: var(--state-focus);
+}
+.state-layer:active::after {
+  opacity: var(--state-press);
+}
+.state-layer[data-dragging="true"]::after {
+  opacity: var(--state-drag);
+}
+.state-on-light {
+  --state-on: #ffffff;
+}
+/* keep real content above the overlay */
+.state-layer > * {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @keyframes drawerIn {
   from {
-    transform: translateX(22px);
+    transform: translateX(24px);
+    opacity: 0.4;
   }
   to {
     transform: translateX(0);
+    opacity: 1;
   }
 }
 @keyframes fadeIn {
@@ -59,13 +260,284 @@ textarea::placeholder {
     opacity: 1;
   }
 }
+.gantt-bar {
+  transition: box-shadow 0.12s ease, filter 0.12s ease;
+}
+.gantt-bar:hover {
+  box-shadow: 0 0 0 2px rgba(28, 25, 23, 0.14);
+  filter: brightness(1.03);
+}
+@keyframes toastIn {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes toastOut {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
 @keyframes popIn {
   from {
-    transform: scale(0.96);
+    transform: scale(0.97);
     opacity: 0;
   }
   to {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+/* ---- route transition ----
+   Every view fades + rises on navigation (app/(app)/template.tsx remounts per
+   route). No `forwards`: the transform clears when done, so it never breaks a
+   fixed-position modal opened later within the view. */
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-enter {
+  animation: pageIn 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* ---- content enter motion ----
+   Lists, grids and cards rise + settle in on mount instead of snapping into
+   place. `.enter-rise` animates a single element; `.enter-stagger > *` cascades
+   its direct children. Bolder than a hairline nudge so the motion actually
+   reads. Neutralised by the prefers-reduced-motion block above. */
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.enter-rise {
+  animation: riseIn 0.5s var(--ease-decel) both;
+}
+.enter-stagger > * {
+  animation: riseIn 0.5s var(--ease-decel) both;
+}
+.enter-stagger > *:nth-child(1) { animation-delay: 40ms; }
+.enter-stagger > *:nth-child(2) { animation-delay: 85ms; }
+.enter-stagger > *:nth-child(3) { animation-delay: 130ms; }
+.enter-stagger > *:nth-child(4) { animation-delay: 175ms; }
+.enter-stagger > *:nth-child(5) { animation-delay: 220ms; }
+.enter-stagger > *:nth-child(6) { animation-delay: 265ms; }
+.enter-stagger > *:nth-child(7) { animation-delay: 305ms; }
+.enter-stagger > *:nth-child(8) { animation-delay: 340ms; }
+.enter-stagger > *:nth-child(9) { animation-delay: 370ms; }
+.enter-stagger > *:nth-child(n + 10) { animation-delay: 395ms; }
+
+/* ---- card hover lift ----
+   Cards on the unified white field gain depth on hover (a small rise + a softer
+   shadow) so the surface feels physical and responsive, not painted-on. */
+.card-lift {
+  transition: transform var(--dur-base) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
+    border-color var(--dur-base) var(--ease-standard);
+  will-change: transform;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -12px rgba(28, 25, 23, 0.14), 0 4px 10px -4px rgba(28, 25, 23, 0.07);
+  border-color: var(--c-line-strong) !important;
+}
+
+/* ---- bar / meter fill ----
+   Progress and meter bars grow from 0 to their value on mount via a CSS custom
+   property `--fill` (set inline as the final width). Reduced-motion neutralises
+   the keyframe so the bar simply appears at full width. */
+@keyframes barFill {
+  from {
+    width: 0;
+  }
+  to {
+    width: var(--fill, 100%);
+  }
+}
+.anim-bar {
+  animation: barFill var(--dur-slow) var(--ease-decel) both;
+}
+/* exit counterparts — overlays now animate out instead of blinking */
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes popOut {
+  to {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+}
+@keyframes drawerOut {
+  to {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+/* ---- loading skeletons ---- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #ecebe8;
+  border-radius: 6px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ---- responsive layout ----
+   Inline styles can't carry media queries, so layout-defining grid templates
+   and the sidebar's collapse live here as classes. */
+.app-main {
+  padding: 36px 36px 72px;
+}
+
+/* ---- mobile bottom tab bar (<=768px) ----
+   Hidden by default; becomes a floating, translucent thumb-zone surface on
+   small screens (see the 768px query). Mirrors the header's glass. */
+.mobile-tabbar {
+  display: none;
+}
+.mobile-tab {
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  padding: 4px 6px;
+}
+/* "Nouveau projet" label collapses to an icon-only button on small screens. */
+.btn-label-collapsible {
+  display: inline;
+}
+
+/* dashboard bento — one unified field of tiles (4 cols); hierarchy by size. */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: minmax(128px, auto);
+  gap: 16px;
+}
+.bento > * {
+  min-width: 0;
+}
+.b-hero { grid-column: 1 / 3; grid-row: 1 / 3; } /* 2x2 anchor */
+.b-late { grid-column: 3 / 4; grid-row: 1 / 2; }
+.b-rendus7 { grid-column: 4 / 5; grid-row: 1 / 2; }
+.b-active { grid-column: 3 / 4; grid-row: 2 / 3; }
+.b-budget { grid-column: 4 / 5; grid-row: 2 / 3; }
+.b-phase { grid-column: 1 / 5; grid-row: 3 / 4; } /* full-width strip */
+.b-upcoming { grid-column: 1 / 3; } /* auto row 4 */
+.b-vigilance { grid-column: 3 / 5; }
+.table-scroll,
+.cal-scroll {
+  overflow-x: auto;
+}
+.rail-only {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .bento { grid-template-columns: repeat(2, 1fr); }
+  .b-hero { grid-column: 1 / 3; grid-row: 1 / 3; }
+  .b-late { grid-column: 1 / 2; grid-row: 3 / 4; }
+  .b-rendus7 { grid-column: 2 / 3; grid-row: 3 / 4; }
+  .b-active { grid-column: 1 / 2; grid-row: 4 / 5; }
+  .b-budget { grid-column: 2 / 3; grid-row: 4 / 5; }
+  .b-phase { grid-column: 1 / 3; grid-row: 5 / 6; }
+  .b-upcoming { grid-column: 1 / 3; }
+  .b-vigilance { grid-column: 1 / 3; }
+}
+@media (max-width: 860px) {
+  .app-sidebar {
+    width: 64px !important;
+    padding: 20px 8px 16px !important;
+    align-items: center;
+  }
+  .rail-hide {
+    display: none !important;
+  }
+  .rail-only {
+    display: flex !important;
+  }
+  .app-nav-link {
+    justify-content: center !important;
+    padding: 9px 0 !important;
+  }
+}
+/* Mobile: drop the left rail entirely and rely on the bottom tab bar. */
+@media (max-width: 768px) {
+  .app-sidebar {
+    display: none !important;
+  }
+  .mobile-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    gap: 4px;
+    padding: 6px 10px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    border-top: 1px solid var(--c-line);
+  }
+  /* Keep content clear of the fixed bottom bar (bar height + safe area). */
+  .app-main {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  /* Hide the verbose "Nouveau projet" label; the + icon + aria-label remain. */
+  .btn-label-collapsible {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-main {
+    padding: 20px 16px calc(76px + env(safe-area-inset-bottom));
+  }
+  .bento {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .b-hero, .b-late, .b-rendus7, .b-active, .b-budget, .b-phase, .b-upcoming, .b-vigilance {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  .header-search {
+    display: none !important;
   }
 }

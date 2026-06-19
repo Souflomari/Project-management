@@ -9,17 +9,23 @@ It tracks engineering projects across six views:
 | --- | --- | --- |
 | **Tableau de bord** | `/` | KPIs, upcoming deliverables (échéancier), points de vigilance |
 | **Projets** | `/projets` | Filterable portfolio table |
-| **Planning** | `/planning` | Gantt — project durations & deliverable markers |
-| **Calendrier** | `/calendrier` | Monthly calendar of deliverables (rendus) |
+| **Planning** | `/planning` | Interactive Gantt — click a project to expand its tasks as sub-bars |
+| **Calendrier** | `/calendrier` | Month / week / agenda views, per-project filter, project-labelled events |
 | **Kanban** | `/kanban` | Cards grouped by study phase, drag to advance the phase |
-| **Équipe** | `/equipe` | Workload per responsable |
+| **Équipe** | `/equipe` | Editable team + workload (charge) per week/month |
 
 Each project has: name, client (maître d'ouvrage), study phase
-(ESQ → APS → APD → PRO → DCE → EXE → RÉC), next deliverable + due date,
-progress %, fees (honoraires, in M€), a responsible person, and a status
-(à jour / à risque / en retard / terminé). Clicking any project opens a detail
-drawer (phase stepper, deliverable checklist, status, comments); "+ Nouveau
-projet" adds one.
+(ESQ → APS → APD → PRO → DCE → EXE → RÉC), fees (honoraires, in M€), a project
+lead, a status (à jour / à risque / en retard / terminé), and a list of editable
+**tasks (sous-tâches)** — each with its own assignee, start date and planned
+days. **Progress** and the **next deliverable** are derived from those tasks.
+Clicking any project opens a drawer to add / rename / reschedule / reassign /
+delete tasks; "+ Nouveau projet" adds a project, and Équipe manages the team.
+
+**Workload (charge):** a person's charge for the selected week/month =
+their planned task-days falling in that period ÷ working days available, shown
+as a % (with the raw days). Tasks are assignable per person, so it reflects real
+allocation.
 
 ## Stack
 

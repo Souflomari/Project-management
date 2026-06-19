@@ -1,12 +1,11 @@
-// Seed a Supabase project with the sample portfolio.
+// Seed a Supabase project with the sample portfolio (task model).
 //
 // Usage:
 //   1. run supabase/schema.sql in your Supabase project
 //   2. set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env
 //   3. npm run seed
 //
-// Uses the service-role key (server-only) to bypass RLS. Re-running clears the
-// existing rows first, so it is idempotent.
+// Uses the service-role key to bypass RLS. Idempotent (clears first).
 
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
@@ -31,11 +30,25 @@ function check(label: string, error: { message: string } | null) {
 }
 
 async function main() {
-  // Deleting projects cascades to project_members, deliverables and comments.
+  // Deleting projects cascades to subtasks and comments.
   check("clear projects", (await sb.from("projects").delete().gt("id", 0)).error);
 
   const team = buildSampleTeam();
-  check("upsert team_members", (await sb.from("team_members").upsert(team)).error);
+  check(
+    "upsert team_members",
+    (
+      await sb.from("team_members").upsert(
+        team.map((m) => ({
+          id: m.id,
+          name: m.name,
+          initials: m.initials,
+          color: m.color,
+          role: m.role,
+          cost_per_day: m.costPerDay,
+        })),
+      )
+    ).error,
+  );
 
   const projects = buildSampleProjects();
   let count = 0;
@@ -48,42 +61,48 @@ async function main() {
         discipline: p.discipline,
         responsable_id: p.responsableId,
         phase_index: p.phaseIndex,
-        progress: p.progress,
         status: p.status,
         budget: p.budget,
         start: p.start,
         deadline: p.deadline,
-        rendu_label: p.rendu.label,
-        rendu_date: p.rendu.date,
-        rendu_done: p.renduDone,
       })
       .select("id")
       .single();
     check(`insert project "${p.name}"`, insert.error);
     const id = insert.data!.id as number;
 
-    check(
-      `deliverables "${p.name}"`,
-      (
-        await sb.from("deliverables").insert(
-          p.checklist.map((c, position) => ({
+    if (p.subtasks.length) {
+      // Insert without deps first; a single multi-row INSERT returns rows in
+      // insertion order, so dbIds[k] is the DB id of the k-th sample task.
+      const ins = await sb
+        .from("subtasks")
+        .insert(
+          p.subtasks.map((s) => ({
             project_id: id,
-            position,
-            label: c.label,
-            done: c.done,
+            name: s.name,
+            assignee_id: s.assigneeId,
+            start: s.start,
+            planned_days: s.plannedDays,
+            done: s.done,
           })),
         )
-      ).error,
-    );
+        .select("id");
+      check(`subtasks "${p.name}"`, ins.error);
+      const dbIds = (ins.data ?? []).map((r) => r.id as number);
 
-    check(
-      `members "${p.name}"`,
-      (
-        await sb
-          .from("project_members")
-          .insert(p.memberIds.map((member_id) => ({ project_id: id, member_id })))
-      ).error,
-    );
+      // Remap each task's dependsOn (sample ids 1..n) to the DB ids.
+      for (let k = 0; k < p.subtasks.length; k++) {
+        const deps = p.subtasks[k].dependsOn
+          .map((sid) => dbIds[sid - 1])
+          .filter((v): v is number => typeof v === "number");
+        if (deps.length) {
+          check(
+            `deps "${p.name}"`,
+            (await sb.from("subtasks").update({ depends_on: deps }).eq("id", dbIds[k])).error,
+          );
+        }
+      }
+    }
 
     if (p.comments.length) {
       check(
