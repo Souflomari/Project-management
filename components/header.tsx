@@ -28,7 +28,7 @@ export function Header() {
     <header
       style={{
         minHeight: 64,
-        background: "rgba(250,250,249,.72)",
+        background: "rgba(255,255,255,.72)",
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
         borderBottom: `1px solid ${C.line}`,

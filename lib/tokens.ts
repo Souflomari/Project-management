@@ -26,7 +26,7 @@ export const C = {
   line: "#EEECE9", // soft warm hairline (low contrast — structure, not noise)
   lineStrong: "#E3E0DB", // hover / modal border
   surface: "#FFFFFF",
-  canvas: "#FAFAF9", // warm off-white app background
+  canvas: "#FFFFFF", // unified white app background (minimalist — cards read by border, not fill)
   subtle: "#F5F4F2", // inset / track / hover / rail
   // near-black action surface (Vercel/Geist-style primary)
   solid: "#1C1917",
@@ -57,7 +57,7 @@ export const AVATAR_PALETTE = [
 // component asks for a role ("a container, one step up") instead of a raw hex —
 // and a future dark theme only has to remap these six values.
 export const SURFACE = {
-  base: "#FAFAF9", // app canvas
+  base: "#FFFFFF", // app canvas (now white)
   containerLowest: "#FFFFFF", // raised cards & dialogs (rest on the canvas)
   containerLow: "#FCFBFA", // faintly raised overlays
   container: "#F7F6F4", // default filled container / track
