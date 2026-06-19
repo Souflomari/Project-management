@@ -1,26 +1,57 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ProjectComments, ProjectIdentity, ProjectOverview, ProjectTasks } from "@/components/project-detail";
-import { Chip, StatusPill } from "@/components/ui";
+import {
+  ProjectBudget,
+  ProjectComments,
+  ProjectIdentity,
+  ProjectProperties,
+  ProjectTasks,
+} from "@/components/project-detail";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, PHASE_COLORS, R, TX } from "@/lib/tokens";
+import { C, R, SH, TX } from "@/lib/tokens";
 
+// Main-column tabs (the right rail — properties + EVM — is always visible).
 const TABS = [
-  { key: "apercu", label: "Vue d'ensemble" },
   { key: "taches", label: "Tâches & planning" },
-  { key: "commentaires", label: "Commentaires" },
+  { key: "activite", label: "Activité" },
 ] as const;
+type TabKey = (typeof TABS)[number]["key"];
 
 export default function ProjectPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const id = Number(Array.isArray(params.id) ? params.id[0] : params.id);
   const { allDerived } = useProjects();
   const p = allDerived.find((x) => x.id === id) ?? null;
-  const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("apercu");
+
+  // Active tab synced to the URL (?onglet=…), shareable + refresh-proof.
+  const urlTab = searchParams.get("onglet");
+  const initialTab: TabKey = TABS.some((t) => t.key === urlTab) ? (urlTab as TabKey) : "taches";
+  const [tab, setTab] = useState<TabKey>(initialTab);
+  useEffect(() => { if (TABS.some((t) => t.key === urlTab) && urlTab !== tab) setTab(urlTab as TabKey); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [urlTab]);
+
+  const selectTab = useCallback((key: TabKey) => {
+    setTab(key);
+    const sp = new URLSearchParams(Array.from(searchParams.entries()));
+    sp.set("onglet", key);
+    router.replace(`?${sp.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  // Roving arrow-key focus across the tablist.
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const onTabKey = useCallback((e: React.KeyboardEvent, idx: number) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    const n = TABS.length;
+    const next = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : e.key === "ArrowRight" ? (idx + 1) % n : (idx - 1 + n) % n;
+    tabRefs.current[next]?.focus();
+    selectTab(TABS[next].key);
+  }, [selectTab]);
 
   const back = (
     <Link href="/projets" className="soft-hover" style={{ ...TX.caption, fontWeight: 600, color: C.ink500, display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 8px", margin: "0 0 14px -8px", borderRadius: R.sm }}>
@@ -39,50 +70,74 @@ export default function ProjectPage() {
   }
 
   return (
-    <div style={{ maxWidth: 860, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1120, margin: "0 auto" }}>
       {back}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-        <Chip label={p.phaseLabel} color={PHASE_COLORS[p.phaseIndex] ?? C.ink500} tone="soft" title={p.phaseFull} />
-        <StatusPill color={p.statusColor} bg={p.statusBg} label={p.statusLabel} filled />
-      </div>
-
+      {/* Header: identity only. Status & phase are editable in the right rail —
+          the header no longer duplicates them as static pills. */}
       <ProjectIdentity p={p} titleStyle={{ ...TX.display, color: C.ink900 }} />
 
-      <div role="tablist" aria-label="Sections du projet" style={{ display: "flex", gap: 6, borderBottom: `1px solid ${C.line}`, marginTop: 22 }}>
-        {TABS.map((t) => {
-          const active = t.key === tab;
-          return (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(t.key)}
-              className="soft-hover"
-              style={{
-                ...TX.bodyStrong,
-                fontSize: 13.5,
-                color: active ? C.ink900 : C.ink500,
-                background: "none",
-                border: "none",
-                borderBottom: `2px solid ${active ? C.solid : "transparent"}`,
-                padding: "10px 8px",
-                marginBottom: -1,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Two-column workspace: main (tasks/activity) + right rail (properties + EVM). */}
+      <div className="detail-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 360px", gap: 28, marginTop: 24, alignItems: "start" }}>
+        {/* ── main column ── */}
+        <div style={{ minWidth: 0 }}>
+          <div role="tablist" aria-label="Sections du projet" style={{ display: "flex", gap: 6, borderBottom: `1px solid ${C.line}` }}>
+            {TABS.map((t, i) => {
+              const active = t.key === tab;
+              return (
+                <button
+                  key={t.key}
+                  ref={(el) => { tabRefs.current[i] = el; }}
+                  role="tab"
+                  aria-selected={active}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => selectTab(t.key)}
+                  onKeyDown={(e) => onTabKey(e, i)}
+                  className="soft-hover"
+                  style={{
+                    ...TX.bodyStrong,
+                    fontSize: 13.5,
+                    color: active ? C.ink900 : C.ink500,
+                    background: "none",
+                    border: "none",
+                    borderBottom: `2px solid ${active ? C.solid : "transparent"}`,
+                    padding: "10px 8px",
+                    marginBottom: -1,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
 
-      <div style={{ paddingTop: 24, maxWidth: 660 }}>
-        {tab === "apercu" ? <ProjectOverview p={p} /> : null}
-        {tab === "taches" ? <ProjectTasks p={p} /> : null}
-        {tab === "commentaires" ? <ProjectComments p={p} /> : null}
+          <div style={{ paddingTop: 22 }}>
+            {tab === "taches" ? <ProjectTasks p={p} /> : null}
+            {tab === "activite" ? <ProjectComments p={p} /> : null}
+          </div>
+        </div>
+
+        {/* ── right rail ── */}
+        <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <RailCard title="Propriétés">
+            <ProjectProperties p={p} />
+          </RailCard>
+          <RailCard title="Honoraires et valeur acquise">
+            <ProjectBudget p={p} />
+          </RailCard>
+        </aside>
       </div>
     </div>
+  );
+}
+
+function RailCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.sm, padding: "16px 18px" }}>
+      <h3 style={{ ...TX.overline, color: C.ink700, margin: "0 0 14px" }}>{title}</h3>
+      {children}
+    </section>
   );
 }

@@ -92,6 +92,25 @@ export function pct(n: number): string {
   return `${n}${NNBSP}%`;
 }
 
+/** A label followed by a French colon with the required NBSP before it, e.g.
+ *  `nbspColon("Statut")` → "Statut :". Converge on this so the ` :` is uniform. */
+export function nbspColon(label: string): string {
+  return `${label}${NBSP}:`;
+}
+
+/** French guillemets with the inner NNBSP both sides, e.g.
+ *  `quote("texte")` → "« texte »". */
+export function quote(inner: string): string {
+  return `«${NNBSP}${inner}${NNBSP}»`;
+}
+
+/** A date range with an NBSP-padded en-dash between the two formatted dates,
+ *  e.g. "15 juin – 21 juin". Pass `full` to use long month names. */
+export function dateRange(startIso: string, endIso: string, full = false): string {
+  const fmt = full ? fmtFull : fmtShort;
+  return `${fmt(startIso)}${NBSP}–${NBSP}${fmt(endIso)}`;
+}
+
 // Compact contexts (cells, chips) use "j"; prose (dueLabelFull) uses "jours".
 export function dueLabel(days: number): string {
   if (days < 0) return `${-days}${NNBSP}j de retard`;

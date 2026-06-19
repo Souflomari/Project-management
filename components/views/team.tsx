@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon } from "../icons";
+import { ChevronLeftIcon, ChevronRightIcon, EditIcon, FilterIcon, PlusIcon, SearchIcon, TrashIcon } from "../icons";
 import { TeamMemberModal } from "../team-member-modal";
-import { Avatar, Button, Card, EmptyState, IconButton, rowProps, Segmented, Toolbar } from "../ui";
-import { buildTeamLoad, type HeatBucket } from "@/lib/derive";
-import { isToday, MONS_LONG, MONTHS_FULL, monthRange, toDate, weekRange } from "@/lib/format";
+import { Avatar, Button, Card, EmptyState, IconButton, Input, rowProps, Segmented, Select, Toolbar } from "../ui";
+import { buildTeamLoad, type HeatBucket, type TeamLoad } from "@/lib/derive";
+import { fmtEur, isToday, MONS_LONG, MONTHS_FULL, monthRange, REFERENCE_DATE, toDate, weekRange } from "@/lib/format";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
-import { C, chargeColor, DUR, EASE, loadTier, num, R, SP, SURFACE, TX } from "@/lib/tokens";
+import { C, chargeColor, DUR, EASE, loadTier, num, PHASE_COLORS, R, SP, SURFACE, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
 
 const MODE_OPTS: { value: TeamMode; label: string }[] = [
@@ -17,11 +17,100 @@ const MODE_OPTS: { value: TeamMode; label: string }[] = [
   { value: "mois", label: "Mois" },
 ];
 
+// View-wide lens: read the period as workload (% of capacity) or as cost (€).
+type Lens = "charge" | "cout";
+const LENS_OPTS: { value: Lens; label: string }[] = [
+  { value: "charge", label: "Charge" },
+  { value: "cout", label: "Coût" },
+];
+
+type SortKey = "charge-desc" | "charge-asc" | "free" | "name";
+const SORT_OPTS: { value: SortKey; label: string }[] = [
+  { value: "charge-desc", label: "Charge (haute → basse)" },
+  { value: "charge-asc", label: "Charge (basse → haute)" },
+  { value: "free", label: "Capacité libre" },
+  { value: "name", label: "Nom (A → Z)" },
+];
+
+type FilterKey = "all" | "over" | "free" | "under";
+const FILTER_OPTS: { value: FilterKey; label: string }[] = [
+  { value: "all", label: "Tous" },
+  { value: "over", label: "Surchargés" },
+  { value: "under", label: "Sous-utilisés" },
+  { value: "free", label: "Disponibles" },
+];
+
+// ── derive-bridge ─────────────────────────────────────────────────────────────
+// The corrected fractional-allocation charge, per-bucket per-project split, and
+// per-member cost are being added to buildTeamLoad by a concurrent agent. We
+// CONSUME those fields when present and otherwise fall back locally so the view
+// is never broken. // TODO(derive): drop the fallbacks once they ship.
+interface ProjShare { projectId: number; projectName: string; color: string; days: number; }
+interface EnrichedBucket extends HeatBucket { shares: ProjShare[]; }
+interface EnrichedLoad {
+  load: TeamLoad;
+  /** Corrected (non-double-counting) charge, % of capacity. */
+  chargePct: number;
+  /** Period cost = period days × daily rate, euros. */
+  costEur: number;
+  /** Free capacity in working days (negative = overbooked). */
+  freeDays: number;
+  buckets: EnrichedBucket[];
+}
+
+type WithAlloc = TeamLoad & {
+  chargeAllocPct?: number;
+  costEur?: number;
+  buckets: (HeatBucket & { shares?: ProjShare[] })[];
+};
+
+function enrich(load: TeamLoad): EnrichedLoad {
+  const w = load as WithAlloc;
+  // Corrected charge: prefer the derive-provided fractional allocation; else the
+  // (over-counting) raw chargePct as a stopgap.
+  const chargePct = w.chargeAllocPct ?? load.chargePct;
+  // Per-member cost: prefer derive; else compute from period days × rate.
+  const costEur = w.costEur ?? Math.round(load.periodDays * (load.member.costPerDay ?? 0));
+  const freeDays = Math.max(-load.capacity * 4, load.capacity - load.periodDays);
+
+  // Per-bucket per-project split for the stacked heatmap. Prefer derive's
+  // `shares`; else approximate from the member's tasks overlapping each bucket
+  // proportionally (keeps cross-project allocation visible without the data).
+  const buckets: EnrichedBucket[] = load.buckets.map((b) => {
+    const provided = (b as HeatBucket & { shares?: ProjShare[] }).shares;
+    if (provided && provided.length) return { ...b, shares: provided };
+    // Fallback: split the bucket's days across projects by their share of the
+    // member's total period days touching this bucket window.
+    const inBucket = load.tasks.filter((t) => t.start <= b.end && t.end >= b.start);
+    const totalDays = inBucket.reduce((s, t) => s + t.daysInPeriod, 0) || 1;
+    const byProject = new Map<number, ProjShare>();
+    for (const t of inBucket) {
+      const cur = byProject.get(t.projectId) ?? { projectId: t.projectId, projectName: t.projectName, color: projectColor(t.projectId), days: 0 };
+      cur.days += (t.daysInPeriod / totalDays) * b.days;
+      byProject.set(t.projectId, cur);
+    }
+    return { ...b, shares: Array.from(byProject.values()) };
+  });
+
+  return { load, chargePct, costEur, freeDays, buckets };
+}
+
+// Stable per-project colour from the phase ramp (deterministic, no data needed).
+function projectColor(projectId: number): string {
+  return PHASE_COLORS[Math.abs(projectId) % PHASE_COLORS.length];
+}
+
 export function Team() {
   const { allDerived, team, teamMode, teamAnchor, setTeamMode, teamPrev, teamNext, teamToday, deleteTeamMember, openProject, setSearch } = useProjects();
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
+
+  const [lens, setLens] = useState<Lens>("charge");
+  const [sort, setSort] = useState<SortKey>("charge-desc");
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [groupByDiscipline, setGroupByDiscipline] = useState(false);
+  const [query, setQuery] = useState("");
 
   const showProjectsOf = (m: TeamMember) => { setSearch(m.name); router.push("/projets"); };
 
@@ -41,7 +130,65 @@ export function Team() {
     () => buildTeamLoad(allDerived, team, range, teamMode === "semaine" ? "day" : "week"),
     [allDerived, team, range.start, range.end, teamMode],
   );
+
+  // Previous period — for a period-over-period charge delta per member.
+  const prevRange = useMemo(() => {
+    if (teamMode === "semaine") {
+      const d = toDate(weekRange(teamAnchor).start);
+      d.setDate(d.getDate() - 7);
+      return weekRange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    }
+    const m = anchor.getMonth() - 1;
+    const y = m < 0 ? anchor.getFullYear() - 1 : anchor.getFullYear();
+    return monthRange(y, (m + 12) % 12);
+  }, [teamAnchor, teamMode, anchor]);
+  const prevLoads = useMemo(
+    () => buildTeamLoad(allDerived, team, prevRange, teamMode === "semaine" ? "day" : "week"),
+    [allDerived, team, prevRange.start, prevRange.end, teamMode],
+  );
+  const prevCharge = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const l of prevLoads) m.set(l.member.id, enrich(l).chargePct);
+    return m;
+  }, [prevLoads]);
+
+  const enriched = useMemo(() => loads.map(enrich), [loads]);
   const capacity = loads[0]?.capacity ?? 0;
+
+  // ── toolbar: search → filter → sort ──
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let out = enriched.filter((e) => {
+      if (q && !(e.load.member.name.toLowerCase().includes(q) || e.load.member.role.toLowerCase().includes(q))) return false;
+      if (filter === "over") return e.chargePct > 100;
+      if (filter === "under") return e.chargePct > 0 && e.chargePct < 60;
+      if (filter === "free") return e.freeDays > 0;
+      return true;
+    });
+    out = [...out].sort((a, b) => {
+      switch (sort) {
+        case "charge-asc": return a.chargePct - b.chargePct;
+        case "free": return b.freeDays - a.freeDays;
+        case "name": return a.load.member.name.localeCompare(b.load.member.name);
+        default: return b.chargePct - a.chargePct;
+      }
+    });
+    return out;
+  }, [enriched, query, filter, sort]);
+
+  // Group by discipline (role) when requested.
+  const groups = useMemo(() => {
+    if (!groupByDiscipline) return [{ key: "", label: "", items: visible }];
+    const map = new Map<string, EnrichedLoad[]>();
+    for (const e of visible) {
+      const k = e.load.member.role || "Sans discipline";
+      (map.get(k) ?? map.set(k, []).get(k)!).push(e);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, items]) => ({ key, label: key, items }));
+  }, [visible, groupByDiscipline]);
+
   const periodLabel =
     teamMode === "semaine"
       ? `${toDate(weekRange(teamAnchor).start).getDate()} – ${toDate(weekRange(teamAnchor).end).getDate()} ${MONTHS_FULL[toDate(weekRange(teamAnchor).end).getMonth()]}`
@@ -50,125 +197,296 @@ export function Team() {
   const openAdd = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (m: TeamMember) => { setEditing(m); setModalOpen(true); };
 
+  const colorsInUse = useMemo(() => team.map((m) => m.color), [team]);
+
+  // Full-view empty state — no team at all.
+  if (team.length === 0) {
+    return (
+      <>
+        <EmptyState
+          title="Aucun membre dans l’équipe"
+          hint="Ajoutez des collaborateurs pour suivre leur charge, leur capacité et leur coût sur la période."
+          action={<Button onClick={openAdd} icon={<PlusIcon size={15} />}>Nouveau membre</Button>}
+        />
+        {modalOpen ? <TeamMemberModal member={editing} colorsInUse={colorsInUse} onClose={() => setModalOpen(false)} /> : null}
+      </>
+    );
+  }
+
   return (
     <>
       <Toolbar style={{ marginBottom: 8 }}>
-        <IconButton onClick={teamPrev} aria-label="Précédent"><ChevronLeftIcon /></IconButton>
+        <IconButton onClick={teamPrev} aria-label="Période précédente"><ChevronLeftIcon /></IconButton>
         <h2 style={{ ...num(18), minWidth: 150 }}>{periodLabel}</h2>
-        <IconButton onClick={teamNext} aria-label="Suivant"><ChevronRightIcon /></IconButton>
+        <IconButton onClick={teamNext} aria-label="Période suivante"><ChevronRightIcon /></IconButton>
         <Button variant="secondary" size="sm" onClick={teamToday}>Aujourd’hui</Button>
         <Segmented value={teamMode} options={MODE_OPTS} onChange={setTeamMode} />
+        <Segmented value={lens} options={LENS_OPTS} onChange={setLens} />
         <div style={{ marginLeft: "auto" }}>
           <Button onClick={openAdd} icon={<PlusIcon size={15} />}>Nouveau membre</Button>
         </div>
       </Toolbar>
 
-      <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 20px" }}>
-        Charge sur <strong style={{ color: C.ink700, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · répartition {teamMode === "semaine" ? "par jour" : "par semaine"} · la ligne = 100&#8239;% (pleine capacité)
+      {/* Resource toolbar: search / filter / sort / group */}
+      <Toolbar style={{ marginBottom: 16 }}>
+        <span style={{ position: "relative", flex: "0 1 240px", minWidth: 160 }}>
+          <span aria-hidden style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.ink400, display: "flex" }}><SearchIcon size={15} /></span>
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher un membre…"
+            aria-label="Rechercher un membre"
+            style={{ paddingLeft: 32 }}
+          />
+        </span>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span aria-hidden style={{ color: C.ink400, display: "flex" }}><FilterIcon size={15} /></span>
+          <span style={{ ...TX.nano, color: C.ink500 }}>Filtrer</span>
+          <Select size="sm" value={filter} onChange={(e) => setFilter(e.target.value as FilterKey)} aria-label="Filtrer les membres">
+            {FILTER_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
+        </label>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span style={{ ...TX.nano, color: C.ink500 }}>Trier</span>
+          <Select size="sm" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Trier les membres">
+            {SORT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </Select>
+        </label>
+        <Button
+          variant={groupByDiscipline ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => setGroupByDiscipline((v) => !v)}
+          aria-pressed={groupByDiscipline}
+        >
+          Grouper par discipline
+        </Button>
+      </Toolbar>
+
+      <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 16px" }}>
+        {lens === "charge" ? (
+          <>Charge sur <strong style={{ color: C.ink700, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · répartition {teamMode === "semaine" ? "par jour" : "par semaine"} · la ligne = 100&#8239;% (pleine capacité)</>
+        ) : (
+          <>Coût de la période = <strong style={{ color: C.ink700, fontWeight: 540 }}>jours travaillés × taux journalier</strong> · {capacity} jours ouvrés de capacité</>
+        )}
       </p>
 
-      <div className="enter-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))", gap: 18 }}>
-        {loads.map((t) => {
-          const c = chargeColor(t.chargePct);
-          const isRef = referenced.has(t.member.id);
-          return (
-            <Card key={t.member.id}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <button
-                  {...rowProps(() => showProjectsOf(t.member))}
-                  className="soft-hover row-focus"
-                  title={`Voir les projets de ${t.member.name}`}
-                  style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, background: "none", border: "none", padding: "4px 6px", margin: "-4px -6px", borderRadius: R.sm, cursor: "pointer", textAlign: "left" }}
-                >
-                  <Avatar initials={t.member.initials} color={t.member.color} size={42} fontSize={15} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: C.ink900 }}>{t.member.name}</div>
-                    <div style={{ ...TX.caption, color: C.ink500 }}>{t.member.role}</div>
-                  </div>
-                </button>
-                <div style={{ display: "flex", gap: 5 }}>
-                  <IconButton size={28} onClick={() => openEdit(t.member)} aria-label="Modifier"><EditIcon size={14} /></IconButton>
-                  <IconButton
-                    size={28}
-                    tone="danger"
-                    disabled={isRef}
-                    onClick={() => !isRef && deleteTeamMember(t.member.id)}
-                    title={isRef ? "Membre affecté à des projets — réaffectez d’abord" : "Supprimer"}
-                  >
-                    <TrashIcon size={14} />
-                  </IconButton>
-                </div>
-              </div>
+      <HeatmapLegend mode={teamMode} />
 
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  {(() => {
-                    const tier = loadTier(t.chargePct);
-                    const over = tier === "over" || tier === "crit";
-                    // Over capacity, the raw % balloons (a member can read 290 %+).
-                    // Cap the headline at a credible ceiling and carry the real
-                    // figure as concrete overflow days ("+N j"), so the card reads
-                    // "booked past capacity", not "broken counter".
-                    const shown = over ? Math.min(t.chargePct, 130) : t.chargePct;
-                    return (
-                      <>
-                        <span style={{ ...num(26), color: c }}>{shown}&#8239;%{over ? " +" : ""}</span>
-                        <span style={{ ...TX.caption, color: C.ink500 }}>
-                          {t.periodDays} / {t.capacity} j
-                          {over ? <span style={{ color: c, fontWeight: 540 }}> · +{t.periodDays - t.capacity}&#8239;j de surcapacité</span> : ""}
-                        </span>
-                      </>
-                    );
-                  })()}
-                </div>
-                <span style={{ ...TX.caption, color: C.ink500 }}>{t.projectsActive} projet{t.projectsActive > 1 ? "s" : ""}</span>
-              </div>
+      {visible.length === 0 ? (
+        <EmptyState compact title="Aucun membre ne correspond" hint="Ajustez la recherche ou le filtre." />
+      ) : (
+        groups.map((g) => (
+          <section key={g.key || "all"} style={{ marginBottom: g.label ? 24 : 0 }} aria-label={g.label || undefined}>
+            {g.label ? (
+              <h3 style={{ ...TX.eyebrow, color: C.ink500, margin: "0 0 10px" }}>
+                {g.label} <span style={{ color: C.ink400 }}>· {g.items.length}</span>
+              </h3>
+            ) : null}
+            <div className="enter-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))", gap: 18 }}>
+              {g.items.map((e) => (
+                <MemberCard
+                  key={e.load.member.id}
+                  e={e}
+                  lens={lens}
+                  mode={teamMode}
+                  prevCharge={prevCharge.get(e.load.member.id)}
+                  isRef={referenced.has(e.load.member.id)}
+                  onProjects={() => showProjectsOf(e.load.member)}
+                  onEdit={() => openEdit(e.load.member)}
+                  onDelete={() => deleteTeamMember(e.load.member.id)}
+                  onOpenProject={openProject}
+                />
+              ))}
+            </div>
+          </section>
+        ))
+      )}
 
-              <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: `${SP[5]}px ${SP[5]}px ${SP[4]}px` }}>
-                <Heatmap buckets={t.buckets} mode={teamMode} />
-              </div>
-
-              {t.tasks.length === 0 ? (
-                <div style={{ marginTop: SP[4] }}>
-                  <EmptyState compact title="Aucune tâche planifiée" hint="Rien d’affecté à ce membre sur la période." />
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: SP[4] }}>
-                  {t.tasks.map((task, i) => (
-                    <div
-                      key={i}
-                      {...rowProps(() => openProject(task.projectId))}
-                      className="row-hover row-focus"
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", ...TX.caption, padding: "2px 4px", borderRadius: R.xxs }}
-                    >
-                      <div style={{ minWidth: 0 }}>
-                        <span style={{ fontWeight: 600, color: task.done ? C.ink500 : C.ink900 }}>{task.taskName}</span>
-                        <span style={{ color: C.ink500 }}> · {task.projectName}</span>
-                      </div>
-                      <span style={{ ...num(12), color: C.ink700, whiteSpace: "nowrap" }}>{task.daysInPeriod}&#8239;j</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          );
-        })}
-      </div>
-
-      {modalOpen ? <TeamMemberModal member={editing} onClose={() => setModalOpen(false)} /> : null}
+      {modalOpen ? <TeamMemberModal member={editing} colorsInUse={colorsInUse} onClose={() => setModalOpen(false)} /> : null}
     </>
   );
 }
 
-const WD = ["L", "M", "M", "J", "V", "S", "D"];
+function MemberCard({
+  e, lens, mode, prevCharge, isRef, onProjects, onEdit, onDelete, onOpenProject,
+}: {
+  e: EnrichedLoad;
+  lens: Lens;
+  mode: TeamMode;
+  prevCharge: number | undefined;
+  isRef: boolean;
+  onProjects: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onOpenProject: (id: number) => void;
+}) {
+  const { load, chargePct, costEur, freeDays } = e;
+  const m = load.member;
+  const c = chargeColor(chargePct);
+  const tier = loadTier(chargePct);
+  const over = tier === "over" || tier === "crit";
+  // Over capacity, the raw % balloons — cap the headline at a credible ceiling
+  // (v1 overload cap) and carry the real figure as concrete overflow days.
+  const shown = over ? Math.min(chargePct, 130) : chargePct;
+  const delta = prevCharge != null ? chargePct - prevCharge : null;
 
-/** Workload heatmap as bars against a 100%-capacity line: the bar fills toward
- *  the dashed line at full capacity, and a terracotta cap rises above it when
- *  the period is overbooked — so *when* overload happens is readable at a glance. */
-function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
-  // Bars grow up from the baseline on mount: heights start at 0 and ease to their
-  // value once mounted, so *when* load lands across the period animates in.
-  // Reduced motion is honoured by mounting full-height immediately (no transition).
+  return (
+    <Card>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <button
+          {...rowProps(onProjects)}
+          className="soft-hover row-focus"
+          aria-label={`Voir les projets de ${m.name}`}
+          style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, background: "none", border: "none", padding: "4px 6px", margin: "-4px -6px", borderRadius: R.sm, cursor: "pointer", textAlign: "left" }}
+        >
+          <Avatar initials={m.initials} color={m.color} size={42} fontSize={15} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.ink900 }}>{m.name}</div>
+            <div style={{ ...TX.caption, color: C.ink500 }}>{m.role}</div>
+          </div>
+        </button>
+        <div style={{ display: "flex", gap: 5 }}>
+          <IconButton size={28} onClick={onEdit} aria-label={`Modifier ${m.name}`}><EditIcon size={14} /></IconButton>
+          <IconButton
+            size={28}
+            tone="danger"
+            disabled={isRef}
+            onClick={() => !isRef && onDelete()}
+            aria-label={isRef ? `${m.name} est affecté·e à des projets — réaffectez d’abord` : `Supprimer ${m.name}`}
+            title={isRef ? "Membre affecté à des projets — réaffectez d’abord" : "Supprimer"}
+          >
+            <TrashIcon size={14} />
+          </IconButton>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          {lens === "charge" ? (
+            <>
+              <span style={{ ...num(26), color: c }}>{shown}&#8239;%{over ? " +" : ""}</span>
+              <span style={{ ...TX.caption, color: C.ink500 }}>
+                {load.periodDays} / {load.capacity} j
+                {over ? (
+                  <span style={{ color: c, fontWeight: 540 }}> · +{load.periodDays - load.capacity}&#8239;j de surcapacité</span>
+                ) : freeDays > 0 ? (
+                  <span style={{ color: C.brandText, fontWeight: 540 }}> · {freeDays}&#8239;j libres</span>
+                ) : ""}
+              </span>
+            </>
+          ) : (
+            <>
+              <span style={{ ...num(26), color: C.ink900 }}>{fmtEur(costEur)}</span>
+              <span style={{ ...TX.caption, color: C.ink500 }}>
+                {fmtEur(m.costPerDay ?? 0)}/j · {load.periodDays}&#8239;j
+              </span>
+            </>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          {delta != null && delta !== 0 ? (
+            <span
+              style={{ ...num(12), color: delta > 0 ? chargeColor(120) : C.brandText, whiteSpace: "nowrap" }}
+              title={`Évolution vs période précédente : ${delta > 0 ? "+" : ""}${delta} % de charge`}
+            >
+              {delta > 0 ? "▲" : "▼"} {Math.abs(delta)}&#8239;%
+            </span>
+          ) : null}
+          <span style={{ ...TX.caption, color: C.ink500 }}>{load.projectsActive} projet{load.projectsActive > 1 ? "s" : ""}</span>
+        </div>
+      </div>
+
+      <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: `${SP[5]}px ${SP[5]}px ${SP[4]}px` }}>
+        <Heatmap buckets={e.buckets} mode={mode} memberName={m.name} />
+      </div>
+
+      {load.tasks.length === 0 ? (
+        <div style={{ marginTop: SP[4] }}>
+          <EmptyState compact title="Aucune tâche planifiée" hint="Rien d’affecté à ce membre sur la période." />
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: SP[4] }}>
+          {load.tasks.map((task, i) => (
+            <div
+              key={i}
+              {...rowProps(() => onOpenProject(task.projectId))}
+              className="row-hover row-focus"
+              aria-label={`${task.taskName} · ${task.projectName} · ${task.daysInPeriod} jours`}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", ...TX.caption, minHeight: 24, padding: "3px 4px", borderRadius: R.xxs }}
+            >
+              <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 7 }}>
+                <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: projectColor(task.projectId), flexShrink: 0 }} />
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ fontWeight: 600, color: task.done ? C.ink500 : C.ink900 }}>{task.taskName}</span>
+                  <span style={{ color: C.ink500 }}> · {task.projectName}</span>
+                </span>
+              </div>
+              <span style={{ ...num(12), color: C.ink700, whiteSpace: "nowrap" }}>{task.daysInPeriod}&#8239;j</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// Clear weekday abbreviations, mirroring the calendar (avoids the ambiguous
+// L/M/M/J/V/S/D where three letters look alike).
+const WD = ["lun", "mar", "mer", "jeu", "ven", "sam", "dim"];
+
+/** ISO-8601 week number ("S24" style), so month-view week labels are meaningful
+ *  instead of a bare day-of-month. */
+function isoWeek(d: Date): number {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = (t.getUTCDay() + 6) % 7; // Mon = 0
+  t.setUTCDate(t.getUTCDate() - day + 3); // nearest Thursday
+  const firstThu = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+  const firstDay = (firstThu.getUTCDay() + 6) % 7;
+  firstThu.setUTCDate(firstThu.getUTCDate() - firstDay + 3);
+  return 1 + Math.round((t.getTime() - firstThu.getTime()) / (7 * 86_400_000));
+}
+
+const HEAT_BANDS: { color: string; label: string }[] = [
+  { color: "#15803D", label: "≤ 84 % — sous-utilisé" },
+  { color: "#B45309", label: "85–100 % — pleine charge" },
+  { color: "#C2683E", label: "> 100 % — en surcharge" },
+];
+
+/** Shared legend, shown once at the top: colour bands, the capacity line, and the
+ *  overflow cap meaning — the four simultaneous encodings, explained once. */
+function HeatmapLegend({ mode }: { mode: TeamMode }) {
+  return (
+    <div
+      role="note"
+      aria-label="Légende du graphique de charge"
+      style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, padding: "8px 12px", marginBottom: 16, background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, ...TX.nano, color: C.ink600 }}
+    >
+      <span style={{ fontWeight: 600, color: C.ink700 }}>Charge {mode === "semaine" ? "par jour" : "par semaine"}</span>
+      {HEAT_BANDS.map((b) => (
+        <span key={b.label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span aria-hidden style={{ width: 12, height: 12, borderRadius: 3, background: b.color }} />
+          {b.label}
+        </span>
+      ))}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span aria-hidden style={{ width: 16, height: 0, borderTop: `1px dashed ${C.lineStrong}` }} />
+        ligne = 100&#8239;% (capacité)
+      </span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span aria-hidden style={{ width: 12, height: 12, borderRadius: 3, background: chargeColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)" }} />
+        cap hachuré = jours au-delà de la capacité
+      </span>
+      <span style={{ color: C.ink500 }}>Les segments empilés = répartition par projet.</span>
+    </div>
+  );
+}
+
+/** Workload heatmap: each bar fills toward the 100%-capacity line and is STACKED
+ *  by project colour, so cross-project allocation is visible. A terracotta
+ *  hatched cap rises above the line when overbooked. Exposed as a labelled
+ *  role=img figure with a per-bucket data-table fallback for assistive tech. */
+function Heatmap({ buckets, mode, memberName }: { buckets: EnrichedBucket[]; mode: TeamMode; memberName: string }) {
+  // Bars grow up from the baseline on mount (reduced-motion → instant full height).
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
@@ -183,31 +501,96 @@ function Heatmap({ buckets, mode }: { buckets: HeatBucket[]; mode: TeamMode }) {
   const OVER = 10; // headroom above the line for the overflow cap
   const H = FULL + OVER;
   const grow = `height ${DUR.slow} ${EASE.decel}`;
+
+  const summary = `Charge de ${memberName} ${mode === "semaine" ? "par jour" : "par semaine"} : ${buckets
+    .map((b) => `${bucketLabel(b, mode)} ${b.pct} %`)
+    .join(", ")}.`;
+
   return (
-    <div style={{ display: "flex", gap: mode === "semaine" ? 5 : 3, alignItems: "flex-end" }}>
-      {buckets.map((b, i) => {
-        const d = toDate(b.start);
-        const today = mode === "semaine" && isToday(b.start);
-        // Fill never exceeds the 100 % track; overflow becomes a capped cap above
-        // the line whose *height saturates* (more red ≠ taller bar), so a 290 %
-        // cell reads as "firmly over" without overshooting the track.
-        const base = (Math.min(b.pct, 100) / 100) * FULL;
-        const over = b.pct > 100 ? Math.min((b.pct - 100) / 40, 1) * OVER : 0;
-        const overDays = Math.max(0, b.days - b.capacity);
-        const lab = mode === "semaine" ? WD[(d.getDay() + 6) % 7] : String(d.getDate());
-        const delay = `${Math.min(i * 25, 200)}ms`;
-        return (
-          <div key={i} style={{ flex: 1, minWidth: 0 }} title={`${mode === "semaine" ? "" : "Semaine du "}${d.getDate()} ${MONTHS_FULL[d.getMonth()]} · ${b.days} / ${b.capacity} j · ${b.pct} %`}>
-            <div style={{ position: "relative", height: H, borderRadius: R.xs, background: SURFACE.containerHigh, boxShadow: `inset 0 0 0 1px ${C.line}`, overflow: "hidden" }}>
-              <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: mounted ? base : 0, background: chargeColor(b.pct), transition: grow, transitionDelay: delay }} />
-              {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: mounted ? over : 0, background: chargeColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)", transition: grow, transitionDelay: delay }} /> : null}
-              {overDays > 0 ? <span style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.surface, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
+    <div role="group" aria-label={`Graphique de charge de ${memberName}`}>
+      <div role="img" aria-label={summary} style={{ display: "flex", gap: mode === "semaine" ? 5 : 3, alignItems: "flex-end" }}>
+        {buckets.map((b, i) => {
+          const inThisBucketToday = bucketContainsToday(b, mode);
+          const base = (Math.min(b.pct, 100) / 100) * FULL;
+          const over = b.pct > 100 ? Math.min((b.pct - 100) / 40, 1) * OVER : 0;
+          const overDays = Math.max(0, b.days - b.capacity);
+          const lab = bucketLabel(b, mode);
+          const delay = `${Math.min(i * 25, 200)}ms`;
+          // Stack the in-capacity fill by project. Heights are proportions of the
+          // capped (≤100%) fill, scaled to the visual track.
+          const inCapDays = Math.min(b.days, b.capacity) || 1;
+          const stack = [...b.shares].sort((a, z) => z.days - a.days);
+          return (
+            <div key={i} style={{ flex: 1, minWidth: 0 }}>
+              <div
+                tabIndex={0}
+                role="img"
+                aria-label={`${bucketLabel(b, mode, true)} : ${b.days} sur ${b.capacity} jours, ${b.pct} %${overDays > 0 ? `, ${overDays} jour(s) au-delà de la capacité` : ""}${b.shares.length ? ` — ${b.shares.map((s) => `${s.projectName} ${Math.round(s.days * 10) / 10} j`).join(", ")}` : ""}`}
+                style={{ position: "relative", height: H, borderRadius: R.xs, background: SURFACE.containerHigh, boxShadow: inThisBucketToday ? `inset 0 0 0 1px ${C.ink700}` : `inset 0 0 0 1px ${C.line}`, overflow: "hidden", outlineOffset: 1 }}
+              >
+                <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.lineStrong}` }} />
+                {/* stacked-by-project in-capacity fill */}
+                {(() => {
+                  let acc = 0;
+                  return stack.map((s, si) => {
+                    const segH = (Math.min(s.days, inCapDays) / inCapDays) * base;
+                    const bottom = acc;
+                    acc += segH;
+                    return (
+                      <div
+                        key={si}
+                        style={{
+                          position: "absolute", left: 0, right: 0, bottom,
+                          height: mounted ? segH : 0,
+                          background: s.color,
+                          boxShadow: si > 0 ? `inset 0 1px 0 rgba(255,255,255,.45)` : "none",
+                          transition: grow, transitionDelay: delay,
+                        }}
+                      />
+                    );
+                  });
+                })()}
+                {/* If no per-project split, fall back to a single charge-coloured fill */}
+                {b.shares.length === 0 ? (
+                  <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: mounted ? base : 0, background: chargeColor(b.pct), transition: grow, transitionDelay: delay }} />
+                ) : null}
+                {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: mounted ? over : 0, background: chargeColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)", transition: grow, transitionDelay: delay }} /> : null}
+                {overDays > 0 ? <span aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.surface, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
+              </div>
+              <div style={{ fontSize: 10, fontWeight: inThisBucketToday ? 700 : 450, color: inThisBucketToday ? C.ink900 : C.ink500, textAlign: "center", marginTop: 4 }}>{lab}</div>
             </div>
-            <div style={{ fontSize: 10, fontWeight: today ? 700 : 450, color: today ? C.ink900 : C.ink500, textAlign: "center", marginTop: 4 }}>{lab}</div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {/* Screen-reader data-table fallback */}
+      <table style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
+        <caption>{summary}</caption>
+        <thead><tr><th scope="col">{mode === "semaine" ? "Jour" : "Semaine"}</th><th scope="col">Jours</th><th scope="col">Capacité</th><th scope="col">Charge</th></tr></thead>
+        <tbody>
+          {buckets.map((b, i) => (
+            <tr key={i}>
+              <th scope="row">{bucketLabel(b, mode, true)}</th>
+              <td>{b.days}</td><td>{b.capacity}</td><td>{b.pct}&#8239;%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
+}
+
+function bucketLabel(b: HeatBucket, mode: TeamMode, full = false): string {
+  const d = toDate(b.start);
+  if (mode === "semaine") {
+    return full ? `${WD[(d.getDay() + 6) % 7]} ${d.getDate()}` : WD[(d.getDay() + 6) % 7];
+  }
+  // Month view: label weeks meaningfully — "S24" not a bare day-of-month.
+  return full ? `Semaine ${isoWeek(d)} (dès le ${d.getDate()} ${MONTHS_FULL[d.getMonth()]})` : `S${isoWeek(d)}`;
+}
+
+function bucketContainsToday(b: HeatBucket, mode: TeamMode): boolean {
+  if (mode === "semaine") return isToday(b.start);
+  // Month view: the week-bucket spans start..end — "today" (the app's fixed
+  // REFERENCE_DATE, not Date.now()) falls inside it.
+  return b.start <= REFERENCE_DATE && REFERENCE_DATE <= b.end;
 }

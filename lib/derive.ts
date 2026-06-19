@@ -9,9 +9,11 @@ import {
   fmtBudget,
   fmtFull,
   fmtShort,
+  isWeekday,
   MONS,
   MONS_LONG,
   overlapWorkingDays,
+  REFERENCE_DATE,
   REFERENCE_TS,
   taskEnd,
   toDate,
@@ -245,6 +247,11 @@ export interface HistoryPoint {
   date: string;
   avg: number; // mean schedule-progress across the portfolio
   rendus: number; // projects with a deliverable due within 7 days
+  /** Projects whose final deadline had elapsed by this date but were unfinished
+   *  (schedule-derived late count) — lets KPIs show a late-count delta. */
+  late: number;
+  /** Projects already started but not yet finished as of this date (active count). */
+  active: number;
 }
 
 const DAY = 86_400_000;
@@ -274,11 +281,26 @@ export function buildHistory(all: DerivedProject[], points = 8, stepDays = 7): H
     const d7ISO = toISO(new Date(dTs + 7 * DAY));
     let sum = 0;
     let rendus = 0;
+    let late = 0;
+    let active = 0;
     for (const p of all) {
-      sum += progressAsOf(p, dISO, dTs);
+      const prog = progressAsOf(p, dISO, dTs);
+      sum += prog;
       if (p.subtasksD.some((s) => s.end > dISO && s.end <= d7ISO)) rendus++;
+      // "as of" status, schedule-derived: started but not 100% done = active;
+      // deadline elapsed yet incomplete = late.
+      const started = p.start <= dISO;
+      const finished = prog >= 100;
+      if (started && !finished) active++;
+      if (p.deadline < dISO && !finished) late++;
     }
-    out.push({ date: dISO, avg: all.length ? Math.round(sum / all.length) : 0, rendus });
+    out.push({
+      date: dISO,
+      avg: all.length ? Math.round(sum / all.length) : 0,
+      rendus,
+      late,
+      active,
+    });
   }
   return out;
 }
@@ -292,6 +314,50 @@ export function computeKpis(all: DerivedProject[]): Kpis {
   const avg = all.length ? Math.round(all.reduce((s, p) => s + p.progress, 0) / all.length) : 0;
   const budgetFmt = fmtBudget(all.reduce((s, p) => s + p.budget, 0));
   return { active, rendus, late, avg, budgetFmt, total: all.length };
+}
+
+// ---- portfolio health (banded; excludes `terminé` from the denominator) ----
+
+export type HealthBand = "critique" | "fragile" | "sain" | "excellent";
+
+export interface PortfolioHealth {
+  /** 0..100 health score over ACTIVE (non-terminé) projects only. */
+  score: number;
+  /** Banded interpretation of the score. */
+  band: HealthBand;
+  /** Active (non-terminé) projects — the denominator. */
+  activeTotal: number;
+  /** Counts of active projects per status. */
+  onTrack: number;
+  atRisk: number;
+  late: number;
+  /** True when there are no active projects (avoids a false red "0/100"). */
+  empty: boolean;
+}
+
+/** Banded portfolio health. Archived (`terminé`) projects are EXCLUDED from the
+ *  denominator so a pile of finished work can't mask burning active projects.
+ *  Score weights: à jour = 1, à risque = 0.5, en retard = 0. */
+export function portfolioHealth(all: DerivedProject[]): PortfolioHealth {
+  const activeProjects = all.filter((p) => p.status !== "terminé");
+  const activeTotal = activeProjects.length;
+  const onTrack = activeProjects.filter((p) => p.status === "à jour").length;
+  const atRisk = activeProjects.filter((p) => p.status === "à risque").length;
+  const late = activeProjects.filter((p) => p.status === "en retard").length;
+  const score = activeTotal
+    ? Math.round((100 * (onTrack + atRisk * 0.5)) / activeTotal)
+    : 100;
+  const band: HealthBand =
+    score >= 85 ? "excellent" : score >= 60 ? "sain" : score >= 35 ? "fragile" : "critique";
+  return {
+    score,
+    band,
+    activeTotal,
+    onTrack,
+    atRisk,
+    late,
+    empty: activeTotal === 0,
+  };
 }
 
 // ------------------------------------------------------------------- gantt
@@ -503,6 +569,131 @@ export function buildBudget(p: Project, team: TeamMember[]): ProjectBudget {
   };
 }
 
+// ----------------------------------------------------- portfolio money/decisions
+//
+// Dashboard-facing selectors that re-anchor the top of the page on MONEY and
+// DECISIONS. All reuse `buildBudget`, so the figures are consistent with the
+// drawer/detail EVM. Schedule-driven, no Date.now().
+
+export interface PortfolioBudget {
+  /** Σ fees (honoraires) across the portfolio, euros. */
+  feesEur: number;
+  /** Σ planned cost (coût engagé prévisionnel), euros. */
+  plannedCostEur: number;
+  /** Σ earned value (valeur acquise), euros. */
+  earnedValueEur: number;
+  /** Projected portfolio margin = fees − plannedCost, euros (can be negative). */
+  marginEur: number;
+  /** marginEur ÷ fees, percentage (can be negative). */
+  marginPct: number;
+  /** plannedCost ÷ fees, 0..100+ — how much of the fees is committed. */
+  committedPct: number;
+  /** Count of projects whose plan commits more than their fees. */
+  overBudgetCount: number;
+  /** Total projects considered. */
+  total: number;
+}
+
+/** Portfolio-wide budget roll-up. Reuses `buildBudget` per project. */
+export function portfolioBudget(all: Project[], team: TeamMember[]): PortfolioBudget {
+  let feesEur = 0;
+  let plannedCostEur = 0;
+  let earnedValueEur = 0;
+  let overBudgetCount = 0;
+  for (const p of all) {
+    const b = buildBudget(p, team);
+    feesEur += b.feesEur;
+    plannedCostEur += b.plannedCostEur;
+    earnedValueEur += b.earnedValueEur;
+    if (b.overBudget) overBudgetCount++;
+  }
+  const marginEur = feesEur - plannedCostEur;
+  return {
+    feesEur,
+    plannedCostEur,
+    earnedValueEur,
+    marginEur,
+    marginPct: feesEur ? Math.round((marginEur / feesEur) * 100) : 0,
+    committedPct: feesEur ? Math.round((plannedCostEur / feesEur) * 100) : 0,
+    overBudgetCount,
+    total: all.length,
+  };
+}
+
+/** Projects recently delivered (a deliverable completed) within the trailing
+ *  `windowDays` (default 7) of the reference date — recent-activity feed.
+ *  Schedule-derived: a done task whose end date falls in [today−window, today]. */
+export interface RecentRendu {
+  projectId: number;
+  projectName: string;
+  taskName: string;
+  /** ISO end date of the delivered task. */
+  date: string;
+  daysAgo: number;
+  assigneeInitials: string;
+  assigneeColor: string;
+}
+
+export function recentRendus(all: DerivedProject[], windowDays = 7): RecentRendu[] {
+  const fromTs = REFERENCE_TS - windowDays * DAY;
+  const out: RecentRendu[] = [];
+  for (const p of all) {
+    for (const s of p.subtasksD) {
+      if (!s.done) continue;
+      const ts = toDate(s.end).getTime();
+      if (ts > REFERENCE_TS || ts < fromTs) continue;
+      out.push({
+        projectId: p.id,
+        projectName: p.name,
+        taskName: s.name,
+        date: s.end,
+        daysAgo: Math.round((REFERENCE_TS - ts) / DAY),
+        assigneeInitials: s.assignee.initials,
+        assigneeColor: s.assignee.color,
+      });
+    }
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/** Top over-capacity members over a range — workload summary tile.
+ *  Uses the corrected allocation (`chargeAllocPct`), not the double-counting sum. */
+export interface WorkloadSummaryMember {
+  member: TeamMember;
+  chargePct: number;
+  projectsActive: number;
+  overCapacity: boolean;
+}
+
+export interface WorkloadSummary {
+  members: WorkloadSummaryMember[];
+  overCapacityCount: number;
+  /** Mean charge across all members (corrected allocation), percentage. */
+  avgChargePct: number;
+}
+
+export function workloadSummary(
+  projects: DerivedProject[],
+  team: TeamMember[],
+  range: DateRange,
+  limit = 5,
+): WorkloadSummary {
+  const loads = buildTeamLoad(projects, team, range);
+  const ranked = loads
+    .map((l) => ({
+      member: l.member,
+      chargePct: l.chargeAllocPct,
+      projectsActive: l.projectsActive,
+      overCapacity: l.chargeAllocPct > 100,
+    }))
+    .sort((a, b) => b.chargePct - a.chargePct);
+  const overCapacityCount = ranked.filter((m) => m.overCapacity).length;
+  const avgChargePct = ranked.length
+    ? Math.round(ranked.reduce((s, m) => s + m.chargePct, 0) / ranked.length)
+    : 0;
+  return { members: ranked.slice(0, limit), overCapacityCount, avgChargePct };
+}
+
 // ---------------------------------------------------------------- calendar
 
 export interface TaskEvent {
@@ -555,7 +746,7 @@ export interface CalCell {
   events: TaskEvent[];
 }
 
-const [REF_Y, REF_M, REF_D] = "2026-06-15".split("-").map(Number);
+const [REF_Y, REF_M, REF_D] = REFERENCE_DATE.split("-").map(Number);
 
 export function buildMonthGrid(year: number, month: number, events: TaskEvent[]): CalCell[] {
   const first = new Date(year, month, 1);
@@ -592,6 +783,88 @@ export function eventsInRange(events: TaskEvent[], range: DateRange): TaskEvent[
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// ---- multi-day spans (work bars, not just end-date dots) ----
+//
+// Each task has a work SPAN [start, end]; the calendar can draw a bar across the
+// days it occupies, plus a distinct deadline cap on the end date. A long span is
+// split per week so a month/week grid can draw one segment per row.
+
+/** One week-clamped segment of a task's work span. */
+export interface TaskSpanSegment {
+  /** Clamped (visible) start of this segment, ISO. */
+  start: string;
+  /** Clamped (visible) end of this segment, ISO. */
+  end: string;
+  /** True when this segment starts the actual task (draw a left cap). */
+  isStart: boolean;
+  /** True when this segment ends the actual task / its deadline (draw a right cap / marker). */
+  isEnd: boolean;
+}
+
+/** A task as a drawable multi-day span, segmented by week, with a deadline marker. */
+export interface TaskSpan {
+  projectId: number;
+  subtaskId: number;
+  projectName: string;
+  taskName: string;
+  /** Work span bounds (full, unclamped). */
+  start: string;
+  end: string;
+  plannedDays: number;
+  phaseIndex: number;
+  color: string;
+  statusColor: string;
+  assigneeInitials: string;
+  assigneeColor: string;
+  done: boolean;
+  /** Per-week clamped segments covering [start, end]. */
+  segments: TaskSpanSegment[];
+  /** The deadline (task end) date — render a distinct cap/marker here. */
+  deadline: string;
+}
+
+/** Build drawable multi-day spans for the given calendar range. Tasks whose work
+ *  window overlaps the range are included; each is split into week-aligned
+ *  segments (clamped to the range). The single-day `buildTaskEvents` export is
+ *  unchanged — this is additive, for bar rendering. */
+export function buildTaskSpans(projects: DerivedProject[], range: DateRange): TaskSpan[] {
+  const out: TaskSpan[] = [];
+  for (const p of projects) {
+    for (const s of p.subtasksD) {
+      // Skip tasks whose work window doesn't intersect the visible range.
+      if (s.end < range.start || s.start > range.end) continue;
+      const visStart = s.start < range.start ? range.start : s.start;
+      const visEnd = s.end > range.end ? range.end : s.end;
+      const segments: TaskSpanSegment[] = weeksInRange({ start: visStart, end: visEnd }).map(
+        (w) => ({
+          start: w.start,
+          end: w.end,
+          isStart: w.start <= s.start && s.start <= w.end,
+          isEnd: w.start <= s.end && s.end <= w.end,
+        }),
+      );
+      out.push({
+        projectId: p.id,
+        subtaskId: s.id,
+        projectName: p.name,
+        taskName: s.name,
+        start: s.start,
+        end: s.end,
+        plannedDays: s.plannedDays,
+        phaseIndex: p.phaseIndex,
+        color: s.done ? "#A8A29E" : PHASE_COLORS[p.phaseIndex],
+        statusColor: p.statusColor,
+        assigneeInitials: s.assignee.initials,
+        assigneeColor: s.assignee.color,
+        done: s.done,
+        segments,
+        deadline: s.end,
+      });
+    }
+  }
+  return out.sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
+}
+
 // ------------------------------------------------------------------ kanban
 
 export interface KanbanColumn {
@@ -621,14 +894,35 @@ export interface TeamTask {
   done: boolean;
 }
 
+/** Per-project contribution within a single heat bucket (for a stacked heatmap). */
+export interface HeatProjectSplit {
+  projectId: number;
+  projectName: string;
+  /** Allocated working days this project consumes in the bucket (corrected). */
+  days: number;
+}
+
 /** One heatmap cell — a sub-period (week or day) of the selected range. */
 export interface HeatBucket {
   start: string;
   end: string;
   label: string;
+  /** Raw summed overlap days (legacy — double-counts parallel tasks). */
   days: number;
+  /** Working-day capacity available in the bucket (calendar working days). */
   capacity: number;
+  /** Legacy charge: raw `days` ÷ capacity (can exceed 100 by double-count). */
   pct: number;
+  // ---- corrected allocation (additive) ----
+  /** Capacity scaled by the member's FTE (weeklyCapacityDays ÷ 5). */
+  capacityFte: number;
+  /** Corrected allocated days: per calendar day, work is capped at the member's
+   *  daily availability, so parallel tasks no longer double-count. */
+  allocDays: number;
+  /** Corrected charge: allocDays ÷ capacityFte, percentage. */
+  allocPct: number;
+  /** Per-project split of `allocDays` for a stacked bar. */
+  projectSplit: HeatProjectSplit[];
 }
 
 export interface TeamLoad {
@@ -640,6 +934,69 @@ export interface TeamLoad {
   tasks: TeamTask[];
   /** Per-week (month view) or per-day (week view) breakdown for the heatmap. */
   buckets: HeatBucket[];
+  // ---- corrected model + cost (additive) ----
+  /** The member's configured weekly capacity in working days (default 5). */
+  weeklyCapacityDays: number;
+  /** Period capacity scaled by FTE (capacity × weeklyCapacityDays ÷ 5). */
+  capacityFte: number;
+  /** Corrected allocated days over the period (parallel tasks no longer summed). */
+  allocDays: number;
+  /** Corrected charge: allocDays ÷ capacityFte, percentage (no 290% artifact). */
+  chargeAllocPct: number;
+  /** Cost of the allocated work over the period: allocDays × member.costPerDay, €. */
+  costEur: number;
+  /** Per-project split of `allocDays` across the whole period (stacked totals). */
+  projectSplit: HeatProjectSplit[];
+}
+
+/** Per-member configurable weekly capacity in working days. Keyed by member id;
+ *  defaults to 5 (full-time) when a member is absent. */
+export type CapacityConfig = Record<number, number>;
+
+const DEFAULT_WEEKLY_CAPACITY = 5;
+
+/** Corrected allocation for one member within a date window: for each calendar
+ *  working day, the member can apply at most `dailyAvail` days of effort split
+ *  across whatever tasks are active that day — so two parallel tasks share the
+ *  day instead of each counting a full day. Returns total allocated days plus a
+ *  per-project split. */
+function allocateInWindow(
+  active: { projectId: number; start: string; end: string }[],
+  winStart: string,
+  winEnd: string,
+  dailyAvail: number,
+): { allocDays: number; byProject: Map<number, number> } {
+  const byProject = new Map<number, number>();
+  let allocDays = 0;
+  const cur = toDate(winStart);
+  const end = toDate(winEnd);
+  while (cur <= end) {
+    if (isWeekday(cur)) {
+      const iso = toISO(cur);
+      const onDay = active.filter((t) => t.start <= iso && iso <= t.end);
+      if (onDay.length) {
+        // Cap the day's total effort at the member's daily availability, shared
+        // equally across the tasks active that day.
+        const perTask = dailyAvail / onDay.length;
+        for (const t of onDay) {
+          byProject.set(t.projectId, (byProject.get(t.projectId) ?? 0) + perTask);
+          allocDays += perTask;
+        }
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return { allocDays, byProject };
+}
+
+function splitFromMap(map: Map<number, number>, names: Map<number, string>): HeatProjectSplit[] {
+  return Array.from(map.entries())
+    .map(([projectId, days]) => ({
+      projectId,
+      projectName: names.get(projectId) ?? "—",
+      days: Math.round(days * 100) / 100,
+    }))
+    .sort((a, b) => b.days - a.days);
 }
 
 export function buildTeamLoad(
@@ -647,13 +1004,20 @@ export function buildTeamLoad(
   team: TeamMember[],
   range: DateRange,
   bucketMode: "week" | "day" = "week",
+  capacityConfig: CapacityConfig = {},
 ): TeamLoad[] {
   const capacity = workingDaysBetween(range.start, range.end);
   const bucketRanges = bucketMode === "day" ? weekdaysInRange(range) : weeksInRange(range);
+  const projectNames = new Map(projects.map((p) => [p.id, p.name]));
 
   return team.map((member) => {
+    const weeklyCapacityDays = capacityConfig[member.id] ?? DEFAULT_WEEKLY_CAPACITY;
+    const fte = weeklyCapacityDays / DEFAULT_WEEKLY_CAPACITY;
+    const dailyAvail = fte; // days of effort available per calendar working day
     const tasks: TeamTask[] = [];
     const bucketDays = bucketRanges.map(() => 0);
+    // Tasks active for this member (clamped to range), for the corrected model.
+    const memberTasks: { projectId: number; start: string; end: string }[] = [];
 
     for (const p of projects) {
       for (const s of p.subtasksD) {
@@ -669,6 +1033,11 @@ export function buildTeamLoad(
             end: s.end,
             done: s.done,
           });
+          memberTasks.push({
+            projectId: p.id,
+            start: s.start < range.start ? range.start : s.start,
+            end: s.end > range.end ? range.end : s.end,
+          });
         }
         bucketRanges.forEach((b, i) => {
           bucketDays[i] += overlapWorkingDays(s.start, s.end, b.start, b.end);
@@ -678,8 +1047,11 @@ export function buildTeamLoad(
 
     const periodDays = tasks.reduce((sum, t) => sum + t.daysInPeriod, 0);
     const projectsActive = new Set(tasks.map((t) => t.projectId)).size;
+
     const buckets: HeatBucket[] = bucketRanges.map((b, i) => {
       const cap = workingDaysBetween(b.start, b.end);
+      const capFte = cap * fte;
+      const alloc = allocateInWindow(memberTasks, b.start, b.end, dailyAvail);
       return {
         start: b.start,
         end: b.end,
@@ -687,8 +1059,16 @@ export function buildTeamLoad(
         days: bucketDays[i],
         capacity: cap,
         pct: cap ? Math.round((bucketDays[i] / cap) * 100) : 0,
+        capacityFte: capFte,
+        allocDays: Math.round(alloc.allocDays * 100) / 100,
+        allocPct: capFte ? Math.round((alloc.allocDays / capFte) * 100) : 0,
+        projectSplit: splitFromMap(alloc.byProject, projectNames),
       };
     });
+
+    const capacityFte = capacity * fte;
+    const periodAlloc = allocateInWindow(memberTasks, range.start, range.end, dailyAvail);
+    const allocDays = Math.round(periodAlloc.allocDays * 100) / 100;
 
     return {
       member,
@@ -698,6 +1078,12 @@ export function buildTeamLoad(
       projectsActive,
       tasks: tasks.sort((a, b) => a.start.localeCompare(b.start)),
       buckets,
+      weeklyCapacityDays,
+      capacityFte,
+      allocDays,
+      chargeAllocPct: capacityFte ? Math.round((allocDays / capacityFte) * 100) : 0,
+      costEur: Math.round(allocDays * member.costPerDay),
+      projectSplit: splitFromMap(periodAlloc.byProject, projectNames),
     };
   });
 }

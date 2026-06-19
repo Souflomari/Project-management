@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { PlusIcon, SearchIcon } from "./icons";
+import { ChevronRightIcon, PlusIcon, SearchIcon } from "./icons";
 import { Button } from "./ui";
 import { openCommandPalette } from "./command-palette";
-import { isWorkspacePath, navItemForPath, WORKSPACE_VIEWS } from "@/lib/nav";
+import { isProjectDetailPath, isWorkspacePath, navItemForPath, WORKSPACE_VIEWS } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, DUR, EASE, R, SH, TX } from "@/lib/tokens";
 
@@ -47,10 +47,21 @@ function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
 
 export function Header() {
   const pathname = usePathname();
+  const params = useParams();
   const item = navItemForPath(pathname);
-  const inWorkspace = isWorkspacePath(pathname);
-  const isListe = item.key === "projets";
-  const { search, setSearch, searched, filtered, openAdd } = useProjects();
+  const isDetail = isProjectDetailPath(pathname);
+  // A project detail page is NOT a workspace lens: it gets a breadcrumb and
+  // drops the list-search/count chrome (meaningless on a single project).
+  const inWorkspace = isWorkspacePath(pathname) && !isDetail;
+  const isListe = item.key === "projets" && pathname === "/projets";
+  const { search, setSearch, searched, filtered, openAdd, allDerived } = useProjects();
+
+  // Resolve the open project's name for the breadcrumb (falls back gracefully
+  // before data hydrates or if the id is unknown).
+  const detailId = Number(Array.isArray(params?.id) ? params.id[0] : params?.id);
+  const detailName = isDetail
+    ? (allDerived.find((p) => p.id === detailId)?.name ?? "Projet")
+    : null;
 
   // Resolve the platform-specific hint only after mount to avoid a visible swap
   // from the SSR/first-paint guess. `null` until then renders a stable-width
@@ -97,9 +108,25 @@ export function Header() {
       }}
     >
       <div className="header-lead" style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
-        <h1 style={{ ...TX.h1, margin: 0, whiteSpace: "nowrap" }}>{title}</h1>
-        {inWorkspace ? <WorkspaceSwitcher activeKey={item.key} /> : null}
-        {isListe ? <span className="header-search" style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap" }}>{count}</span> : null}
+        {isDetail ? (
+          <nav aria-label="Fil d'Ariane" style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <Link href="/projets" className="soft-hover" style={{ ...TX.h1, color: C.ink500, textDecoration: "none", padding: "2px 6px", margin: "0 -6px", borderRadius: R.sm, whiteSpace: "nowrap" }}>
+              Projets
+            </Link>
+            <span aria-hidden style={{ color: C.ink400, display: "flex", flexShrink: 0 }}>
+              <ChevronRightIcon size={18} />
+            </span>
+            <h1 style={{ ...TX.h1, margin: 0, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} aria-current="page">
+              {detailName}
+            </h1>
+          </nav>
+        ) : (
+          <>
+            <h1 style={{ ...TX.h1, margin: 0, whiteSpace: "nowrap" }}>{title}</h1>
+            {inWorkspace ? <WorkspaceSwitcher activeKey={item.key} /> : null}
+            {isListe ? <span className="header-search" style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap" }}>{count}</span> : null}
+          </>
+        )}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

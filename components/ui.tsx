@@ -3,11 +3,12 @@
 // Shared primitive kit. One source of truth for buttons, inputs, cards, etc.
 // so divergent inline styles stop being expressible across views.
 
-import { useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
-import { motion } from "motion/react";
+import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "motion/react";
 
-import { CaretDownIcon, CheckIcon, CloseIcon } from "./icons";
-import { C, ELEV, num, PHASE_COLORS, R, SH, SP, SURFACE, TX } from "@/lib/tokens";
+import { CaretDownIcon, CheckIcon, CloseIcon, MinusIcon, SpinnerIcon } from "./icons";
+import { C, ELEV, num, PHASE_COLORS, R, SH, SP, SPRING, SURFACE, TX, Z } from "@/lib/tokens";
 import { PHASES, PHASES_FULL } from "@/lib/types";
 
 /** Make a clickable row keyboard-operable (WCAG 2.1.1). Spread onto the row;
@@ -70,6 +71,25 @@ export function useFocusTrap(ref: { current: HTMLElement | null }, onClose: () =
   }, [ref, onClose]);
 }
 
+// ───────────────────────────────────────── Spinner
+
+/** Indeterminate activity ring. Spins via framer-motion (the motion engine), so
+ *  it honours reduced-motion by simply not animating the rotation. `currentColor`
+ *  so it inherits the button/control ink. */
+export function Spinner({ size = 16, style }: { size?: number; style?: CSSProperties }) {
+  const reduce = prefersReducedMotion();
+  return (
+    <motion.span
+      aria-hidden
+      style={{ display: "inline-flex", lineHeight: 0, ...style }}
+      animate={reduce ? undefined : { rotate: 360 }}
+      transition={reduce ? undefined : { repeat: Infinity, ease: "linear", duration: 0.7 }}
+    >
+      <SpinnerIcon size={size} />
+    </motion.span>
+  );
+}
+
 // ───────────────────────────────────────── Button
 
 type ButtonVariant = "primary" | "secondary" | "tonal" | "outlined" | "ghost" | "danger";
@@ -78,13 +98,20 @@ export function Button({
   variant = "primary",
   size = "md",
   icon,
+  loading = false,
+  fullWidth = false,
   children,
   style,
+  disabled,
   ...props
 }: {
   variant?: ButtonVariant;
   size?: "sm" | "md";
   icon?: ReactNode;
+  /** Show a spinner, set aria-busy, and block clicks. Width is preserved (the
+   *  label stays in flow at opacity 0) so the button doesn't jump on toggle. */
+  loading?: boolean;
+  fullWidth?: boolean;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const sizes: Record<string, CSSProperties> = {
     sm: { fontSize: 12, padding: "6px 12px" },
@@ -98,11 +125,16 @@ export function Button({
     ghost: { background: "transparent", color: C.ink500 },
     danger: { background: C.danger, color: C.surface },
   };
+  const isDisabled = disabled || loading;
   return (
     <button
       className={`btn btn-${variant}`}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
       style={{
-        display: "inline-flex",
+        position: "relative",
+        display: fullWidth ? "flex" : "inline-flex",
+        width: fullWidth ? "100%" : undefined,
         alignItems: "center",
         justifyContent: "center",
         gap: 6,
@@ -110,18 +142,25 @@ export function Button({
         fontWeight: 600,
         border: "1px solid transparent",
         borderRadius: R.sm,
-        cursor: props.disabled ? "not-allowed" : "pointer",
+        cursor: isDisabled ? "not-allowed" : "pointer",
         whiteSpace: "nowrap",
         transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)",
         ...sizes[size],
         ...variants[variant],
-        ...(props.disabled ? { background: C.subtle, color: C.ink300, borderColor: C.line } : null),
+        ...(isDisabled && !loading ? { background: C.subtle, color: C.ink300, borderColor: C.line } : null),
         ...style,
       }}
       {...props}
     >
-      {icon}
-      {children}
+      {loading ? (
+        <span aria-hidden style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Spinner size={size === "sm" ? 14 : 16} />
+        </span>
+      ) : null}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, visibility: loading ? "hidden" : undefined }}>
+        {icon}
+        {children}
+      </span>
     </button>
   );
 }
@@ -173,18 +212,23 @@ export function Checkbox({
   label,
   tone = "ink",
   size = 18,
+  indeterminate = false,
 }: {
   checked: boolean;
   onChange: () => void;
   label: string;
   tone?: "ink" | "brand";
   size?: number;
+  /** Tri-state "some selected" (MinusIcon). Reads as filled (selected-ish) and
+   *  announces `aria-checked="mixed"`. */
+  indeterminate?: boolean;
 }) {
   const fill = tone === "brand" ? C.brand : C.solid;
+  const on = checked || indeterminate;
   return (
     <button
       role="checkbox"
-      aria-checked={checked}
+      aria-checked={indeterminate ? "mixed" : checked}
       aria-label={label}
       className="btn"
       onClick={(e) => { e.stopPropagation(); onChange(); }}
@@ -201,13 +245,13 @@ export function Checkbox({
         padding: 0,
         color: C.surface,
         transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard)",
-        ...(checked
+        ...(on
           ? { background: fill, border: `1px solid ${fill}` }
           : { background: C.surface, border: `1.5px solid ${C.lineStrong}` }),
       }}
     >
       <span aria-hidden style={{ position: "absolute", inset: -8 }} />
-      {checked ? <CheckIcon size={Math.round(size * 0.66)} /> : null}
+      {indeterminate ? <MinusIcon size={Math.round(size * 0.66)} /> : checked ? <CheckIcon size={Math.round(size * 0.66)} /> : null}
     </button>
   );
 }
@@ -216,48 +260,73 @@ export function Checkbox({
 
 export function Input({
   size = "md",
+  invalid = false,
+  leading,
+  trailing,
   style,
   ...props
-}: { size?: "sm" | "md" } & Omit<InputHTMLAttributes<HTMLInputElement>, "size">) {
+}: {
+  size?: "sm" | "md";
+  /** Paint the error border + set aria-invalid. Pair with Field's `error`. */
+  invalid?: boolean;
+  /** Adornment slots rendered inside the field frame (icon, unit, button). */
+  leading?: ReactNode;
+  trailing?: ReactNode;
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "size">) {
   const s = size === "sm" ? { height: 30, fontSize: 13 } : { height: 36, fontSize: 14 };
+  const padL = leading ? 32 : 12;
+  const padR = trailing ? 32 : 12;
   return (
-    <input
-      className="ui-field"
-      style={{
-        ...s,
-        padding: "0 12px",
-        width: "100%",
-        border: `1px solid ${C.line}`,
-        borderRadius: R.sm,
-        background: C.surface,
-        color: C.ink900,
-        outline: "none",
-        fontFamily: "inherit",
-        ...style,
-      }}
-      {...props}
-    />
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", width: "100%" }}>
+      {leading ? <span style={{ position: "absolute", left: 10, display: "flex", color: C.ink500, pointerEvents: "none" }}>{leading}</span> : null}
+      <input
+        className="ui-field"
+        aria-invalid={invalid || undefined}
+        style={{
+          ...s,
+          padding: `0 ${padR}px 0 ${padL}px`,
+          width: "100%",
+          border: `1px solid ${invalid ? C.danger : C.line}`,
+          borderRadius: R.sm,
+          background: C.surface,
+          color: C.ink900,
+          outline: "none",
+          fontFamily: "inherit",
+          ...style,
+        }}
+        {...props}
+      />
+      {trailing ? <span style={{ position: "absolute", right: 10, display: "flex", color: C.ink500 }}>{trailing}</span> : null}
+    </span>
   );
 }
 
 export function Select({
   size = "md",
+  invalid = false,
+  leading,
   children,
   style,
   ...props
-}: { size?: "sm" | "md" } & Omit<SelectHTMLAttributes<HTMLSelectElement>, "size">) {
+}: {
+  size?: "sm" | "md";
+  invalid?: boolean;
+  leading?: ReactNode;
+} & Omit<SelectHTMLAttributes<HTMLSelectElement>, "size">) {
   const s = size === "sm" ? { height: 30, fontSize: 13 } : { height: 36, fontSize: 14 };
   return (
     <span style={{ position: "relative", display: "inline-flex", width: style?.width ?? "auto" }}>
+      {leading ? <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", display: "flex", color: C.ink500, pointerEvents: "none" }}>{leading}</span> : null}
       <select
         className="ui-field"
+        aria-invalid={invalid || undefined}
         style={{
           appearance: "none",
           WebkitAppearance: "none",
           ...s,
-          padding: "0 30px 0 12px",
+          padding: `0 30px 0 ${leading ? 32 : 12}px`,
           width: "100%",
-          border: `1px solid ${C.line}`,
+          border: `1px solid ${invalid ? C.danger : C.line}`,
           borderRadius: R.sm,
           background: C.surface,
           color: C.ink900,
@@ -274,6 +343,81 @@ export function Select({
         <CaretDownIcon size={14} />
       </span>
     </span>
+  );
+}
+
+// ───────────────────────────────────────── Textarea
+
+export function Textarea({
+  invalid = false,
+  rows = 4,
+  style,
+  ...props
+}: {
+  invalid?: boolean;
+} & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      className="ui-field"
+      rows={rows}
+      aria-invalid={invalid || undefined}
+      style={{
+        padding: "8px 12px",
+        width: "100%",
+        minHeight: 80,
+        fontSize: 14,
+        lineHeight: 1.5,
+        border: `1px solid ${invalid ? C.danger : C.line}`,
+        borderRadius: R.sm,
+        background: C.surface,
+        color: C.ink900,
+        outline: "none",
+        fontFamily: "inherit",
+        resize: "vertical",
+        ...style,
+      }}
+      {...props}
+    />
+  );
+}
+
+// ───────────────────────────────────────── Field (label + control + error)
+
+/** Form-field wrapper: associates a visible label and an error/help line with
+ *  the control via a generated id, so call sites stop hand-wiring htmlFor/id and
+ *  aria-describedby. Pass the id down to your control as a render prop. */
+export function Field({
+  label,
+  error,
+  hint,
+  required,
+  children,
+  style,
+}: {
+  label: string;
+  error?: string;
+  hint?: string;
+  required?: boolean;
+  /** Receives `{ id, invalid }` to spread onto the control. */
+  children: (a: { id: string; invalid: boolean }) => ReactNode;
+  style?: CSSProperties;
+}) {
+  const id = useId();
+  const descId = `${id}-desc`;
+  const invalid = !!error;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, ...style }}>
+      <label htmlFor={id} style={{ ...TX.micro, color: C.ink700, fontWeight: 560 }}>
+        {label}
+        {required ? <span aria-hidden style={{ color: C.danger, marginLeft: 3 }}>*</span> : null}
+      </label>
+      {children({ id, invalid })}
+      {error ? (
+        <span id={descId} role="alert" style={{ ...TX.nano, color: C.danger }}>{error}</span>
+      ) : hint ? (
+        <span id={descId} style={{ ...TX.nano, color: C.ink500 }}>{hint}</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -337,7 +481,11 @@ export function Card({
   padding = "18px 20px",
   elevation = 0,
   radius = R.lg,
+  interactive = false,
   style,
+  onClick,
+  className,
+  id,
 }: {
   children: ReactNode;
   padding?: number | string;
@@ -345,18 +493,28 @@ export function Card({
    *  white card resting on the canvas; raise the hero, not every tile. */
   elevation?: 0 | 1 | 2 | 3;
   radius?: number;
+  /** Opt-in hover-lift. Off by default so static (non-clickable) cards don't
+   *  signal a false affordance. Set when the whole card is a link/button. */
+  interactive?: boolean;
   style?: CSSProperties;
+  onClick?: () => void;
+  className?: string;
+  id?: string;
 }) {
   // On the unified white field, cards read by a hairline border + a soft resting
   // shadow (depth comes from light, not tone). `elevation` deepens the shadow for
-  // hero/overlay surfaces. Cards lift on hover with a spring (framer-motion) so
-  // the surface feels physical and responsive.
+  // hero/overlay surfaces. Interactive cards lift on hover with a spring
+  // (framer-motion, SPRING.snappy) from a resting SH.sm to SH.md — not the
+  // overlay tier, which is reserved for modal/drawer.
   const lift = elevation > 0 ? ELEV[elevation] : { background: C.surface, boxShadow: SH.sm };
   const border = elevation > 0 ? `1px solid ${C.lineStrong}` : `1px solid ${C.line}`;
   return (
     <motion.div
-      whileHover={{ y: -4, boxShadow: SH.lg, borderColor: C.hoverBorder }}
-      transition={{ type: "spring", stiffness: 380, damping: 28 }}
+      whileHover={interactive ? { y: -3, boxShadow: SH.md, borderColor: C.hoverBorder } : undefined}
+      transition={SPRING.snappy}
+      onClick={onClick}
+      className={className}
+      id={id}
       style={{ background: C.surface, border, borderRadius: radius, padding, ...lift, ...style }}
     >
       {children}
@@ -533,6 +691,8 @@ export function Avatar({
   return (
     <div
       title={title}
+      role="img"
+      aria-label={title ?? initials}
       style={{
         width: size,
         height: size,
@@ -549,7 +709,7 @@ export function Avatar({
         ...(ring ? { border: `2px solid ${C.surface}` } : null),
       }}
     >
-      {initials}
+      <span aria-hidden>{initials}</span>
     </div>
   );
 }
@@ -562,35 +722,114 @@ export function Chip({
   tone = "outline",
   dot = false,
   title,
+  selected,
+  onClick,
 }: {
   label: string;
   color?: string;
   tone?: "outline" | "soft" | "plain";
   dot?: boolean;
   title?: string;
+  /** When provided, the Chip becomes a toggle button (role + aria-pressed). */
+  selected?: boolean;
+  onClick?: () => void;
 }) {
   const toneStyle: CSSProperties =
     tone === "soft" ? { background: `${color}14` } : tone === "outline" ? { border: `1px solid ${C.line}` } : {};
+  const base: CSSProperties = {
+    ...TX.eyebrow,
+    fontSize: 10.5,
+    letterSpacing: ".05em",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "3px 8px",
+    borderRadius: R.xs,
+    whiteSpace: "nowrap",
+    color,
+    ...toneStyle,
+  };
+  const dotNode = dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} /> : null;
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="btn"
+        title={title}
+        aria-pressed={!!selected}
+        onClick={onClick}
+        style={{
+          ...base,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          border: `1px solid ${selected ? color : C.line}`,
+          background: selected ? `${color}1A` : tone === "soft" ? `${color}14` : "transparent",
+          color: selected ? color : C.ink600,
+        }}
+      >
+        {dotNode}
+        {label}
+      </button>
+    );
+  }
   return (
-    <span
-      title={title}
-      style={{
-        ...TX.eyebrow,
-        fontSize: 10.5,
-        letterSpacing: ".05em",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "3px 8px",
-        borderRadius: R.xs,
-        whiteSpace: "nowrap",
-        color,
-        ...toneStyle,
-      }}
-    >
-      {dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} /> : null}
+    <span title={title} style={base}>
+      {dotNode}
       {label}
     </span>
+  );
+}
+
+// ───────────────────────────────────────── ToggleButton (selectable control)
+
+/** Selectable button used for filters / pickers / status setters (was hand-rolled
+ *  ≥4× with divergent active treatments). `selected` drives aria-pressed and a
+ *  tonal fill; `tone` recolours the selected state. */
+export function ToggleButton({
+  selected = false,
+  tone = "ink",
+  size = "md",
+  icon,
+  children,
+  style,
+  onClick,
+  ...props
+}: {
+  selected?: boolean;
+  tone?: "ink" | "brand" | "danger";
+  size?: "sm" | "md";
+  icon?: ReactNode;
+} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "color">) {
+  const accent = tone === "brand" ? C.brand : tone === "danger" ? C.danger : C.ink900;
+  const sizes = size === "sm" ? { fontSize: 12, padding: "5px 10px" } : { fontSize: 13, padding: "7px 12px" };
+  return (
+    <button
+      type="button"
+      className="btn"
+      aria-pressed={selected}
+      onClick={onClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        fontFamily: "inherit",
+        fontWeight: 600,
+        borderRadius: R.sm,
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)",
+        ...sizes,
+        ...(selected
+          ? { background: `${accent}14`, border: `1px solid ${accent}`, color: accent }
+          : { background: C.surface, border: `1px solid ${C.line}`, color: C.ink600 }),
+        ...style,
+      }}
+      {...props}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 
@@ -636,11 +875,15 @@ export function ProgressBar({
   color,
   track = C.subtle,
   height = 7,
+  label,
 }: {
   pct: number;
   color: string;
   track?: string;
   height?: number;
+  /** Descriptive context for AT (e.g. "Avancement du projet"). The percentage
+   *  is appended automatically. */
+  label?: string;
 }) {
   const clamped = Math.min(100, Math.max(0, pct));
   return (
@@ -649,6 +892,7 @@ export function ProgressBar({
       aria-valuenow={Math.round(clamped)}
       aria-valuemin={0}
       aria-valuemax={100}
+      aria-label={label ? `${label} : ${Math.round(clamped)} %` : undefined}
       style={{ flex: 1, height, background: track, borderRadius: R.pill, overflow: "hidden" }}
     >
       {/* `.anim-bar` grows the fill from 0 to `--fill` on mount (reduced-motion
@@ -675,6 +919,7 @@ export function Sparkline({
   fill = true,
   gradient = false,
   endLabel,
+  ariaLabel,
 }: {
   values: number[];
   height?: number;
@@ -682,6 +927,9 @@ export function Sparkline({
   fill?: boolean;
   gradient?: boolean;
   endLabel?: string;
+  /** Descriptive label for AT — the trend is otherwise invisible to non-sighted
+   *  users. Defaults to first→last summary. */
+  ariaLabel?: string;
 }) {
   // Stable id per instance (SSR-safe: assigned once at module scope counter).
   const gidRef = useRef<string | null>(null);
@@ -712,9 +960,10 @@ export function Sparkline({
   const area = `0,${height} ${line} ${W},${height}`;
   const lastX = x(values.length - 1);
   const lastY = y(values[values.length - 1]);
+  const autoLabel = ariaLabel ?? `Tendance : de ${values[0]} à ${values[values.length - 1]}`;
   return (
-    <div style={{ position: "relative" }}>
-      <svg width="100%" height={height} viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" style={{ display: "block", overflow: "visible" }}>
+    <div style={{ position: "relative" }} role="img" aria-label={autoLabel}>
+      <svg aria-hidden width="100%" height={height} viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" style={{ display: "block", overflow: "visible" }}>
         {gradient ? (
           <defs>
             <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
@@ -766,6 +1015,7 @@ export function Gauge({
   color = C.brand,
   label,
   sublabel,
+  ariaLabel,
 }: {
   value: number;
   max?: number;
@@ -774,6 +1024,9 @@ export function Gauge({
   color?: string;
   label?: ReactNode;
   sublabel?: ReactNode;
+  /** Descriptive label for AT. The visible count animates (wrong transient
+   *  value), so the centre stack is aria-hidden and this carries the reading. */
+  ariaLabel?: string;
 }) {
   const pct = Math.min(1, Math.max(0, value / max));
   // Animate the sweep in from 0 on mount: render at 0, then flip to the real
@@ -811,9 +1064,10 @@ export function Gauge({
       major: t === 0 || t === 1,
     };
   });
+  const autoLabel = ariaLabel ?? `${Math.round(pct * 100)} %`;
   return (
-    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", transform: `rotate(${rot}deg)` }}>
+    <div role="img" aria-label={autoLabel} style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg aria-hidden width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", transform: `rotate(${rot}deg)` }}>
         <circle
           cx={cx}
           cy={cy}
@@ -849,10 +1103,358 @@ export function Gauge({
           style={{ transition: "stroke-dasharray var(--dur-slow) var(--ease-decel), stroke var(--dur-fast) var(--ease-standard)" }}
         />
       </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
+      <div aria-hidden style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
         {label}
         {sublabel}
       </div>
     </div>
+  );
+}
+
+// ───────────────────────────────────────── Dot
+
+/** Small status/legend dot. The atom behind StatusPill/Chip dots — use directly
+ *  for legends so the 6px circle is consistent everywhere. */
+export function Dot({ color, size = 6, style }: { color: string; size?: number; style?: CSSProperties }) {
+  return <span aria-hidden style={{ display: "inline-block", width: size, height: size, borderRadius: "50%", background: color, flexShrink: 0, ...style }} />;
+}
+
+// ───────────────────────────────────────── Badge / Count
+
+/** Numeric/short badge. `tone` recolours; `dot` shows a leading status dot. Used
+ *  for counts (nav, tabs), small status tags. */
+export function Badge({
+  children,
+  tone = "neutral",
+  dot = false,
+  style,
+}: {
+  children: ReactNode;
+  tone?: "neutral" | "brand" | "danger" | "warn" | "info";
+  dot?: boolean;
+  style?: CSSProperties;
+}) {
+  const tones: Record<string, { fg: string; bg: string }> = {
+    neutral: { fg: C.ink600, bg: C.subtle },
+    brand: { fg: C.brandText, bg: C.brand50 },
+    danger: { fg: "#7A2820", bg: "#FAEEEB" },
+    warn: { fg: "#9A4708", bg: "#FAF1E4" },
+    info: { fg: "#1E4D55", bg: "#E2EEF0" },
+  };
+  const t = tones[tone];
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        minWidth: 18,
+        height: 18,
+        padding: "0 6px",
+        borderRadius: R.pill,
+        ...num(11),
+        fontWeight: 600,
+        justifyContent: "center",
+        color: t.fg,
+        background: t.bg,
+        ...style,
+      }}
+    >
+      {dot ? <Dot color={t.fg} size={5} /> : null}
+      {children}
+    </span>
+  );
+}
+
+// ───────────────────────────────────────── Kbd
+
+/** Keyboard-shortcut hint key. Renders a single key cap; pass a string like
+ *  "⌘K" or compose multiple <Kbd> for chords. */
+export function Kbd({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+  return (
+    <kbd
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: 18,
+        height: 18,
+        padding: "0 5px",
+        borderRadius: R.xs,
+        border: `1px solid ${C.line}`,
+        borderBottomWidth: 2,
+        background: C.surface,
+        color: C.ink600,
+        fontFamily: "inherit",
+        fontSize: 11,
+        fontWeight: 600,
+        lineHeight: 1,
+        ...style,
+      }}
+    >
+      {children}
+    </kbd>
+  );
+}
+
+// ───────────────────────────────────────── Switch (role=switch)
+
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+  tone = "brand",
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  disabled?: boolean;
+  tone?: "brand" | "ink";
+}) {
+  const accent = tone === "brand" ? C.brand : C.solid;
+  const W = 36;
+  const H = 20;
+  const knob = 14;
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      className="btn"
+      onClick={() => !disabled && onChange(!checked)}
+      style={{
+        width: W,
+        height: H,
+        flexShrink: 0,
+        padding: 0,
+        borderRadius: R.pill,
+        border: "none",
+        cursor: disabled ? "not-allowed" : "pointer",
+        background: checked ? accent : C.lineStrong,
+        opacity: disabled ? 0.5 : 1,
+        position: "relative",
+        transition: "background var(--dur-base) var(--ease-standard)",
+      }}
+    >
+      <motion.span
+        aria-hidden
+        animate={{ x: checked ? W - knob - 3 : 3 }}
+        transition={SPRING.snappy}
+        style={{
+          position: "absolute",
+          top: (H - knob) / 2,
+          left: 0,
+          width: knob,
+          height: knob,
+          borderRadius: "50%",
+          background: C.surface,
+          boxShadow: SH.xs,
+        }}
+      />
+    </button>
+  );
+}
+
+// ───────────────────────────────────────── Tabs (roving-tabindex)
+
+type TabItem = { value: string; label: ReactNode; count?: number };
+
+/** Accessible tablist: roving tabindex, Arrow/Home/End keys, aria-controls wiring.
+ *  Two looks: `underline` (editorial) and `pill` (segmented). Replaces the two
+ *  hand-rolled tablists. Caller renders panels and reads `value`. */
+export function Tabs({
+  value,
+  options,
+  onChange,
+  variant = "underline",
+  idBase,
+  style,
+}: {
+  value: string;
+  options: TabItem[];
+  onChange: (v: string) => void;
+  variant?: "underline" | "pill";
+  /** Stable base for the generated tab/panel ids (aria-controls). */
+  idBase?: string;
+  style?: CSSProperties;
+}) {
+  const auto = useId();
+  const base = idBase ?? auto;
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const move = (i: number) => {
+    const next = (i + options.length) % options.length;
+    onChange(options[next].value);
+    refs.current[next]?.focus();
+  };
+  const onKey = (e: KeyboardEvent, i: number) => {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(i + 1); }
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(i - 1); }
+    else if (e.key === "Home") { e.preventDefault(); move(0); }
+    else if (e.key === "End") { e.preventDefault(); move(options.length - 1); }
+  };
+  const pill = variant === "pill";
+  return (
+    <div
+      role="tablist"
+      style={{
+        display: "inline-flex",
+        gap: pill ? 2 : 4,
+        ...(pill ? { background: C.subtle, borderRadius: R.md, padding: 3 } : { borderBottom: `1px solid ${C.line}` }),
+        ...style,
+      }}
+    >
+      {options.map((o, i) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            ref={(el) => { refs.current[i] = el; }}
+            role="tab"
+            id={`${base}-tab-${o.value}`}
+            aria-selected={active}
+            aria-controls={`${base}-panel-${o.value}`}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onChange(o.value)}
+            onKeyDown={(e) => onKey(e, i)}
+            className="btn"
+            style={{
+              position: "relative",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 13,
+              fontWeight: 600,
+              border: "none",
+              background: pill ? (active ? C.surface : "transparent") : "transparent",
+              color: active ? C.ink900 : C.ink500,
+              ...(pill
+                ? { padding: "5px 12px", borderRadius: R.sm, boxShadow: active ? SH.sm : "none" }
+                : { padding: "8px 4px", marginBottom: -1, borderBottom: `2px solid ${active ? C.ink900 : "transparent"}` }),
+            }}
+          >
+            {o.label}
+            {o.count != null ? <Badge tone={active ? "neutral" : "neutral"}>{o.count}</Badge> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Companion id helpers so panels match the Tabs aria wiring. */
+export function tabPanelProps(idBase: string, value: string, active: string) {
+  return {
+    role: "tabpanel" as const,
+    id: `${idBase}-panel-${value}`,
+    "aria-labelledby": `${idBase}-tab-${value}`,
+    hidden: value !== active,
+  };
+}
+
+// ───────────────────────────────────────── Tooltip (portal, dark surface)
+
+/** Accessible tooltip. Opens on hover AND keyboard focus, dismisses on Escape /
+ *  blur / pointer-leave, renders into a portal on a dark C.ink900 surface (like
+ *  the Toaster). Replaces native `title=` for help text. The trigger must be a
+ *  single focusable element; `label` is wired via aria-describedby. */
+export function Tooltip({
+  label,
+  children,
+  placement = "top",
+  delay = 250,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  placement?: "top" | "bottom";
+  delay?: number;
+}) {
+  const id = useId();
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const place = useCallback(() => {
+    const el = wrapRef.current?.firstElementChild ?? wrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setCoords({
+      x: r.left + r.width / 2,
+      y: placement === "top" ? r.top - 8 : r.bottom + 8,
+    });
+  }, [placement]);
+
+  const show = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => { place(); setOpen(true); }, delay);
+  }, [place, delay]);
+  const hide = useCallback(() => {
+    window.clearTimeout(timer.current);
+    setOpen(false);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") hide(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, hide]);
+
+  return (
+    <span
+      ref={wrapRef}
+      style={{ display: "inline-flex" }}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={() => { place(); setOpen(true); }}
+      onBlur={hide}
+      aria-describedby={open ? id : undefined}
+    >
+      {children}
+      {mounted && coords
+        ? createPortal(
+            <AnimatePresence>
+              {open ? (
+                <motion.span
+                  role="tooltip"
+                  id={id}
+                  initial={{ opacity: 0, y: placement === "top" ? 4 : -4, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={SPRING.snappy}
+                  style={{
+                    position: "fixed",
+                    left: coords.x,
+                    top: coords.y,
+                    transform: `translate(-50%, ${placement === "top" ? "-100%" : "0"})`,
+                    zIndex: Z.toast + 1,
+                    pointerEvents: "none",
+                    maxWidth: 240,
+                    background: C.ink900,
+                    color: "#fff",
+                    ...TX.nano,
+                    fontWeight: 500,
+                    padding: "5px 9px",
+                    borderRadius: R.sm,
+                    boxShadow: SH.overlay,
+                    whiteSpace: "normal",
+                  }}
+                >
+                  {label}
+                </motion.span>
+              ) : null}
+            </AnimatePresence>,
+            document.body,
+          )
+        : null}
+    </span>
   );
 }

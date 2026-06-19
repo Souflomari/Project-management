@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -165,6 +166,14 @@ export function ProjectsProvider({
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [team, setTeam] = useState<TeamMember[]>(initialTeam);
 
+  // Live mirrors of projects/team so mutation callbacks can read current state
+  // WITHOUT listing projects/team in their dep arrays — that churn re-created
+  // ~15 callbacks on every edit and forced the whole context value to change.
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
+  const teamRef = useRef(team);
+  teamRef.current = team;
+
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [respFilter, setRespFilter] = useState<number | null>(null);
@@ -177,7 +186,11 @@ export function ProjectsProvider({
   const [newName, setNewName] = useState("");
   const [newClient, setNewClient] = useState("");
   const [newResp, setNewResp] = useState(0);
+  const newProjectRef = useRef({ newName, newClient, newResp });
+  newProjectRef.current = { newName, newClient, newResp };
   const [commentDraft, setCommentDraft] = useState("");
+  const commentDraftRef = useRef(commentDraft);
+  commentDraftRef.current = commentDraft;
 
   const [calMode, setCalMode] = useState<CalMode>("mois");
   const [calAnchor, setCalAnchor] = useState("2026-06-15");
@@ -197,12 +210,12 @@ export function ProjectsProvider({
       toast({ message, variant: "error", action: retry ? { label: "Réessayer", onClick: retry } : undefined }),
     [],
   );
-  const nameOf = useCallback((id: number) => projects.find((p) => p.id === id)?.name ?? "ce projet", [projects]);
+  const nameOf = useCallback((id: number) => projectsRef.current.find((p) => p.id === id)?.name ?? "ce projet", []);
 
   const setStatus = useCallback(
     (id: number, status: Status) => {
-      const snapshot = projects;
-      const prev = projects.find((p) => p.id === id)?.status;
+      const snapshot = projectsRef.current;
+      const prev = snapshot.find((p) => p.id === id)?.status;
       setProjects((p2) => p2.map((p) => (p.id === id ? { ...p, status } : p))); // optimistic
       (serverBacked ? setStatusAction(id, status) : sampleRepository.setStatus(id, status))
         .then((u) => {
@@ -211,14 +224,14 @@ export function ProjectsProvider({
         })
         .catch(() => { setProjects(snapshot); failToast(`Statut non enregistré pour « ${nameOf(id)} »`, () => setStatus(id, status)); });
     },
-    [serverBacked, applyUpdate, failToast, nameOf, projects],
+    [serverBacked, applyUpdate, failToast, nameOf],
   );
 
   const updateProject = useCallback(
     (id: number, patch: ProjectPatch) => {
-      const snapshot = projects;
+      const snapshot = projectsRef.current;
       // Forgiving dates: keep deadline ≥ start whichever field changed (Postel's law).
-      const cur = projects.find((p) => p.id === id);
+      const cur = snapshot.find((p) => p.id === id);
       const norm: ProjectPatch = { ...patch };
       if (cur) {
         const start = norm.start ?? cur.start;
@@ -233,13 +246,13 @@ export function ProjectsProvider({
         .then(applyUpdate)
         .catch(() => { setProjects(snapshot); failToast(`Modification non enregistrée pour « ${nameOf(id)} »`, () => updateProject(id, norm)); });
     },
-    [serverBacked, applyUpdate, failToast, nameOf, projects],
+    [serverBacked, applyUpdate, failToast, nameOf],
   );
 
   const setPhase = useCallback(
     (id: number, phaseIndex: number) => {
-      const snapshot = projects;
-      const prev = projects.find((p) => p.id === id)?.phaseIndex;
+      const snapshot = projectsRef.current;
+      const prev = snapshot.find((p) => p.id === id)?.phaseIndex;
       setProjects((p2) => p2.map((p) => (p.id === id ? { ...p, phaseIndex } : p))); // optimistic
       (serverBacked ? setPhaseAction(id, phaseIndex) : sampleRepository.setPhase(id, phaseIndex))
         .then((u) => {
@@ -248,21 +261,21 @@ export function ProjectsProvider({
         })
         .catch(() => { setProjects(snapshot); failToast(`Phase non enregistrée pour « ${nameOf(id)} »`, () => setPhase(id, phaseIndex)); });
     },
-    [serverBacked, applyUpdate, failToast, nameOf, projects],
+    [serverBacked, applyUpdate, failToast, nameOf],
   );
 
   const advancePhase = useCallback(
     (id: number) => {
-      const current = projects.find((p) => p.id === id);
+      const current = projectsRef.current.find((p) => p.id === id);
       if (!current) return;
       setPhase(id, Math.min(current.phaseIndex + 1, FINAL_PHASE_INDEX));
     },
-    [projects, setPhase],
+    [setPhase],
   );
 
   const addComment = useCallback(
     (id: number) => {
-      const text = commentDraft.trim();
+      const text = commentDraftRef.current.trim();
       if (!text) return;
       (serverBacked ? addCommentAction(id, text) : sampleRepository.addComment(id, text)).then((u) => {
         applyUpdate(u);
@@ -270,10 +283,11 @@ export function ProjectsProvider({
         toast({ message: "Commentaire ajouté", variant: "success" });
       }).catch(() => failToast("Commentaire non publié"));
     },
-    [serverBacked, commentDraft, applyUpdate, failToast],
+    [serverBacked, applyUpdate, failToast],
   );
 
   const submitAdd = useCallback(async () => {
+    const { newName, newClient, newResp } = newProjectRef.current;
     if (!newName.trim()) return false;
     const input = { name: newName, client: newClient, responsableId: newResp };
     const created = serverBacked ? await createProjectAction(input) : await sampleRepository.createProject(input);
@@ -282,7 +296,7 @@ export function ProjectsProvider({
     setSelectedId(created.id); // land straight in the new project's dossier
     toast({ message: "Projet créé", variant: "success" });
     return true;
-  }, [serverBacked, newName, newClient, newResp]);
+  }, [serverBacked]);
 
   const addSubtask = useCallback(
     (projectId: number, input: NewSubtaskInput) => {
@@ -295,7 +309,7 @@ export function ProjectsProvider({
 
   const updateSubtask = useCallback(
     (projectId: number, subtaskId: number, patch: SubtaskPatch) => {
-      const snapshot = projects;
+      const snapshot = projectsRef.current;
       // optimistic
       setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, subtasks: p.subtasks.map((s) => (s.id === subtaskId ? { ...s, ...patch } : s)) } : p)));
       (serverBacked
@@ -303,13 +317,13 @@ export function ProjectsProvider({
         : sampleRepository.updateSubtask(projectId, subtaskId, patch)
       ).then(applyUpdate).catch(() => { setProjects(snapshot); failToast("Modification non enregistrée", () => updateSubtask(projectId, subtaskId, patch)); });
     },
-    [serverBacked, applyUpdate, failToast, projects],
+    [serverBacked, applyUpdate, failToast],
   );
 
   const deleteSubtask = useCallback(
     (projectId: number, subtaskId: number) => {
-      const snapshot = projects;
-      const proj = projects.find((p) => p.id === projectId);
+      const snapshot = projectsRef.current;
+      const proj = snapshot.find((p) => p.id === projectId);
       const s = proj?.subtasks.find((x) => x.id === subtaskId);
       setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, subtasks: p.subtasks.filter((x) => x.id !== subtaskId) } : p))); // optimistic
       (serverBacked
@@ -324,7 +338,7 @@ export function ProjectsProvider({
         });
       }
     },
-    [serverBacked, applyUpdate, failToast, projects, addSubtask],
+    [serverBacked, applyUpdate, failToast, addSubtask],
   );
 
   const addTeamMember = useCallback(
@@ -347,7 +361,7 @@ export function ProjectsProvider({
 
   const deleteTeamMember = useCallback(
     (id: number) => {
-      const m = team.find((x) => x.id === id);
+      const m = teamRef.current.find((x) => x.id === id);
       (serverBacked ? deleteTeamMemberAction(id) : sampleRepository.deleteTeamMember(id)).then(setTeam).catch(() => failToast("Suppression non enregistrée"));
       if (m) {
         toast({
@@ -357,7 +371,7 @@ export function ProjectsProvider({
         });
       }
     },
-    [serverBacked, failToast, team, addTeamMember],
+    [serverBacked, failToast, addTeamMember],
   );
 
   // ---- bulk actions (optimistic batch + one summary toast + undo) ----
@@ -368,7 +382,7 @@ export function ProjectsProvider({
   const bulkSetStatus = useCallback(
     (ids: number[], status: Status) => {
       if (!ids.length) return;
-      const snapshot = projects;
+      const snapshot = projectsRef.current;
       const prevById = new Map(snapshot.filter((p) => ids.includes(p.id)).map((p) => [p.id, p.status]));
       const persist = (id: number, s: Status) => (serverBacked ? setStatusAction(id, s) : sampleRepository.setStatus(id, s));
       setProjects((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, status } : p)));
@@ -379,12 +393,12 @@ export function ProjectsProvider({
         action: { label: "Annuler", onClick: () => { setProjects(snapshot); Promise.all(ids.map((id) => persist(id, prevById.get(id) ?? status))).then(reconcile); } },
       });
     },
-    [projects, serverBacked, failToast, reconcile],
+    [serverBacked, failToast, reconcile],
   );
 
   const bulkAdvancePhase = useCallback(
     (ids: number[]) => {
-      const snapshot = projects;
+      const snapshot = projectsRef.current;
       const targets = snapshot
         .filter((p) => ids.includes(p.id) && p.phaseIndex < FINAL_PHASE_INDEX)
         .map((p) => ({ id: p.id, next: p.phaseIndex + 1, prev: p.phaseIndex }));
@@ -398,25 +412,25 @@ export function ProjectsProvider({
         action: { label: "Annuler", onClick: () => { setProjects(snapshot); Promise.all(targets.map((t) => persist(t.id, t.prev))).then(reconcile); } },
       });
     },
-    [projects, serverBacked, failToast, reconcile],
+    [serverBacked, failToast, reconcile],
   );
 
   const bulkSetResponsable = useCallback(
     (ids: number[], responsableId: number) => {
       if (!ids.length) return;
-      const snapshot = projects;
+      const snapshot = projectsRef.current;
       const prevById = new Map(snapshot.filter((p) => ids.includes(p.id)).map((p) => [p.id, p.responsableId]));
       const persist = (id: number, rid: number) => (serverBacked ? updateProjectAction(id, { responsableId: rid }) : sampleRepository.updateProject(id, { responsableId: rid }));
       setProjects((prev) => prev.map((p) => (ids.includes(p.id) ? { ...p, responsableId } : p)));
       Promise.all(ids.map((id) => persist(id, responsableId))).then(reconcile).catch(() => { setProjects(snapshot); failToast(`${ids.length} projet(s) non mis à jour`); });
-      const who = team.find((m) => m.id === responsableId)?.name ?? "";
+      const who = teamRef.current.find((m) => m.id === responsableId)?.name ?? "";
       toast({
         message: `${ids.length} projet${ids.length > 1 ? "s" : ""} · responsable ${who}`,
         variant: "success",
         action: { label: "Annuler", onClick: () => { setProjects(snapshot); Promise.all(ids.map((id) => persist(id, prevById.get(id) ?? responsableId))).then(reconcile); } },
       });
     },
-    [projects, serverBacked, failToast, reconcile, team],
+    [serverBacked, failToast, reconcile],
   );
 
   // ---- facets / saved views / url sync ----
@@ -509,9 +523,9 @@ export function ProjectsProvider({
   const openAdd = useCallback(() => {
     setNewName("");
     setNewClient("");
-    setNewResp(team[0]?.id ?? 0);
+    setNewResp(teamRef.current[0]?.id ?? 0);
     setShowAdd(true);
-  }, [team]);
+  }, []);
   const closeAdd = useCallback(() => setShowAdd(false), []);
 
   const calPrev = useCallback(() => {
@@ -555,7 +569,7 @@ export function ProjectsProvider({
     [projects, selectedId],
   );
 
-  const value: ProjectsContextValue = {
+  const value = useMemo<ProjectsContextValue>(() => ({
     projects,
     team,
     serverBacked,
@@ -626,7 +640,26 @@ export function ProjectsProvider({
     bulkSetStatus,
     bulkAdvancePhase,
     bulkSetResponsable,
-  };
+  }), [
+    // state / derived — the only things that legitimately change identity
+    projects, team, serverBacked,
+    allDerived, searched, filtered, filters, selected,
+    search, filter, selectedId, selectedIds, showAdd,
+    newName, newClient, newResp, commentDraft,
+    calMode, calAnchor, calProjectFilter,
+    teamMode, teamAnchor,
+    respFilter, phaseFilter, tableSort, savedViews,
+    // stable callbacks (identity fixed via refs/functional updaters) — listed for correctness
+    resetFilters, saveView, applyView, deleteView,
+    toggleSelected, selectAll, clearSelected,
+    openProject, closeDrawer, openAdd, closeAdd,
+    calPrev, calNext, calToday,
+    teamPrev, teamNext, teamToday,
+    updateProject, advancePhase, setPhase, setStatus, addComment, submitAdd,
+    addSubtask, updateSubtask, deleteSubtask,
+    addTeamMember, updateTeamMember, deleteTeamMember,
+    bulkSetStatus, bulkAdvancePhase, bulkSetResponsable,
+  ]);
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;
 }
