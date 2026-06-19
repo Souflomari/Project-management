@@ -3,7 +3,7 @@
 // Shared primitive kit. One source of truth for buttons, inputs, cards, etc.
 // so divergent inline styles stop being expressible across views.
 
-import { useEffect, useRef, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
 
 import { CaretDownIcon, CheckIcon, CloseIcon } from "./icons";
 import { C, num, PHASE_COLORS, R, SH, TX } from "@/lib/tokens";
@@ -23,6 +23,25 @@ export function rowProps(onActivate: () => void) {
       }
     },
   };
+}
+
+/** True when the user has asked the OS to minimise motion. JS-driven animation
+ *  (count-up, exit choreography) must short-circuit on this; CSS is handled by
+ *  the global prefers-reduced-motion rule. */
+export const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/** Manage a brief "closing" phase so an overlay can animate out before it
+ *  unmounts. Returns the flag + a wrapped close that plays the exit then calls
+ *  the real `onClose` (immediately under reduced motion). */
+export function useExitClose(onClose: () => void, ms = 160) {
+  const [closing, setClosing] = useState(false);
+  const requestClose = useCallback(() => {
+    if (prefersReducedMotion()) return onClose();
+    setClosing(true);
+    window.setTimeout(onClose, ms);
+  }, [onClose, ms]);
+  return { closing, requestClose };
 }
 
 /** Trap Tab focus within `ref`, focus the first control on mount, restore focus
@@ -388,12 +407,13 @@ export function Modal({
   footer?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  useFocusTrap(ref, onClose);
+  const { closing, requestClose } = useExitClose(onClose);
+  useFocusTrap(ref, requestClose);
 
   return (
     <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .16s ease", padding: 20 }}
+      onClick={requestClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", animation: closing ? "fadeOut .16s ease forwards" : "fadeIn var(--dur-base) var(--ease-out)", padding: 20 }}
     >
       <div
         ref={ref}
@@ -402,11 +422,11 @@ export function Modal({
         aria-labelledby="modal-title"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.lg, boxShadow: SH.lg, padding: 24, color: C.ink900, animation: "popIn .2s cubic-bezier(.2,.7,.2,1)", outline: "none" }}
+        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.lg, boxShadow: SH.lg, padding: 24, color: C.ink900, animation: closing ? "popOut .16s ease forwards" : "popIn var(--dur-base) var(--ease-out)", outline: "none" }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: subtitle ? 4 : 16 }}>
           <h2 id="modal-title" style={{ ...TX.h2, margin: 0 }}>{title}</h2>
-          <IconButton size={28} onClick={onClose} aria-label="Fermer">
+          <IconButton size={28} onClick={requestClose} aria-label="Fermer">
             <CloseIcon size={15} />
           </IconButton>
         </div>

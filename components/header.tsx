@@ -8,7 +8,7 @@ import { Button } from "./ui";
 import { openCommandPalette } from "./command-palette";
 import { navItemForPath } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, R, TX } from "@/lib/tokens";
+import { C, R, SH, TX } from "@/lib/tokens";
 
 export function Header() {
   const pathname = usePathname();
@@ -17,6 +17,19 @@ export function Header() {
   const [kbd, setKbd] = useState("⌘K");
   useEffect(() => {
     if (!/Mac|iPhone|iPad/.test(navigator.platform)) setKbd("Ctrl K");
+  }, []);
+
+  // Lift the sticky header (shadow + denser glass) once content scrolls under it.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setScrolled(window.scrollY > 4));
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => { window.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
   }, []);
 
   const subtitle =
@@ -28,10 +41,12 @@ export function Header() {
     <header
       style={{
         minHeight: 64,
-        background: "rgba(255,255,255,.72)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
+        background: scrolled ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.72)",
+        backdropFilter: scrolled ? "blur(10px)" : "blur(6px)",
+        WebkitBackdropFilter: scrolled ? "blur(10px)" : "blur(6px)",
         borderBottom: `1px solid ${C.line}`,
+        boxShadow: scrolled ? SH.sm : "none",
+        transition: "box-shadow .16s ease, background .16s ease",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",

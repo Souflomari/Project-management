@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { CloseIcon, PlusIcon, TrashIcon } from "./icons";
-import { Avatar, Button, Checkbox, IconButton, Input, ProgressBar, Select, useFocusTrap } from "./ui";
+import { Avatar, Button, Checkbox, IconButton, Input, prefersReducedMotion, ProgressBar, Select, useFocusTrap } from "./ui";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { deriveProject, type DerivedSubtask } from "@/lib/derive";
 import { fmtFull, REFERENCE_DATE } from "@/lib/format";
@@ -35,7 +35,13 @@ export function ProjectDrawer() {
   const [ntStart, setNtStart] = useState(REFERENCE_DATE);
   const [ntDays, setNtDays] = useState(5);
   const asideRef = useRef<HTMLElement>(null);
-  useFocusTrap(asideRef, closeDrawer);
+  const [closing, setClosing] = useState(false);
+  const requestClose = useCallback(() => {
+    if (prefersReducedMotion()) { closeDrawer(); return; }
+    setClosing(true);
+    window.setTimeout(() => { closeDrawer(); setClosing(false); }, 220);
+  }, [closeDrawer]);
+  useFocusTrap(asideRef, requestClose);
 
   if (!selected) return null;
 
@@ -54,8 +60,8 @@ export function ProjectDrawer() {
   return (
     <>
       <div
-        onClick={closeDrawer}
-        style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 60, animation: "fadeIn .18s ease" }}
+        onClick={requestClose}
+        style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 60, animation: closing ? "fadeOut .2s ease forwards" : "fadeIn var(--dur-base) ease" }}
       />
       <aside
         ref={asideRef}
@@ -77,14 +83,14 @@ export function ProjectDrawer() {
           borderLeft: `1px solid ${C.line}`,
           boxShadow: SH.drawer,
           overflowY: "auto",
-          animation: "drawerIn .26s cubic-bezier(.2,.7,.2,1)",
+          animation: closing ? "drawerOut .2s var(--ease-accel) forwards" : "drawerIn var(--dur-slow) var(--ease-out)",
         }}
       >
         {/* header */}
         <div style={{ position: "sticky", top: 0, background: C.surface, padding: "18px 24px 14px", borderBottom: `1px solid ${C.line}`, zIndex: 2 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={LABEL}>{p.phaseFull}</span>
-            <IconButton size={30} onClick={closeDrawer} aria-label="Fermer le dossier">
+            <IconButton size={30} onClick={requestClose} aria-label="Fermer le dossier">
               <CloseIcon size={15} />
             </IconButton>
           </div>

@@ -8,6 +8,7 @@ import { buildHistory, buildKanban, computeKpis, statusDistribution, upcomingRen
 import { WEEK_SHORT } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, num, PHASE_COLORS, R, STATUS_META, TX } from "@/lib/tokens";
+import { useCountUp } from "@/lib/use-count-up";
 
 const STALE_DAYS = 90;
 
@@ -39,6 +40,7 @@ export function Dashboard() {
   const lateCount = countOf("en retard");
   const done = countOf("terminé");
   const health = Math.round((100 * (onTrack + done + atRisk * 0.5)) / distTotal);
+  const healthShown = useCountUp(health);
   const healthColor = health >= 75 ? C.brand : health >= 55 ? "#B45309" : C.danger;
   const healthLabel = health >= 75 ? "Sous contrôle" : health >= 55 ? "À surveiller" : "Sous tension";
 
@@ -60,7 +62,7 @@ export function Dashboard() {
           <Card padding="18px 20px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
             <div style={{ ...TX.eyebrow, color: C.ink400 }}>Santé du portefeuille</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
-              <span style={{ ...num(46), color: healthColor }}>{health}</span>
+              <span style={{ ...num(46), color: healthColor }}>{healthShown}</span>
               <span style={{ ...num(18), color: C.ink400 }}>/ 100</span>
             </div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 4 }}>
@@ -195,12 +197,14 @@ function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: 
 
 function Kpi({ title, value, sub, color, accent, delta, onClick, className }: { title: string; value: string | number; sub: string; color?: string; accent?: string; delta?: number; onClick?: () => void; className?: string }) {
   const cls = [className, onClick ? "lift-hover row-focus" : ""].filter(Boolean).join(" ") || undefined;
+  const counted = useCountUp(typeof value === "number" ? value : 0);
+  const display = typeof value === "number" ? counted : value;
   return (
     <div className={cls} {...(onClick ? rowProps(onClick) : {})} style={{ borderRadius: R.lg, ...(onClick ? { cursor: "pointer" } : {}) }}>
       <Card padding="16px 18px" style={{ height: "100%", ...(accent ? { borderTop: `2px solid ${accent}` } : {}) }}>
         <div style={{ ...TX.eyebrow, color: C.ink400 }}>{title}</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
-          <span style={{ ...num(36), color: color ?? C.ink900 }}>{value}</span>
+          <span style={{ ...num(36), color: color ?? C.ink900 }}>{display}</span>
           {delta !== undefined ? <Delta v={delta} /> : null}
         </div>
         <div style={{ ...TX.nano, color: C.ink400, marginTop: 7 }}>{sub}</div>

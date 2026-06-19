@@ -48,7 +48,7 @@ export function Toaster() {
               padding: "10px 12px 10px 13px",
               minWidth: 260,
               maxWidth: 440,
-              animation: leaving.has(t.id) ? "toastOut .16s ease forwards" : "toastIn .22s cubic-bezier(.2,.7,.2,1)",
+              animation: leaving.has(t.id) ? "toastOut .16s ease forwards" : "toastIn .22s var(--ease-out)",
             }}
           >
             {t.variant === "success" ? <span style={{ color: C.inversePrimary, display: "flex" }}><CheckIcon size={15} /></span> : null}

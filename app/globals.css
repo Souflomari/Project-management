@@ -285,6 +285,24 @@ select:focus-visible,
     opacity: 1;
   }
 }
+/* exit counterparts — overlays now animate out instead of blinking */
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes popOut {
+  to {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+}
+@keyframes drawerOut {
+  to {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
 
 /* ---- loading skeletons ---- */
 .skeleton {
