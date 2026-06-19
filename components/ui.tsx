@@ -168,17 +168,24 @@ export function Button({
 export function IconButton({
   size = 30,
   tone = "default",
+  loading = false,
   children,
   style,
+  disabled,
   ...props
 }: {
   size?: number;
   tone?: "default" | "danger";
+  /** Swap the glyph for a spinner, set aria-busy and block clicks. */
+  loading?: boolean;
   children: ReactNode;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const isDisabled = disabled || loading;
   return (
     <button
       className={`btn icon-btn${tone === "danger" ? " icon-danger" : ""}`}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
       style={{
         width: size,
         height: size,
@@ -188,17 +195,17 @@ export function IconButton({
         border: `1px solid ${C.line}`,
         background: C.surface,
         borderRadius: R.sm,
-        cursor: props.disabled ? "not-allowed" : "pointer",
+        cursor: isDisabled ? "not-allowed" : "pointer",
         color: tone === "danger" ? C.danger : C.ink500,
         padding: 0,
         flexShrink: 0,
         transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)",
-        ...(props.disabled ? { background: C.subtle, color: C.ink300, borderColor: C.line } : null),
+        ...(isDisabled && !loading ? { background: C.subtle, color: C.ink300, borderColor: C.line } : null),
         ...style,
       }}
       {...props}
     >
-      {children}
+      {loading ? <Spinner size={Math.round(size * 0.5)} /> : children}
     </button>
   );
 }
@@ -213,6 +220,7 @@ export function Checkbox({
   tone = "ink",
   size = 18,
   indeterminate = false,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: () => void;
@@ -222,6 +230,7 @@ export function Checkbox({
   /** Tri-state "some selected" (MinusIcon). Reads as filled (selected-ish) and
    *  announces `aria-checked="mixed"`. */
   indeterminate?: boolean;
+  disabled?: boolean;
 }) {
   const fill = tone === "brand" ? C.brand : C.solid;
   const on = checked || indeterminate;
@@ -230,8 +239,10 @@ export function Checkbox({
       role="checkbox"
       aria-checked={indeterminate ? "mixed" : checked}
       aria-label={label}
+      aria-disabled={disabled || undefined}
+      disabled={disabled}
       className="btn"
-      onClick={(e) => { e.stopPropagation(); onChange(); }}
+      onClick={(e) => { e.stopPropagation(); if (!disabled) onChange(); }}
       style={{
         position: "relative",
         width: size,
@@ -241,13 +252,17 @@ export function Checkbox({
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
         padding: 0,
         color: C.surface,
         transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard)",
-        ...(on
-          ? { background: fill, border: `1px solid ${fill}` }
-          : { background: C.surface, border: `1.5px solid ${C.lineStrong}` }),
+        ...(disabled
+          ? on
+            ? { background: C.ink300, border: `1px solid ${C.ink300}` }
+            : { background: C.subtle, border: `1.5px solid ${C.line}` }
+          : on
+            ? { background: fill, border: `1px solid ${fill}` }
+            : { background: C.surface, border: `1.5px solid ${C.lineStrong}` }),
       }}
     >
       <span aria-hidden style={{ position: "absolute", inset: -8 }} />
@@ -292,6 +307,7 @@ export function Input({
           color: C.ink900,
           outline: "none",
           fontFamily: "inherit",
+          ...(props.disabled ? { background: C.subtle, color: C.ink300, cursor: "not-allowed" } : null),
           ...style,
         }}
         {...props}
@@ -332,14 +348,15 @@ export function Select({
           color: C.ink900,
           outline: "none",
           fontFamily: "inherit",
-          cursor: "pointer",
+          cursor: props.disabled ? "not-allowed" : "pointer",
+          ...(props.disabled ? { background: C.subtle, color: C.ink300 } : null),
           ...style,
         }}
         {...props}
       >
         {children}
       </select>
-      <span style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: C.ink500, display: "flex" }}>
+      <span style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: props.disabled ? C.ink300 : C.ink500, display: "flex" }}>
         <CaretDownIcon size={14} />
       </span>
     </span>
@@ -374,6 +391,7 @@ export function Textarea({
         outline: "none",
         fontFamily: "inherit",
         resize: "vertical",
+        ...(props.disabled ? { background: C.subtle, color: C.ink300, cursor: "not-allowed", resize: "none" } : null),
         ...style,
       }}
       {...props}
@@ -427,10 +445,12 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (v: T) => void;
+  disabled?: boolean;
 }) {
   const move = (dir: 1 | -1) => {
     const i = options.findIndex((o) => o.value === value);
@@ -438,7 +458,7 @@ export function Segmented<T extends string>({
     onChange(options[(i + dir + options.length) % options.length].value);
   };
   return (
-    <div role="radiogroup" style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3 }}>
+    <div role="radiogroup" aria-disabled={disabled || undefined} style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3, opacity: disabled ? 0.5 : 1 }}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -447,6 +467,7 @@ export function Segmented<T extends string>({
             role="radio"
             aria-checked={active}
             tabIndex={active ? 0 : -1}
+            disabled={disabled}
             onClick={() => onChange(o.value)}
             onKeyDown={(e) => {
               if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(1); }
@@ -455,7 +476,7 @@ export function Segmented<T extends string>({
             className="btn"
             style={{
               border: "none",
-              cursor: "pointer",
+              cursor: disabled ? "not-allowed" : "pointer",
               fontFamily: "inherit",
               fontSize: 12,
               fontWeight: 600,
@@ -501,21 +522,23 @@ export function Card({
   className?: string;
   id?: string;
 }) {
-  // On the unified white field, cards read by a hairline border + a soft resting
-  // shadow (depth comes from light, not tone). `elevation` deepens the shadow for
-  // hero/overlay surfaces. Interactive cards lift on hover with a spring
-  // (framer-motion, SPRING.snappy) from a resting SH.sm to SH.md — not the
-  // overlay tier, which is reserved for modal/drawer.
-  const lift = elevation > 0 ? ELEV[elevation] : { background: C.surface, boxShadow: SH.sm };
+  // DATA-INK: a static card at rest reads by a single hairline on the white
+  // field — no resting shadow (depth is reserved for genuine lift). `elevation`
+  // opts a tile into the tonal-shadow ramp for the hero / raised surfaces; raise
+  // those, not every tile. Interactive cards stay flat at rest (no false
+  // affordance) and lift on hover with a spring (framer-motion, SPRING.snappy)
+  // from flat to SH.md + a stronger hairline — not the overlay tier, reserved
+  // for modal/drawer.
+  const lift = elevation > 0 ? ELEV[elevation] : { background: C.surface, boxShadow: "none" };
   const border = elevation > 0 ? `1px solid ${C.lineStrong}` : `1px solid ${C.line}`;
   return (
     <motion.div
-      whileHover={interactive ? { y: -3, boxShadow: SH.md, borderColor: C.hoverBorder } : undefined}
+      whileHover={interactive ? { y: -2, boxShadow: SH.md, borderColor: C.lineStrong } : undefined}
       transition={SPRING.snappy}
       onClick={onClick}
       className={className}
       id={id}
-      style={{ background: C.surface, border, borderRadius: radius, padding, ...lift, ...style }}
+      style={{ background: C.surface, border, borderRadius: radius, padding, cursor: interactive ? "pointer" : undefined, ...lift, ...style }}
     >
       {children}
     </motion.div>
@@ -655,7 +678,7 @@ export function Modal({
         aria-labelledby="modal-title"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.lg, boxShadow: SH.lg, padding: 24, color: C.ink900, animation: closing ? "popOut var(--dur-fast) var(--ease-accel) forwards" : "popIn var(--dur-base) var(--ease-out)", outline: "none" }}
+        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.lg, boxShadow: SH.overlay, padding: 24, color: C.ink900, animation: closing ? "popOut var(--dur-fast) var(--ease-accel) forwards" : "popIn var(--dur-base) var(--ease-out)", outline: "none" }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: subtitle ? 4 : 16 }}>
           <h2 id="modal-title" style={{ ...TX.h2, margin: 0 }}>{title}</h2>
@@ -753,7 +776,8 @@ export function Chip({
     ...toneStyle,
   };
   // Hue lives in the dot only — a thin accent, so the label stays neutral ink.
-  const dotNode = dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} /> : null;
+  // Uses the shared Dot atom so the 6px circle is identical to StatusPill/legends.
+  const dotNode = dot ? <Dot color={color} /> : null;
   if (onClick) {
     return (
       <button
@@ -875,7 +899,7 @@ export function StatusPill({
         ...(filled && bg ? { background: bg, padding: "3px 9px", borderRadius: R.pill } : null),
       }}
     >
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      <Dot color={color} />
       {label}
     </span>
   );

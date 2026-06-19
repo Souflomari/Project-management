@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
-import { CaretDownIcon, CheckIcon, CloseIcon } from "./icons";
+import { CaretDownIcon, CheckIcon, CloseIcon, FilterIcon } from "./icons";
 import { Button, Input, Modal } from "./ui";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, R, SH, SPRING, STATUS_META, TX, Z } from "@/lib/tokens";
@@ -132,6 +132,107 @@ function FacetOption({
   );
 }
 
+function FacetSection({ title, count, onClear, children }: { title: string; count: number; onClear: () => void; children: ReactNode }) {
+  return (
+    <div style={{ padding: "4px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px 2px" }}>
+        <span style={{ ...TX.eyebrow, color: C.ink400 }}>{title}</span>
+        {count > 0 ? (
+          <button type="button" onClick={onClear} className="soft-hover" style={{ marginLeft: "auto", ...TX.nano, fontWeight: 600, color: C.ink500, background: "none", border: "none", borderRadius: R.xxs, padding: "2px 5px", cursor: "pointer" }}>
+            Effacer
+          </button>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Single consolidated filter entry point (Hick / progressive disclosure):
+ *  status, phase and responsable as stacked sections behind one "Filtrer"
+ *  button that carries the combined active-facet count. */
+function FilterPopover({ facets, team }: { facets: FacetControls; team: { id: number; name: string; color: string }[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  const total = facets.statusSel.size + facets.phaseSel.size + facets.respSel.size;
+  const active = total > 0;
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="btn state-layer"
+        style={{
+          cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 600, padding: "7px 11px 7px 10px", borderRadius: R.sm,
+          display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", minHeight: 34,
+          border: `1px solid ${active ? C.lineStrong : C.line}`, background: active ? C.subtle : C.surface, color: active ? C.ink900 : C.ink700,
+          transition: "background .12s, border-color .12s",
+        }}
+      >
+        <span style={{ display: "inline-flex", color: active ? C.ink700 : C.ink500 }}><FilterIcon size={14} /></span>
+        Filtrer
+        {active ? (
+          <span style={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 16, textAlign: "center", padding: "1px 5px", borderRadius: R.xs, background: C.ink800, color: "#fff" }}>{total}</span>
+        ) : null}
+        <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .12s", color: C.ink500 }}>
+          <CaretDownIcon size={12} />
+        </span>
+      </button>
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            role="dialog"
+            aria-label="Filtres"
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={SPRING.snappy}
+            style={{
+              position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: Z.sticky + 1, width: 248, maxHeight: 440, overflowY: "auto",
+              background: C.surface, border: `1px solid ${C.lineStrong}`, borderRadius: R.md, boxShadow: SH.overlay, padding: 6,
+            }}
+          >
+            <FacetSection title="Statut" count={facets.statusSel.size} onClear={facets.clearStatus}>
+              {STATUSES.map((s) => (
+                <FacetOption
+                  key={s}
+                  selected={facets.statusSel.has(s)}
+                  label={STATUS_META[s].label}
+                  count={facets.statusCount(s)}
+                  dot={STATUS_META[s].color}
+                  onToggle={() => facets.toggleStatus(s)}
+                />
+              ))}
+            </FacetSection>
+
+            <div style={{ height: 1, background: C.line, margin: "2px 0" }} />
+
+            <FacetSection title="Phase" count={facets.phaseSel.size} onClear={facets.clearPhase}>
+              {PHASES.map((ph, i) => (
+                <FacetOption key={ph} selected={facets.phaseSel.has(i)} label={ph} count={facets.phaseCount(i)} onToggle={() => facets.togglePhase(i)} />
+              ))}
+            </FacetSection>
+
+            <div style={{ height: 1, background: C.line, margin: "2px 0" }} />
+
+            <FacetSection title="Responsable" count={facets.respSel.size} onClear={facets.clearResp}>
+              {team.map((m) => (
+                <FacetOption key={m.id} selected={facets.respSel.has(m.id)} label={m.name} count={facets.respCount(m.id)} dot={m.color} onToggle={() => facets.toggleResp(m.id)} />
+              ))}
+            </FacetSection>
+
+            {active ? (
+              <button type="button" onClick={() => facets.resetAll()} style={clearBtn}>Tout réinitialiser</button>
+            ) : null}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNode; showViews?: boolean; facets?: FacetControls }) {
   const {
     filters, setFilter, filter,
@@ -157,54 +258,11 @@ export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNod
   return (
     <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
       {facets ? (
-        <>
-          {/* honest, multi-select status popover */}
-          <FacetPopover label="Statut" badge={facets.statusSel.size} active={facets.statusSel.size > 0}>
-            {() => (
-              <>
-                {STATUSES.map((s) => (
-                  <FacetOption
-                    key={s}
-                    selected={facets.statusSel.has(s)}
-                    label={STATUS_META[s].label}
-                    count={facets.statusCount(s)}
-                    dot={STATUS_META[s].color}
-                    onToggle={() => facets.toggleStatus(s)}
-                  />
-                ))}
-                {facets.statusSel.size > 0 ? (
-                  <button type="button" onClick={facets.clearStatus} style={clearBtn}>Effacer</button>
-                ) : null}
-              </>
-            )}
-          </FacetPopover>
-
-          <FacetPopover label="Phase" badge={facets.phaseSel.size} active={facets.phaseSel.size > 0}>
-            {() => (
-              <>
-                {PHASES.map((ph, i) => (
-                  <FacetOption key={ph} selected={facets.phaseSel.has(i)} label={ph} count={facets.phaseCount(i)} onToggle={() => facets.togglePhase(i)} />
-                ))}
-                {facets.phaseSel.size > 0 ? (
-                  <button type="button" onClick={facets.clearPhase} style={clearBtn}>Effacer</button>
-                ) : null}
-              </>
-            )}
-          </FacetPopover>
-
-          <FacetPopover label="Responsable" badge={facets.respSel.size} active={facets.respSel.size > 0}>
-            {() => (
-              <>
-                {team.map((m) => (
-                  <FacetOption key={m.id} selected={facets.respSel.has(m.id)} label={m.name} count={facets.respCount(m.id)} dot={m.color} onToggle={() => facets.toggleResp(m.id)} />
-                ))}
-                {facets.respSel.size > 0 ? (
-                  <button type="button" onClick={facets.clearResp} style={clearBtn}>Effacer</button>
-                ) : null}
-              </>
-            )}
-          </FacetPopover>
-        </>
+        /* Hick's law: one "Filtrer" entry point instead of three peer popovers.
+         * All facets (statut / phase / responsable) live behind it as sections,
+         * so the toolbar shows a single control at rest and the choice cost is
+         * paid only on demand (progressive disclosure). */
+        <FilterPopover facets={facets} team={team} />
       ) : (
         <>
           {/* legacy store-backed single-select (kanban / gantt) */}
@@ -255,7 +313,10 @@ export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNod
         </>
       )}
 
-      {hasFacets ? (
+      {/* The consolidated facet popover carries its own "Tout réinitialiser";
+       *  the standalone reset chip is only needed for the legacy single-select
+       *  branch so the table toolbar stays to a single Filtrer control. */}
+      {!facets && hasFacets ? (
         <button onClick={reset} className="soft-hover" style={{ display: "inline-flex", alignItems: "center", gap: 4, ...TX.caption, color: C.ink500, background: "none", border: "none", borderRadius: R.xs, padding: "4px 6px", cursor: "pointer" }}>
           <CloseIcon size={12} /> Réinitialiser
         </button>

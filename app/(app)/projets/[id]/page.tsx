@@ -119,24 +119,29 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* ── right rail ── */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <RailCard title="Propriétés">
-            <ProjectProperties p={p} />
-          </RailCard>
-          <RailCard title="Honoraires et valeur acquise">
-            <ProjectBudget p={p} />
-          </RailCard>
+        {/* ── right rail ──
+            Data-ink: one quiet container holds both property + budget sections,
+            grouped by whitespace and divided by a single hairline rule rather
+            than two competing bordered+shadowed boxes (box-in-box → calm list). */}
+        <aside>
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.sm, padding: "20px 20px 22px" }}>
+            <RailSection title="Propriétés">
+              <ProjectProperties p={p} />
+            </RailSection>
+            <RailSection title="Honoraires et valeur acquise" divided>
+              <ProjectBudget p={p} />
+            </RailSection>
+          </div>
         </aside>
       </div>
     </div>
   );
 }
 
-function RailCard({ title, children }: { title: string; children: React.ReactNode }) {
+function RailSection({ title, children, divided = false }: { title: string; children: React.ReactNode; divided?: boolean }) {
   return (
-    <section style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.sm, padding: "16px 18px" }}>
-      <h3 style={{ ...TX.overline, color: C.ink700, margin: "0 0 14px" }}>{title}</h3>
+    <section style={divided ? { marginTop: 22, paddingTop: 22, borderTop: `1px solid ${C.line}` } : undefined}>
+      <h3 style={{ ...TX.overline, color: C.ink700, margin: "0 0 16px" }}>{title}</h3>
       {children}
     </section>
   );

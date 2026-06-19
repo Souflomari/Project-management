@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -136,7 +136,7 @@ export function Dashboard() {
   return (
     <>
       {/* period / date context — anchors every figure below to a window */}
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ ...TX.caption, color: C.ink500 }}>
           Vue d’ensemble du portefeuille — <span style={{ color: C.ink700, fontWeight: 560 }}>{WEEK_LABEL}</span>
         </div>
@@ -144,26 +144,27 @@ export function Dashboard() {
       </div>
 
       <div className="bento enter-stagger">
-        {/* portfolio-health hero — the 2x2 anchor tile */}
+        {/* HERO — the single focal point: portfolio-health decision, given the only
+            elevated card + the largest readout on the page. Everything else is
+            demoted to borderless cells grouped by whitespace (Gestalt), not boxes. */}
         <div className="b-hero">
-          <Card elevation={1} radius={R.xxl} padding="22px 24px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+          <Card elevation={1} radius={R.xxl} padding="26px 28px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
             <div style={{ ...TX.overline, color: C.ink500 }}>Santé du portefeuille</div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 18 }}>
               <Gauge
                 value={healthAnim}
-                size={128}
+                size={132}
                 thickness={11}
                 color={healthColor}
-                label={<span style={{ ...num(38), color: healthColor }}>{Math.round(healthAnim)}</span>}
-                sublabel={<span style={{ ...TX.nano, color: C.ink400 }}>/ 100</span>}
+                label={<span style={{ ...num(54), color: healthColor }}>{Math.round(healthAnim)}</span>}
               />
               <div style={{ minWidth: 0 }}>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
-                  <span style={{ ...TX.bodyStrong, color: C.ink900, fontSize: 16 }}>{healthLabel}</span>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: "50%", background: healthColor, flexShrink: 0 }} />
+                  <span style={{ ...TX.h2, color: C.ink900 }}>{healthLabel}</span>
                 </div>
-                <div style={{ ...TX.caption, color: C.ink500, marginTop: 6, maxWidth: 200 }}>
+                <div style={{ ...TX.caption, color: C.ink500, marginTop: 8, maxWidth: 210 }}>
                   {hasLiveWork
                     ? `Composite pondéré des ${activeDenom} projet${activeDenom > 1 ? "s" : ""} actif${activeDenom > 1 ? "s" : ""} (terminés exclus).`
                     : "Aucun projet actif à évaluer pour le moment."}
@@ -171,7 +172,9 @@ export function Dashboard() {
               </div>
             </div>
 
-            <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 18, background: SURFACE.containerHigh, boxShadow: `inset 0 0 0 1px ${C.line}` }}>
+            {/* status mix — a single hairline-tracked bar; the legend carries the
+                counts so the bar itself stays decoration-free. */}
+            <div style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 24, background: SURFACE.container }}>
               {dist.map((s) =>
                 s.count > 0 ? (
                   <button
@@ -185,7 +188,7 @@ export function Dashboard() {
                 ) : null,
               )}
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 12 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 12 }}>
               {dist.map((s) => (
                 <button key={s.status} onClick={() => goProjects(s.status)} className="soft-hover" style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
                   <span style={{ width: 8, height: 8, borderRadius: R.xs, background: s.color, flexShrink: 0 }} />
@@ -197,20 +200,22 @@ export function Dashboard() {
               ))}
             </div>
 
-            <div style={{ marginTop: "auto", paddingTop: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...TX.caption, color: C.ink500 }}>
+            <div style={{ marginTop: "auto", paddingTop: 22 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", ...TX.caption, color: C.ink500 }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>Avancement moyen <Delta v={avgDelta} unit="pts" /></span>
-                <span style={{ ...num(15), color: C.brand }}>{pct(Math.round(avgAnim))}</span>
+                <span style={{ ...num(15), color: C.ink900 }}>{pct(Math.round(avgAnim))}</span>
               </div>
               <div style={{ marginTop: 10, paddingRight: 30 }}>
-                <Sparkline values={history.map((h) => h.avg)} height={46} gradient endLabel={pct(kpis.avg)} />
+                <Sparkline values={history.map((h) => h.avg)} height={42} gradient endLabel={pct(kpis.avg)} />
               </div>
               <div style={{ ...TX.nano, color: C.ink400, marginTop: 4 }}>8 dernières semaines</div>
             </div>
           </Card>
         </div>
 
-        {/* director-grade KPI row: urgency, money, decisions */}
+        {/* director-grade KPI cells — borderless, grouped by whitespace + a single
+            shared hairline frame, so they read as ONE related set rather than four
+            competing boxes. */}
         <Kpi
           className="b-late"
           title="En retard"
@@ -250,10 +255,10 @@ export function Dashboard() {
 
         <PhaseStrip className="b-phase" columns={phaseCols} total={allDerived.length} onPhase={goPhase} />
 
-        {/* workload + recent-activity pillars — one full-width row that auto-fits
-            to a single column on narrow screens (no media query needed). */}
-        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px,100%), 1fr))", gap: 16 }}>
-          {/* workload / capacity tile — was unused (buildTeamLoad available) */}
+        {/* workload + recent-activity pillars — borderless panels separated by the
+            grid gap; auto-fits to a single column on narrow screens. */}
+        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px,100%), 1fr))", gap: 28 }}>
+          {/* workload / capacity */}
           <WorkloadTile
             avgCharge={chargeAnim}
             band={loadBand(avgCharge)}
@@ -265,15 +270,9 @@ export function Dashboard() {
           />
 
           {/* recent activity — rendus livrés (7 j) */}
-          <Card padding="6px 20px 14px" style={{ height: "100%" }}>
-            <h2 style={{ ...TX.h2, margin: "14px 0 6px", display: "flex", alignItems: "baseline", gap: 8 }}>
-              Rendus livrés <span style={{ ...TX.nano, color: C.ink400, fontWeight: 500 }}>· 7 derniers jours</span>
-              <span style={{ ...num(13), color: C.ink400, marginLeft: "auto" }}>{deliveredRecent.length}</span>
-            </h2>
+          <Panel title="Rendus livrés" meta="7 derniers jours" count={deliveredRecent.length}>
             {deliveredRecent.length === 0 ? (
-              <div style={{ borderTop: `1px solid ${C.line}` }}>
-                <EmptyState compact icon={<CheckIcon size={22} />} title="Aucun rendu livré" hint="Les tâches achevées de la semaine s’afficheront ici." />
-              </div>
+              <EmptyState compact icon={<CheckIcon size={22} />} title="Aucun rendu livré" hint="Les tâches achevées de la semaine s’afficheront ici." />
             ) : null}
             {deliveredRecent.map((d, i) => (
               <motion.div
@@ -283,7 +282,7 @@ export function Dashboard() {
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ ...SPRING.gentle, delay: i * 0.03 }}
-                style={{ display: "flex", gap: 11, alignItems: "center", padding: "8px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", borderRadius: 4 }}
+                style={{ display: "flex", gap: 11, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: 4 }}
               >
                 <span style={{ display: "flex", color: C.brand, flexShrink: 0 }}><CheckIcon size={15} /></span>
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -292,25 +291,20 @@ export function Dashboard() {
                 </div>
               </motion.div>
             ))}
-          </Card>
+          </Panel>
         </div>
 
         <div className="b-upcoming">
-        <Card padding="6px 20px 14px" style={{ height: "100%" }}>
-          <h2 style={{ ...TX.h2, margin: "14px 0 6px", display: "flex", alignItems: "baseline", gap: 8 }}>
-            Prochains rendus <span style={{ ...num(13), color: C.ink400 }}>{upcoming.length}</span>
-          </h2>
+        <Panel title="Prochains rendus" count={upcoming.length}>
           {upcoming.length === 0 ? (
-            <div style={{ borderTop: `1px solid ${C.line}` }}>
-              <EmptyState compact icon={<CalendrierIcon size={22} />} title="Aucun rendu à venir" hint="Les prochaines échéances du portefeuille apparaîtront ici." />
-            </div>
+            <EmptyState compact icon={<CalendrierIcon size={22} />} title="Aucun rendu à venir" hint="Les prochaines échéances du portefeuille apparaîtront ici." />
           ) : null}
           {upcoming.map((r) => (
             <div
               key={r.id}
               {...rowProps(() => openProject(r.id))}
               className="row-hover row-focus"
-              style={{ display: "flex", gap: 12, alignItems: "center", padding: "8px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", borderRadius: 4 }}
+              style={{ display: "flex", gap: 12, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: 4 }}
             >
               <div style={{ textAlign: "center", minWidth: 42 }}>
                 <div style={num(20)}>{r.renduDay}</div>
@@ -328,24 +322,19 @@ export function Dashboard() {
             <div
               {...rowProps(goLate)}
               className="row-hover row-focus"
-              style={{ display: "flex", gap: 8, alignItems: "center", padding: "9px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", color: STATUS_META["en retard"].color, fontSize: 12, fontWeight: 600, borderRadius: R.xs }}
+              style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 6px", marginTop: 4, borderTop: `1px solid ${C.line}`, cursor: "pointer", color: STATUS_META["en retard"].color, fontSize: 12, fontWeight: 600, borderRadius: R.xs }}
             >
               <FlagIcon size={14} />
               {staleCount} projet{staleCount > 1 ? "s" : ""} en souffrance (plus de {formatDays(STALE_DAYS)})
             </div>
           ) : null}
-        </Card>
+        </Panel>
         </div>
 
         <div className="b-vigilance">
-        <Card padding="6px 20px 14px" style={{ height: "100%" }}>
-          <h2 style={{ ...TX.h2, margin: "14px 0 6px", display: "flex", alignItems: "baseline", gap: 8 }}>
-            Points de vigilance <span style={{ ...num(13), color: C.ink400 }}>{alerts.length}</span>
-          </h2>
+        <Panel title="Points de vigilance" count={alerts.length}>
           {alerts.length === 0 ? (
-            <div style={{ borderTop: `1px solid ${C.line}` }}>
-              <EmptyState compact icon={<span style={{ color: C.brand, display: "flex" }}><CheckIcon size={22} /></span>} title="Aucun point de vigilance" hint="Tous les projets actifs sont à jour ou sous contrôle." />
-            </div>
+            <EmptyState compact icon={<span style={{ color: C.brand, display: "flex" }}><CheckIcon size={22} /></span>} title="Aucun point de vigilance" hint="Tous les projets actifs sont à jour ou sous contrôle." />
           ) : null}
           <AnimatePresence initial={false}>
             {visibleAlerts.map((a) => (
@@ -358,7 +347,7 @@ export function Dashboard() {
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={SPRING.gentle}
-                style={{ display: "flex", gap: 11, alignItems: "center", padding: "8px 6px", borderTop: `1px solid ${C.line}`, cursor: "pointer", borderRadius: 4, overflow: "hidden" }}
+                style={{ display: "flex", gap: 11, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: 4, overflow: "hidden" }}
               >
                 <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: a.statusColor }} />
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -375,15 +364,31 @@ export function Dashboard() {
             <button
               onClick={() => setShowAllAlerts((v) => !v)}
               className="soft-hover row-focus"
-              style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 6px", borderTop: `1px solid ${C.line}`, background: "none", border: "none", cursor: "pointer", ...TX.caption, color: C.ink500, fontWeight: 560 }}
+              style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 6px", marginTop: 4, background: "none", border: "none", cursor: "pointer", ...TX.caption, color: C.ink500, fontWeight: 560 }}
             >
               {showAllAlerts ? "Réduire" : `Voir tout (${alerts.length})`}
             </button>
           ) : null}
-        </Card>
+        </Panel>
         </div>
       </div>
     </>
+  );
+}
+
+/** A borderless list panel: a quiet heading + rows separated by whitespace, not
+ *  a bordered card. Removes the decorative box (Tufte data-ink) so the lower row
+ *  reads as grouped content on the canvas, with the hero as the only framed tile. */
+function Panel({ title, meta, count, children }: { title: string; meta?: string; count?: number; children: ReactNode }) {
+  return (
+    <section style={{ height: "100%" }}>
+      <h2 style={{ ...TX.overline, color: C.ink700, margin: "0 0 4px", display: "flex", alignItems: "baseline", gap: 8, padding: "0 6px" }}>
+        {title}
+        {meta ? <span style={{ ...TX.nano, color: C.ink400, fontWeight: 500 }}>· {meta}</span> : null}
+        {count !== undefined ? <span style={{ ...num(13), color: C.ink400, marginLeft: "auto" }}>{count}</span> : null}
+      </h2>
+      <div style={{ display: "flex", flexDirection: "column" }}>{children}</div>
+    </section>
   );
 }
 
@@ -460,21 +465,27 @@ function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: 
   );
 }
 
+/** KPI cell — borderless by default so the four read as one whitespace-grouped
+ *  set, not four competing boxes (Tufte data-ink; Gestalt proximity). Resting
+ *  state is bare; the hover state paints a quiet well + lift only when actionable,
+ *  so the affordance stays visible without a permanent box. */
 function Kpi({ title, value, sub, subColor, dot, delta, onClick, className }: { title: string; value: string | number; sub: string; subColor?: string; dot?: string; delta?: number; onClick?: () => void; className?: string }) {
   const cls = [className, onClick ? "lift-hover row-focus" : ""].filter(Boolean).join(" ") || undefined;
   return (
-    <div className={cls} {...(onClick ? rowProps(onClick) : {})} style={{ borderRadius: R.lg, ...(onClick ? { cursor: "pointer" } : {}) }}>
-      <Card padding="16px 18px" style={{ height: "100%" }}>
-        <div style={{ ...TX.overline, color: C.ink700 }}>{title}</div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
-          <span style={{ ...num(36), color: C.ink900 }}>{value}</span>
-          {delta !== undefined ? <Delta v={delta} /> : null}
-        </div>
-        <div style={{ ...TX.nano, color: subColor ?? C.ink400, marginTop: 7, display: "inline-flex", alignItems: "center", gap: 6 }}>
-          {dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, flexShrink: 0 }} /> : null}
-          {sub}
-        </div>
-      </Card>
+    <div
+      className={cls}
+      {...(onClick ? rowProps(onClick) : {})}
+      style={{ border: `1px solid ${C.line}`, borderRadius: R.lg, background: C.surface, padding: "16px 16px", height: "100%", display: "flex", flexDirection: "column", ...(onClick ? { cursor: "pointer" } : {}) }}
+    >
+      <div style={{ ...TX.overline, color: C.ink700 }}>{title}</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
+        <span style={{ ...num(36), color: C.ink900 }}>{value}</span>
+        {delta !== undefined ? <Delta v={delta} /> : null}
+      </div>
+      <div style={{ ...TX.nano, color: subColor ?? C.ink400, marginTop: "auto", paddingTop: 7, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, flexShrink: 0 }} /> : null}
+        {sub}
+      </div>
     </div>
   );
 }
@@ -484,28 +495,28 @@ function Kpi({ title, value, sub, subColor, dot, delta, onClick, className }: { 
 function WorkloadTile({ avgCharge, band, overloaded, members, peakName, peakPct, onClick }: { avgCharge: number; band: "low" | "ok" | "high" | "over"; overloaded: number; members: number; peakName: string; peakPct: number; onClick: () => void }) {
   const color = band === "over" ? "#C2683E" : band === "high" ? "#B45309" : C.brand;
   const shown = Math.round(avgCharge);
+  // Borderless panel matching the lower row's Panel treatment — grouped by
+  // whitespace, not a box; the bar carries the signal.
   return (
-    <div className="lift-hover row-focus" {...rowProps(onClick)} style={{ borderRadius: R.lg, cursor: "pointer", height: "100%" }}>
-      <Card padding="16px 18px" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ ...TX.overline, color: C.ink700 }}>Charge de l’équipe</div>
-          <div style={{ ...TX.nano, color: C.ink400 }}>4 prochaines semaines · {members} pers.</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
-          <span style={{ ...num(36), color: C.ink900 }}>{pct(shown)}</span>
-          <span style={{ ...TX.nano, color: C.ink400 }}>capacité moyenne</span>
-        </div>
-        <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 14, background: SURFACE.containerHigh, boxShadow: `inset 0 0 0 1px ${C.line}` }}>
-          <div className="anim-bar" style={{ width: `${Math.min(100, shown)}%`, ["--fill" as string]: `${Math.min(100, shown)}%`, background: color }} />
-        </div>
-        <div style={{ ...TX.nano, color: overloaded > 0 ? "#B45309" : C.ink400, marginTop: "auto", paddingTop: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
-          {overloaded > 0 ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#B45309", flexShrink: 0 }} /> : null}
-          {overloaded > 0
-            ? `${overloaded} personne${overloaded > 1 ? "s" : ""} en surcharge — pic ${peakName} ${pct(peakPct)}`
-            : `Pic : ${peakName} ${pct(peakPct)}`}
-        </div>
-      </Card>
-    </div>
+    <section className="soft-hover row-focus" {...rowProps(onClick)} style={{ cursor: "pointer", height: "100%", display: "flex", flexDirection: "column", borderRadius: R.lg, padding: "0 6px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ ...TX.overline, color: C.ink700 }}>Charge de l’équipe</div>
+        <div style={{ ...TX.nano, color: C.ink400 }}>4 sem. · {members} pers.</div>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
+        <span style={{ ...num(32), color: C.ink900 }}>{pct(shown)}</span>
+        <span style={{ ...TX.nano, color: C.ink400 }}>capacité moyenne</span>
+      </div>
+      <div style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 14, background: SURFACE.container }}>
+        <div className="anim-bar" style={{ width: `${Math.min(100, shown)}%`, ["--fill" as string]: `${Math.min(100, shown)}%`, background: color }} />
+      </div>
+      <div style={{ ...TX.nano, color: overloaded > 0 ? "#B45309" : C.ink400, marginTop: "auto", paddingTop: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {overloaded > 0 ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#B45309", flexShrink: 0 }} /> : null}
+        {overloaded > 0
+          ? `${overloaded} personne${overloaded > 1 ? "s" : ""} en surcharge — pic ${peakName} ${pct(peakPct)}`
+          : `Pic : ${peakName} ${pct(peakPct)}`}
+      </div>
+    </section>
   );
 }
 
@@ -513,38 +524,36 @@ function WorkloadTile({ avgCharge, band, overloaded, members, peakName, peakPct,
  *  echoing the hero's status bar. Each segment filters Projets by that phase. */
 function PhaseStrip({ className, columns, total, onPhase }: { className?: string; columns: { phaseIndex: number; label: string; full: string; count: number }[]; total: number; onPhase: (i: number) => void }) {
   const denom = Math.max(1, total);
+  // Secondary context strip — the calmest element on the page: borderless, the bar
+  // + inline legend carry it. No trailing total (the legend sums it; Tufte: drop
+  // the echoed figure).
   return (
-    <div className={className}>
-      <Card padding="14px 18px" style={{ height: "100%" }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ ...TX.overline, color: C.ink500 }}>Répartition par phase</div>
-          <div style={{ ...TX.nano, color: C.ink400 }}>{total} projets</div>
-        </div>
-        <div style={{ display: "flex", height: 8, borderRadius: R.pill, overflow: "hidden", marginTop: 12, background: C.subtle }}>
-          {columns.map((c) =>
-            c.count > 0 ? (
-              <button
-                key={c.phaseIndex}
-                onClick={() => onPhase(c.phaseIndex)}
-                title={`${c.full} · ${c.count} — filtrer`}
-                aria-label={`Filtrer : ${c.full}`}
-                className="anim-bar"
-                style={{ width: `${(c.count / denom) * 100}%`, minWidth: 6, ["--fill" as string]: `${(c.count / denom) * 100}%`, background: PHASE_COLORS[c.phaseIndex], border: "none", padding: 0, cursor: "pointer" }}
-              />
-            ) : null,
-          )}
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 12 }}>
-          {columns.map((c) =>
-            c.count > 0 ? (
-              <button key={c.phaseIndex} onClick={() => onPhase(c.phaseIndex)} className="soft-hover" title={c.full} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
-                <span style={{ width: 8, height: 8, borderRadius: R.xs, background: PHASE_COLORS[c.phaseIndex], flexShrink: 0 }} />
-                {c.label} <span style={{ ...num(13), color: C.ink900 }}>{c.count}</span>
-              </button>
-            ) : null,
-          )}
-        </div>
-      </Card>
-    </div>
+    <section className={className} style={{ padding: "2px 6px" }}>
+      <div style={{ ...TX.overline, color: C.ink500 }}>Répartition par phase</div>
+      <div style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 12, background: SURFACE.container }}>
+        {columns.map((c) =>
+          c.count > 0 ? (
+            <button
+              key={c.phaseIndex}
+              onClick={() => onPhase(c.phaseIndex)}
+              title={`${c.full} · ${c.count} — filtrer`}
+              aria-label={`Filtrer : ${c.full}`}
+              className="anim-bar"
+              style={{ width: `${(c.count / denom) * 100}%`, minWidth: 6, ["--fill" as string]: `${(c.count / denom) * 100}%`, background: PHASE_COLORS[c.phaseIndex], border: "none", padding: 0, cursor: "pointer" }}
+            />
+          ) : null,
+        )}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 12 }}>
+        {columns.map((c) =>
+          c.count > 0 ? (
+            <button key={c.phaseIndex} onClick={() => onPhase(c.phaseIndex)} className="soft-hover" title={c.full} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
+              <span style={{ width: 8, height: 8, borderRadius: R.xs, background: PHASE_COLORS[c.phaseIndex], flexShrink: 0 }} />
+              {c.label} <span style={{ ...num(13), color: C.ink900 }}>{c.count}</span>
+            </button>
+          ) : null,
+        )}
+      </div>
+    </section>
   );
 }

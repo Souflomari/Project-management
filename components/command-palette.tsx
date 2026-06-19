@@ -387,12 +387,14 @@ export function CommandPalette() {
                     onMouseEnter={() => { if (usingMouse.current) setActive(i); }}
                     onClick={() => run(i)}
                     aria-selected={sel}
-                    style={{ position: "relative", width: "100%", display: "flex", alignItems: "center", gap: 11, textAlign: "left", padding: "9px 12px", borderRadius: R.sm, border: "none", cursor: "pointer", background: sel ? C.brand50 : "transparent", transition: `background ${DUR.fast} ${EASE.standard}` }}
+                    style={{ position: "relative", width: "100%", minHeight: 40, display: "flex", alignItems: "center", gap: 11, textAlign: "left", padding: "8px 12px", borderRadius: R.sm, border: "none", cursor: "pointer", background: sel ? C.subtle : "transparent", transition: `background ${DUR.fast} ${EASE.standard}` }}
                   >
+                    {/* Same selection atom as the sidebar: quiet container + one green
+                        bar, neutral ink label. One accent cue, consistent everywhere. */}
                     <span aria-hidden style={{ position: "absolute", left: 3, top: "50%", transform: `translateY(-50%) scaleY(${sel ? 1 : 0})`, width: 3, height: 16, borderRadius: R.pill, background: C.brand, transition: `transform ${DUR.fast} ${EASE.out}` }} />
                     <span style={{ width: 20, display: "flex", justifyContent: "center", flexShrink: 0 }}>{it.leading}</span>
                     <span style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ ...TX.bodyStrong, color: sel ? C.brandText : C.ink900, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: `color ${DUR.fast} ${EASE.standard}` }}>{it.label}</span>
+                      <span style={{ ...TX.bodyStrong, color: C.ink900, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: `color ${DUR.fast} ${EASE.standard}` }}>{it.label}</span>
                       {it.sub ? <span style={{ ...TX.micro, color: C.ink500, display: "block" }}>{it.sub}</span> : null}
                     </span>
                   </button>

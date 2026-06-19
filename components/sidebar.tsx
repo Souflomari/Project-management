@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
-import { CaretDownIcon, NAV_ICONS, UserIcon } from "./icons";
+import { CaretDownIcon, NAV_ICONS } from "./icons";
 import { signOutAction } from "@/app/actions";
 import { WEEK_SHORT } from "@/lib/format";
 import {
@@ -26,12 +26,16 @@ function navLinkStyle(active: boolean): React.CSSProperties {
     alignItems: "center",
     gap: 11,
     width: "100%",
+    minHeight: 40, // Fitts: generous nav target
     fontSize: 13.5,
-    fontWeight: active ? 540 : 450,
-    padding: "9px 10px",
+    fontWeight: active ? 560 : 450,
+    padding: "0 10px",
     borderRadius: R.sm,
-    color: active ? C.brandText : C.ink500,
-    background: active ? C.brand50 : "transparent",
+    color: active ? C.ink900 : C.ink500,
+    // Calm active state: one quiet container tint. The green identity is carried
+    // by the single ActiveBar + the icon, so the row itself stays neutral and the
+    // active item reads as selected without a coloured pill competing for accent.
+    background: active ? C.subtle : "transparent",
     transition: `background ${DUR.base} ${EASE.standard}, color ${DUR.base} ${EASE.standard}`,
   };
 }
@@ -98,12 +102,12 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
           className="rail-hide nav-hover"
           style={{
             position: "absolute",
-            right: 4,
+            right: 3,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 24,
-            height: 24,
+            width: 30,
+            height: 30, // Fitts: enlarge the disclosure hit area
             border: "none",
             background: "transparent",
             color: C.ink400,
@@ -139,14 +143,17 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
+                      gap: 9,
                       width: "100%",
+                      minHeight: 36, // Fitts: sub-row still comfortably tappable
                       fontSize: 13,
-                      fontWeight: active ? 540 : 450,
-                      padding: "7px 10px 7px 33px",
+                      fontWeight: active ? 560 : 450,
+                      padding: "0 10px 0 33px",
                       borderRadius: R.sm,
-                      color: active ? C.brandText : C.ink500,
-                      background: active ? C.brand50 : "transparent",
+                      // Same calm model as primary rows: quiet neutral container,
+                      // the active dot (a non-colour position cue too) goes green.
+                      color: active ? C.ink900 : C.ink500,
+                      background: active ? C.subtle : "transparent",
                       transition: `background ${DUR.base} ${EASE.standard}, color ${DUR.base} ${EASE.standard}`,
                     }}
                   >
@@ -202,6 +209,7 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
     alignItems: "center",
     gap: 9,
     width: "100%",
+    minHeight: 38, // Fitts: comfortable menu-row target
     textAlign: "left",
     background: "transparent",
     border: "none",
@@ -209,7 +217,7 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
     color: C.ink700,
     fontSize: 13,
     fontWeight: 450,
-    padding: "8px 10px",
+    padding: "0 10px",
     borderRadius: R.sm,
   };
 
@@ -275,14 +283,15 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
           alignItems: "center",
           gap: 10,
           width: "100%",
+          minHeight: 48, // Fitts: the account control is a generous target
           textAlign: "left",
           background: "transparent",
           border: "none",
           cursor: "pointer",
-          padding: "10px",
+          padding: "8px 8px",
           marginTop: 16,
           borderTop: `1px solid ${C.line}`,
-          borderRadius: 0,
+          borderRadius: R.sm,
         }}
       >
         <div aria-hidden style={{ width: 30, height: 30, borderRadius: "50%", background: C.subtle, border: `1px solid ${C.line}`, color: C.ink700, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
@@ -292,8 +301,10 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
           <div style={{ fontSize: 13, fontWeight: 540, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
           <div style={{ fontSize: 11.5, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{role}</div>
         </div>
-        <span className="rail-hide" aria-hidden style={{ color: C.ink400, display: "flex", flexShrink: 0 }}>
-          <UserIcon size={15} />
+        {/* Conventional disclosure caret (Jakob): the avatar signals identity, the
+            caret signals "opens a menu" — clearer than a redundant person icon. */}
+        <span className="rail-hide" aria-hidden style={{ color: C.ink400, display: "flex", flexShrink: 0, transform: `rotate(${open ? 180 : 0}deg)`, transition: `transform ${DUR.base} ${EASE.standard}` }}>
+          <CaretDownIcon size={14} />
         </span>
       </button>
     </div>

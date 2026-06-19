@@ -12,17 +12,7 @@ import { deriveProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, R, SH, SPRING, TX, Z } from "@/lib/tokens";
 
-const SECTION: React.CSSProperties = { ...TX.overline, color: C.ink700, marginBottom: 10 };
-
-// A drawer block is a white card lifted off the field by a hairline + soft
-// shadow (unified-white depth model — no tinted fills).
-const CARD: React.CSSProperties = {
-  background: C.surface,
-  border: `1px solid ${C.line}`,
-  borderRadius: R.lg,
-  boxShadow: SH.sm,
-  padding: "16px 18px",
-};
+const SECTION: React.CSSProperties = { ...TX.overline, color: C.ink700 };
 
 export function ProjectDrawer() {
   const { selected, team, closeDrawer } = useProjects();
@@ -125,13 +115,14 @@ function Peek({
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "16px 22px 32px" }}>
-          {/* the three decision numbers + next deliverable */}
+        <div style={{ padding: "20px 22px 32px" }}>
+          {/* the two decision numbers + next deliverable */}
           <ProjectPeekSummary p={p} />
 
-          {/* recent activity (last 3) — full thread on the page */}
-          <div style={CARD}>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+          {/* recent activity (last 3) — separated by whitespace + a hairline
+              rule, not wrapped in a competing card. Full thread on the page. */}
+          <div style={{ marginTop: 24, paddingTop: 20, borderTop: `1px solid ${C.line}` }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
               <div style={SECTION}>Activité récente</div>
               <Link
                 href={`/projets/${p.id}?onglet=activite`}
@@ -146,7 +137,7 @@ function Peek({
               <div style={{ ...TX.caption, color: C.ink500 }}>Aucune activité pour l’instant.</div>
             ) : (
               recentComments.map((cm, i) => (
-                <div key={i} style={{ display: "flex", gap: 9, marginBottom: i === recentComments.length - 1 ? 0 : 10 }}>
+                <div key={i} style={{ display: "flex", gap: 9, marginBottom: i === recentComments.length - 1 ? 0 : 12 }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: cm.color, marginTop: 7, flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ ...TX.caption }}>

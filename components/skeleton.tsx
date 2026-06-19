@@ -93,34 +93,34 @@ function ContentSkeleton({ viewKey }: { viewKey: string }) {
   }
 }
 
-/** One KPI tile placeholder — matches the live `<Kpi>` rhythm (label / figure / sub). */
+/** One KPI cell placeholder — matches the live `<Kpi>`: a flat hairline cell
+ *  (no resting shadow) so only the hero reads as elevated. */
 function SkelKpi({ className }: { className?: string }) {
   return (
-    <div className={className}>
-      <SkelCard padding={16}>
-        <Skeleton w={90} h={10} r={4} />
-        <div style={{ marginTop: 12 }}><Skeleton w={70} h={30} /></div>
-        <div style={{ marginTop: 11 }}><Skeleton w={120} h={9} r={4} /></div>
-      </SkelCard>
+    <div className={className} style={{ border: `1px solid ${C.line}`, borderRadius: R.lg, background: C.surface, padding: 16, display: "flex", flexDirection: "column" }}>
+      <Skeleton w={90} h={10} r={4} />
+      <div style={{ marginTop: 12 }}><Skeleton w={70} h={30} /></div>
+      <div style={{ marginTop: "auto", paddingTop: 14 }}><Skeleton w={120} h={9} r={4} /></div>
     </div>
   );
 }
 
-/** A list-panel placeholder (Prochains rendus / Points de vigilance / activity). */
-function SkelListCard({ rows = 4 }: { rows?: number }) {
+/** A borderless list-panel placeholder (Prochains rendus / Points de vigilance /
+ *  activity) — quiet heading + whitespace-separated rows, no bounding box. */
+function SkelListPanel({ rows = 4 }: { rows?: number }) {
   return (
-    <SkelCard padding="14px 20px">
-      <Skeleton w={170} h={16} />
-      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 0 }}>
+    <section style={{ padding: "2px 6px" }}>
+      <Skeleton w={150} h={11} r={4} />
+      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 0 }}>
         {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} style={{ display: "flex", gap: 11, alignItems: "center", padding: "9px 0", borderTop: i ? `1px solid ${C.line}` : "none" }}>
+          <div key={i} style={{ display: "flex", gap: 11, alignItems: "center", padding: "10px 0" }}>
             <Skeleton w={10} h={10} r={999} />
             <div style={{ flex: 1 }}><Skeleton w="60%" /><div style={{ marginTop: 7 }}><Skeleton w="40%" h={9} r={4} /></div></div>
             <Skeleton w={56} h={20} r={999} />
           </div>
         ))}
       </div>
-    </SkelCard>
+    </section>
   );
 }
 
@@ -130,69 +130,64 @@ function DashboardSkeleton() {
   return (
     <>
       {/* period / date context header row */}
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
         <Skeleton w={280} h={11} r={4} />
         <Skeleton w={90} h={9} r={4} />
       </div>
 
       <div className="bento">
-        {/* 2x2 health hero */}
+        {/* 2x2 health hero — the only elevated/framed tile */}
         <div className="b-hero">
-          <SkelCard padding="22px 24px">
+          <SkelCard padding="26px 28px">
             <Skeleton w={150} h={10} r={4} />
-            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14 }}>
-              <Skeleton w={128} h={128} r={999} />
+            <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 18 }}>
+              <Skeleton w={132} h={132} r={999} />
               <div style={{ flex: 1 }}>
-                <Skeleton w="70%" h={14} />
-                <div style={{ marginTop: 10 }}><Skeleton w="90%" h={9} r={4} /></div>
+                <Skeleton w="70%" h={18} />
+                <div style={{ marginTop: 12 }}><Skeleton w="90%" h={9} r={4} /></div>
                 <div style={{ marginTop: 6 }}><Skeleton w="60%" h={9} r={4} /></div>
               </div>
             </div>
-            <div style={{ marginTop: 18 }}><Skeleton h={8} r={999} /></div>
-            <div style={{ marginTop: 14, display: "flex", gap: 12 }}>
+            <div style={{ marginTop: 24 }}><Skeleton h={6} r={999} /></div>
+            <div style={{ marginTop: 12, display: "flex", gap: 16 }}>
               {Array.from({ length: 4 }).map((_, i) => (<Skeleton key={i} w={64} h={10} r={4} />))}
             </div>
-            <div style={{ marginTop: 22 }}><Skeleton h={46} r={6} /></div>
+            <div style={{ marginTop: 24 }}><Skeleton h={42} r={6} /></div>
           </SkelCard>
         </div>
 
-        {/* four KPI tiles */}
+        {/* four flat KPI cells */}
         <SkelKpi className="b-late" />
         <SkelKpi className="b-rendus7" />
         <SkelKpi className="b-active" />
         <SkelKpi className="b-budget" />
 
-        {/* full-width phase strip */}
-        <div className="b-phase">
-          <SkelCard padding="14px 18px">
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <Skeleton w={150} h={10} r={4} />
-              <Skeleton w={70} h={9} r={4} />
-            </div>
-            <div style={{ marginTop: 12 }}><Skeleton h={8} r={999} /></div>
-            <div style={{ marginTop: 12, display: "flex", gap: 14 }}>
-              {Array.from({ length: 5 }).map((_, i) => (<Skeleton key={i} w={70} h={10} r={4} />))}
-            </div>
-          </SkelCard>
+        {/* full-width borderless phase strip */}
+        <div className="b-phase" style={{ padding: "2px 6px" }}>
+          <Skeleton w={150} h={11} r={4} />
+          <div style={{ marginTop: 12 }}><Skeleton h={6} r={999} /></div>
+          <div style={{ marginTop: 12, display: "flex", gap: 16 }}>
+            {Array.from({ length: 5 }).map((_, i) => (<Skeleton key={i} w={70} h={10} r={4} />))}
+          </div>
         </div>
 
-        {/* full-width workload + recent-activity row (auto-fit two-up) */}
-        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(300px,100%), 1fr))", gap: 16 }}>
-          <SkelCard padding="16px 18px">
+        {/* full-width workload + recent-activity row (borderless, auto-fit two-up) */}
+        <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px,100%), 1fr))", gap: 28 }}>
+          <section style={{ padding: "2px 6px" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <Skeleton w={120} h={10} r={4} />
-              <Skeleton w={120} h={9} r={4} />
+              <Skeleton w={120} h={11} r={4} />
+              <Skeleton w={110} h={9} r={4} />
             </div>
-            <div style={{ marginTop: 12 }}><Skeleton w={80} h={30} /></div>
-            <div style={{ marginTop: 14 }}><Skeleton h={8} r={999} /></div>
+            <div style={{ marginTop: 12 }}><Skeleton w={80} h={28} /></div>
+            <div style={{ marginTop: 14 }}><Skeleton h={6} r={999} /></div>
             <div style={{ marginTop: 14 }}><Skeleton w="70%" h={9} r={4} /></div>
-          </SkelCard>
-          <SkelListCard rows={3} />
+          </section>
+          <SkelListPanel rows={3} />
         </div>
 
         {/* lower split — prochains rendus / points de vigilance */}
-        <div className="b-upcoming"><SkelListCard rows={4} /></div>
-        <div className="b-vigilance"><SkelListCard rows={4} /></div>
+        <div className="b-upcoming"><SkelListPanel rows={4} /></div>
+        <div className="b-vigilance"><SkelListPanel rows={4} /></div>
       </div>
     </>
   );

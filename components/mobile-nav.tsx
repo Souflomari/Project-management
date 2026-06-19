@@ -68,17 +68,22 @@ export function MobileNav() {
                 key={v.key}
                 href={v.href}
                 aria-current={active ? "page" : undefined}
+                className="state-layer"
                 style={{
                   flexShrink: 0,
                   fontSize: 13,
-                  fontWeight: active ? 640 : 500,
-                  padding: "7px 14px",
+                  fontWeight: active ? 600 : 500,
+                  padding: "0 14px",
                   borderRadius: R.pill,
-                  minHeight: 36,
+                  minHeight: 40, // Fitts: comfortable mobile lens target
                   display: "inline-flex",
                   alignItems: "center",
-                  background: active ? C.brand50 : C.subtle,
-                  color: active ? C.brandText : C.ink500,
+                  // Calm active state, consistent with sidebar/header switcher:
+                  // a quiet neutral pill (no green) so only ONE accent is spent.
+                  // Inactive lenses are unboxed text — less ink, less clutter.
+                  border: `1px solid ${active ? C.line : "transparent"}`,
+                  background: active ? C.surface : "transparent",
+                  color: active ? C.ink900 : C.ink500,
                   boxShadow: active ? SH.sm : "none",
                   transition: `background ${DUR.fast} ${EASE.standard}, color ${DUR.fast} ${EASE.standard}`,
                   whiteSpace: "nowrap",
@@ -111,7 +116,9 @@ export function MobileNav() {
                 minWidth: 0,
                 minHeight: 48,
                 borderRadius: R.md,
-                color: active ? C.brandText : C.ink500,
+                // Consistent with sidebar: the green accent lives on the icon; the
+                // label is neutral ink so the active tab reads calm, not coloured.
+                color: active ? C.ink900 : C.ink500,
                 fontWeight: active ? 600 : 500,
                 transition: `color ${DUR.base} ${EASE.standard}`,
               }}

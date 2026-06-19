@@ -10,7 +10,7 @@ import { buildKanban } from "@/lib/derive";
 import type { DerivedProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
 import { toast } from "@/lib/toast";
-import { C, FONT_NUM, PHASE_COLORS, R, SH, SPRING, STATUS_META, TX } from "@/lib/tokens";
+import { C, FONT_NUM, PHASE_COLORS, R, SH, SP, SPRING, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type Status } from "@/lib/types";
 
 // ── Group-by engine ──────────────────────────────────────────────────────────
@@ -336,7 +336,7 @@ export function Kanban() {
           ref={boardRef}
           className="kanban-board enter-stagger"
           role="list"
-          style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 10, alignItems: "flex-start" }}
+          style={{ display: "flex", gap: SP[5], overflowX: "auto", paddingBottom: SP[3], alignItems: "flex-start" }}
         >
           {columns.map((col) => {
             const isOver = movable && overKey === col.key;
@@ -356,16 +356,16 @@ export function Kanban() {
                   aria-label={`${col.label} (${col.cards.length}) — déplier la colonne`}
                   className="btn"
                   style={{
-                    width: 46, flexShrink: 0, background: C.surface, borderRadius: R.md,
+                    width: 46, flexShrink: 0, background: C.surface, borderRadius: R.lg,
                     border: `1px solid ${isOver ? C.brand : C.line}`,
-                    boxShadow: isOver ? `inset 0 0 0 1px ${C.brand}, 0 0 0 3px ${C.brand50}` : undefined,
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "10px 0",
+                    boxShadow: isOver ? `0 0 0 3px ${C.brand50}` : undefined,
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: SP[3], padding: "10px 0",
                     cursor: "pointer", opacity: dimmed ? 0.45 : 1,
                     transition: "box-shadow var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)",
                   }}
                 >
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: col.accent, flexShrink: 0 }} />
-                  <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: wip.color }}>{col.cards.length}</span>
+                  <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: tier === "ok" ? C.ink400 : wip.color }}>{col.cards.length}</span>
                   <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, letterSpacing: ".06em", color: C.ink700 }}>{col.label}</span>
                 </button>
               );
@@ -376,43 +376,44 @@ export function Kanban() {
                 key={col.key}
                 data-col-key={col.key}
                 role="listitem"
+                className="kanban-col"
                 style={{
-                  width: 268, flexShrink: 0, background: C.surface, borderRadius: R.md,
-                  border: `1px solid ${isOver ? C.brand : C.line}`,
-                  boxShadow: isOver ? `inset 0 0 0 1px ${C.brand}, 0 0 0 3px ${C.brand50}` : undefined,
+                  width: 288, flexShrink: 0, background: isOver ? C.surface : "transparent", borderRadius: R.lg,
+                  border: `1px solid ${isOver ? C.brand : "transparent"}`,
+                  boxShadow: isOver ? `0 0 0 3px ${C.brand50}` : undefined,
                   display: "flex", flexDirection: "column", maxHeight: "calc(100dvh - 230px)",
                   opacity: dimmed ? 0.5 : 1,
-                  transition: "box-shadow var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)",
+                  transition: "box-shadow var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)",
                 }}
               >
-                {/* header */}
-                <div style={{ padding: "11px 12px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                {/* header — calm: name carries it, count demoted to quiet ink, accent
+                    only when at/over capacity; meter hidden until it matters */}
+                <div style={{ padding: `${SP[2]}px ${SP[3]}px ${SP[3]}px`, display: "flex", flexDirection: "column", gap: SP[3] }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: SP[3] }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: SP[3], minWidth: 0 }}>
                       <span style={{ width: 7, height: 7, borderRadius: "50%", background: col.accent, flexShrink: 0 }} />
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontFamily: FONT_NUM, fontSize: 13, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{col.label}</div>
-                        <div style={{ fontSize: 10.5, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{col.full}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+                      <span style={{ fontFamily: FONT_NUM, fontSize: 13, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={col.full}>{col.label}</span>
                       <span
-                        title={tier === "over" ? `Limite dépassée (${col.cards.length}/${col.limit})` : tier === "warn" ? `Limite atteinte (${col.cards.length}/${col.limit})` : `Dans la limite (${col.cards.length}/${col.limit})`}
-                        style={{ ...numTab, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: wip.color, background: wip.bg, borderRadius: R.xs, padding: tier === "ok" ? "1px 2px" : "1px 8px", transition: "color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard)" }}
+                        title={tier === "over" ? `Limite dépassée (${col.cards.length}/${col.limit})` : tier === "warn" ? `Limite atteinte (${col.cards.length}/${col.limit})` : `${col.cards.length} sur ${col.limit}`}
+                        style={{ ...numTab, display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 600, color: tier === "ok" ? C.ink400 : wip.color, flexShrink: 0, transition: "color var(--dur-fast) var(--ease-standard)" }}
                       >
                         {tier === "over" ? <AlertTriangleIcon size={11} /> : null}
-                        {col.cards.length} / {col.limit}
+                        {tier === "ok" ? col.cards.length : `${col.cards.length}/${col.limit}`}
                       </span>
-                      <IconButton size={28} onClick={() => toggleCollapse(col.key)} title="Replier" aria-label={`Replier la colonne ${col.label}`}><MinusIcon size={14} /></IconButton>
                     </div>
+                    <IconButton size={28} onClick={() => toggleCollapse(col.key)} title="Replier" aria-label={`Replier la colonne ${col.label}`}><MinusIcon size={14} /></IconButton>
                   </div>
-                  {/* capacity meter (non-colour-only: tier icon in the count too) */}
-                  <div title={`Capacité ${col.cards.length}/${col.limit}`} style={{ height: 4, borderRadius: R.pill, background: C.subtle, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${meterPct}%`, background: wip.meter, borderRadius: R.pill, transition: "width var(--dur-base) var(--ease-out), background var(--dur-fast) var(--ease-standard)" }} />
-                  </div>
-                  {/* column quick actions */}
+                  {/* capacity meter — only inked once attention is warranted (at/over
+                      limit); within the limit it stays a quiet hairline track, no fill */}
+                  {tier !== "ok" ? (
+                    <div title={`Capacité ${col.cards.length}/${col.limit}`} style={{ height: 3, borderRadius: R.pill, background: C.subtle, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${meterPct}%`, background: wip.meter, borderRadius: R.pill, transition: "width var(--dur-base) var(--ease-out), background var(--dur-fast) var(--ease-standard)" }} />
+                    </div>
+                  ) : null}
+                  {/* column quick actions — primary add stays obvious (Fitts); both kept
+                      quiet (ghost) so the column header reads calm at rest */}
                   {groupBy === "phase" ? (
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <div style={{ display: "flex", gap: SP[3] }}>
                       <button onClick={openAdd} className="btn" title={`Nouveau projet en ${col.label}`} aria-label={`Nouveau projet en ${col.full}`} style={addBtnStyle(false)}>
                         <PlusIcon size={12} /> Nouveau
                       </button>
@@ -432,7 +433,7 @@ export function Kanban() {
                 </div>
 
                 {/* cards */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "2px 8px 12px", overflowY: "auto" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: SP[3], padding: `${SP[1]}px ${SP[1]}px ${SP[4]}px`, overflowY: "auto" }}>
                   <AnimatePresence initial={false}>
                     {col.cards.map((c) => {
                       const isDragged = draggingId === c.id;
@@ -452,7 +453,7 @@ export function Kanban() {
                           style={{
                             background: C.surface,
                             border: `1px solid ${isDragged ? C.lineStrong : C.line}`,
-                            borderRadius: R.md, padding: "11px 12px",
+                            borderRadius: R.lg, padding: `${SP[4]}px ${SP[4]}px`,
                             cursor: movable ? (isDragged ? "grabbing" : "grab") : "pointer",
                             touchAction: "none",
                             boxShadow: isDragged ? SH.sm : undefined,
@@ -483,7 +484,7 @@ export function Kanban() {
           style={{
             position: "fixed", left: ghost.x, top: ghost.y, width: ghost.w, zIndex: 90,
             pointerEvents: "none", background: C.surface, border: `1px solid ${C.lineStrong}`,
-            borderRadius: R.md, padding: "11px 12px", boxShadow: SH.lg, transform: "rotate(1.5deg) scale(1.03)",
+            borderRadius: R.lg, padding: `${SP[4]}px ${SP[4]}px`, boxShadow: SH.lg, transform: "rotate(1.5deg) scale(1.03)",
           }}
         >
           <CardBody c={ghost.card} />
@@ -505,39 +506,39 @@ function CardBody({ c }: { c: DerivedProject }) {
   const shown = c.members.slice(0, 4);
   return (
     <>
-      {/* focal: name, with a quiet status dot — no saturated slab competing */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 7, minWidth: 0 }}>
+      {/* FOCAL POINT — the project name, the single loud thing on the card. A
+          small status dot rides alongside (the one meaningful accent); everything
+          below is demoted to quiet ink so the name unambiguously dominates. */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: SP[3], minWidth: 0 }}>
         <span
           title={`Statut : ${c.statusLabel}`}
-          style={{ width: 7, height: 7, borderRadius: "50%", background: c.statusColor, flexShrink: 0, marginTop: 6 }}
+          style={{ width: 8, height: 8, borderRadius: "50%", background: c.statusColor, flexShrink: 0, marginTop: 5 }}
         />
-        <div title={c.name} style={{ ...TX.bodyStrong, lineHeight: 1.3, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.name}</div>
+        <div style={{ minWidth: 0 }}>
+          <div title={c.name} style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-.011em", color: C.ink900, lineHeight: 1.32, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.name}</div>
+          {/* secondary — client recedes immediately under the name */}
+          <div title={c.client} style={{ fontSize: 12, fontWeight: 450, color: C.ink500, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.client}</div>
+        </div>
       </div>
 
-      {/* secondary metadata — quiet ink, recedes under the name */}
-      <div title={c.client} style={{ fontSize: 12, fontWeight: 450, color: C.ink500, marginTop: 4, paddingLeft: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.client}</div>
-
-      {/* progress — mono fill, thin, quiet readout */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 11 }} title={`Avancement ${c.progress}%`}>
+      {/* progress — mono fill, thin; the at-a-glance signal */}
+      <div style={{ display: "flex", alignItems: "center", gap: SP[3], marginTop: SP[5] }} title={`Avancement ${c.progress}%`}>
         <ProgressBar pct={c.progress} color={C.ink350} height={4} />
         <span style={{ ...numTab, fontSize: 11.5, fontWeight: 600, color: C.ink500, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
       </div>
 
-      {/* deadline + budget — quiet; deadline reddens only when genuinely overdue */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginTop: 9 }}>
+      {/* footer — one quiet meta row: deadline (the actionable date, reddens only
+          when overdue) balanced against the team. Budget / next-rendu are
+          progressive detail, deferred to the open drawer (Miller: card stays lean). */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: SP[4], gap: SP[3] }}>
         <span
           title={`Échéance contractuelle : ${c.deadlineFull}`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 500, color: overdue ? STATUS_META["en retard"].color : C.ink500, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 500, color: overdue ? STATUS_META["en retard"].color : C.ink500, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
         >
           <ClockIcon size={11} />
           {c.deadlineDaysLabel}
         </span>
-        <span title={`Honoraires : ${c.budgetFmt}`} style={{ ...numTab, fontSize: 11, fontWeight: 500, color: C.ink500, whiteSpace: "nowrap" }}>{c.budgetFmt}</span>
-      </div>
-
-      {/* team avatar group (muted) + next-rendu (quiet) */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 11, gap: 6 }}>
-        <div style={{ display: "flex", alignItems: "center" }} title={`Équipe : ${c.members.map((m) => m.name).join(", ") || "—"}`}>
+        <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }} title={`Équipe : ${c.members.map((m) => m.name).join(", ") || "—"}`}>
           {shown.map((m, i) => (
             <span key={m.id} style={{ marginLeft: i === 0 ? 0 : -7, position: "relative", zIndex: shown.length - i }}>
               <Avatar initials={m.initials} color={m.color} size={22} fontSize={9} ring title={`${m.name} · ${m.role}`} />
@@ -547,7 +548,6 @@ function CardBody({ c }: { c: DerivedProject }) {
             <span style={{ marginLeft: -7, width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: C.ink600, background: C.subtle, border: `2px solid ${C.surface}` }}>+{extra}</span>
           ) : null}
         </div>
-        <span title={`Prochain rendu : ${c.renduFull}`} style={{ fontSize: 11, fontWeight: 500, color: C.ink500, whiteSpace: "nowrap" }}>{c.renduDaysLabel}</span>
       </div>
     </>
   );

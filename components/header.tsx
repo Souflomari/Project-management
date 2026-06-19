@@ -11,7 +11,9 @@ import { isProjectDetailPath, isWorkspacePath, navItemForPath, WORKSPACE_VIEWS }
 import { useProjects } from "@/lib/store/projects-context";
 import { C, DUR, EASE, R, SH, TX } from "@/lib/tokens";
 
-/** Segmented links switching the lens of the Projets workspace. */
+/** Segmented links switching the lens of the Projets workspace. A neutral toggle:
+ *  the selected lens is a quiet white pill on the inset track (size/elevation, not
+ *  colour) so the one green accent stays reserved for brand/semantics. */
 function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
   return (
     <div role="tablist" aria-label="Vue des projets" className="ws-switcher" style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3, maxWidth: "100%", overflowX: "auto" }}>
@@ -23,15 +25,17 @@ function WorkspaceSwitcher({ activeKey }: { activeKey: string }) {
             href={v.href}
             role="tab"
             aria-selected={active}
+            className="state-layer"
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: 30,
               fontSize: 12.5,
-              fontWeight: active ? 640 : 600,
-              padding: "5px 12px",
+              fontWeight: active ? 600 : 540,
+              padding: "0 13px",
               borderRadius: R.sm,
-              // Active lens carries a faint green-tint pill + green text so the
-              // switcher reads as part of the brand identity, not just a neutral toggle.
-              background: active ? C.brand50 : "transparent",
-              color: active ? C.brandText : C.ink500,
+              background: active ? C.surface : "transparent",
+              color: active ? C.ink900 : C.ink500,
               boxShadow: active ? SH.sm : "none",
               transition: `background ${DUR.fast} ${EASE.standard}, color ${DUR.fast} ${EASE.standard}, box-shadow ${DUR.fast} ${EASE.standard}`,
               whiteSpace: "nowrap",
@@ -54,7 +58,7 @@ export function Header() {
   // drops the list-search/count chrome (meaningless on a single project).
   const inWorkspace = isWorkspacePath(pathname) && !isDetail;
   const isListe = item.key === "projets" && pathname === "/projets";
-  const { search, setSearch, searched, filtered, openAdd, allDerived } = useProjects();
+  const { search, setSearch, openAdd, allDerived } = useProjects();
 
   // Resolve the open project's name for the breadcrumb (falls back gracefully
   // before data hydrates or if the id is unknown).
@@ -85,7 +89,6 @@ export function Header() {
   }, []);
 
   const title = inWorkspace ? "Projets" : item.label;
-  const count = `${filtered.length} affiché${filtered.length > 1 ? "s" : ""} sur ${searched.length}`;
 
   return (
     <header
@@ -124,7 +127,6 @@ export function Header() {
           <>
             <h1 style={{ ...TX.h1, margin: 0, whiteSpace: "nowrap" }}>{title}</h1>
             {inWorkspace ? <WorkspaceSwitcher activeKey={item.key} /> : null}
-            {isListe ? <span className="header-search" style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap" }}>{count}</span> : null}
           </>
         )}
       </div>
@@ -141,7 +143,7 @@ export function Header() {
               border: `1px solid ${C.line}`,
               borderRadius: R.sm,
               padding: "0 12px",
-              height: 36,
+              height: 38,
               width: 280,
               color: C.ink400,
             }}
@@ -161,7 +163,7 @@ export function Header() {
             onClick={openCommandPalette}
             className="ui-field header-search lift-hover"
             aria-label="Recherche rapide"
-            style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.sm, padding: "0 10px 0 12px", height: 36, width: 240, color: C.ink500, cursor: "pointer", font: "inherit" }}
+            style={{ display: "flex", alignItems: "center", gap: 8, background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.sm, padding: "0 10px 0 12px", height: 38, width: 240, color: C.ink500, cursor: "pointer", font: "inherit" }}
           >
             <SearchIcon />
             <span style={{ fontSize: 14, flex: 1, textAlign: "left" }}>Rechercher…</span>

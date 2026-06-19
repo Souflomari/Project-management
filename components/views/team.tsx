@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ChevronLeftIcon, ChevronRightIcon, EditIcon, FilterIcon, PlusIcon, SearchIcon, TrashIcon } from "../icons";
+import { CaretDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, SearchIcon, TrashIcon } from "../icons";
 import { TeamMemberModal } from "../team-member-modal";
 import { Avatar, Button, Card, EmptyState, IconButton, Input, rowProps, Segmented, Select, Toolbar } from "../ui";
 import { buildTeamLoad, type HeatBucket, type TeamLoad } from "@/lib/derive";
@@ -190,9 +190,13 @@ export function Team() {
 
   return (
     <>
-      <Toolbar style={{ marginBottom: 8 }}>
+      {/* One calm control strip. F-pattern: period + lens (what you're looking at)
+          lead on the left; the primary action anchors the right. Refinement
+          controls (search / sort / filter / group) sit on a quiet second line so
+          the first row never exceeds ~5 simultaneous choices (Hick/Miller). */}
+      <Toolbar style={{ marginBottom: SP[4] }}>
         <IconButton onClick={teamPrev} aria-label="Période précédente"><ChevronLeftIcon /></IconButton>
-        <h2 style={{ ...num(18), minWidth: 150 }}>{periodLabel}</h2>
+        <h2 style={{ ...num(18), minWidth: 150, textAlign: "center" }}>{periodLabel}</h2>
         <IconButton onClick={teamNext} aria-label="Période suivante"><ChevronRightIcon /></IconButton>
         <Button variant="secondary" size="sm" onClick={teamToday}>Aujourd’hui</Button>
         <Segmented value={teamMode} options={MODE_OPTS} onChange={setTeamMode} />
@@ -202,8 +206,9 @@ export function Team() {
         </div>
       </Toolbar>
 
-      {/* Resource toolbar: search / filter / sort / group */}
-      <Toolbar style={{ marginBottom: 16 }}>
+      {/* Refinement row — quiet, hairline-free; labels live inside the selects so
+          there's no redundant label+icon chrome. */}
+      <Toolbar style={{ marginBottom: SP[4], gap: SP[3] }}>
         <span style={{ position: "relative", flex: "0 1 240px", minWidth: 160 }}>
           <span aria-hidden style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.ink400, display: "flex" }}><SearchIcon size={15} /></span>
           <Input
@@ -214,38 +219,33 @@ export function Team() {
             style={{ paddingLeft: 32 }}
           />
         </span>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span aria-hidden style={{ color: C.ink400, display: "flex" }}><FilterIcon size={15} /></span>
-          <span style={{ ...TX.nano, color: C.ink500 }}>Filtrer</span>
-          <Select size="sm" value={filter} onChange={(e) => setFilter(e.target.value as FilterKey)} aria-label="Filtrer les membres">
-            {FILTER_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-        </label>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ ...TX.nano, color: C.ink500 }}>Trier</span>
-          <Select size="sm" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Trier les membres">
-            {SORT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-        </label>
-        <Button
-          variant={groupByDiscipline ? "primary" : "secondary"}
-          size="sm"
+        <Select size="sm" value={filter} onChange={(e) => setFilter(e.target.value as FilterKey)} aria-label="Filtrer les membres">
+          {FILTER_OPTS.map((o) => <option key={o.value} value={o.value}>{o.value === "all" ? "Tous les membres" : `Filtre · ${o.label}`}</option>)}
+        </Select>
+        <Select size="sm" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Trier les membres">
+          {SORT_OPTS.map((o) => <option key={o.value} value={o.value}>{`Tri · ${o.label}`}</option>)}
+        </Select>
+        <button
+          type="button"
+          className="btn row-focus"
           onClick={() => setGroupByDiscipline((v) => !v)}
           aria-pressed={groupByDiscipline}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6, height: 30, padding: "0 12px",
+            border: `1px solid ${groupByDiscipline ? C.lineStrong : C.line}`, borderRadius: R.sm,
+            background: groupByDiscipline ? C.subtle : "transparent",
+            color: groupByDiscipline ? C.ink900 : C.ink500,
+            ...TX.nano, cursor: "pointer",
+          }}
         >
           Grouper par discipline
-        </Button>
+        </button>
+        <p style={{ ...TX.nano, color: C.ink400, margin: 0, marginLeft: "auto", textAlign: "right", maxWidth: 280 }}>
+          {lens === "charge"
+            ? <>Charge sur {capacity}&#8239;j ouvrés · la barre pleine = 100&#8239;%</>
+            : <>Coût = jours travaillés × taux journalier · {capacity}&#8239;j de capacité</>}
+        </p>
       </Toolbar>
-
-      <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 16px" }}>
-        {lens === "charge" ? (
-          <>Charge sur <strong style={{ color: C.ink700, fontWeight: 540 }}>{capacity} jours ouvrés</strong> · répartition {teamMode === "semaine" ? "par jour" : "par semaine"} · la ligne = 100&#8239;% (pleine capacité)</>
-        ) : (
-          <>Coût de la période = <strong style={{ color: C.ink700, fontWeight: 540 }}>jours travaillés × taux journalier</strong> · {capacity} jours ouvrés de capacité</>
-        )}
-      </p>
-
-      <HeatmapLegend mode={teamMode} />
 
       {visible.length === 0 ? (
         <EmptyState compact title="Aucun membre ne correspond" hint="Ajustez la recherche ou le filtre." />
@@ -307,9 +307,18 @@ function MemberCard({
   const shown = over ? Math.min(chargePct, 130) : chargePct;
   const delta = prevCharge != null ? chargePct - prevCharge : null;
 
+  // Progressive disclosure (Tesler): the task list is secondary detail. Show the
+  // two heaviest tasks; the rest collapse behind a quiet count so the card's one
+  // focal point stays the member + their headline load.
+  const PEEK = 2;
+  const [expanded, setExpanded] = useState(false);
+  const tasks = useMemo(() => [...load.tasks].sort((a, b) => b.daysInPeriod - a.daysInPeriod), [load.tasks]);
+  const shownTasks = expanded ? tasks : tasks.slice(0, PEEK);
+  const hidden = tasks.length - shownTasks.length;
+
   return (
-    <Card>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+    <Card padding={`${SP[6]}px ${SP[6]}px ${SP[5]}px`}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: SP[5] }}>
         <button
           {...rowProps(onProjects)}
           className="soft-hover row-focus"
@@ -337,11 +346,11 @@ function MemberCard({
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: SP[5] }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
           {lens === "charge" ? (
             <>
-              <span style={{ ...num(26), color: headColor }}>{shown}&#8239;%{over ? " +" : ""}</span>
+              <span style={{ ...num(30), color: headColor }}>{shown}&#8239;%{over ? " +" : ""}</span>
               <span style={{ ...TX.caption, color: C.ink500 }}>
                 {load.periodDays} / {load.capacity} j
                 {over ? (
@@ -353,7 +362,7 @@ function MemberCard({
             </>
           ) : (
             <>
-              <span style={{ ...num(26), color: C.ink900 }}>{fmtEur(costEur)}</span>
+              <span style={{ ...num(30), color: C.ink900 }}>{fmtEur(costEur)}</span>
               <span style={{ ...TX.caption, color: C.ink500 }}>
                 {fmtEur(m.costPerDay ?? 0)}/j · {load.periodDays}&#8239;j
               </span>
@@ -373,27 +382,29 @@ function MemberCard({
         </div>
       </div>
 
-      <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: `${SP[5]}px ${SP[5]}px ${SP[4]}px` }}>
+      {/* Heatmap sits directly on the card — no decorative box. A hairline above
+          separates it from the headline by Gestalt proximity, not a border. */}
+      <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: SP[5] }}>
         <Heatmap buckets={e.buckets} mode={mode} memberName={m.name} />
       </div>
 
-      {load.tasks.length === 0 ? (
-        <div style={{ marginTop: SP[4] }}>
+      {tasks.length === 0 ? (
+        <div style={{ marginTop: SP[5] }}>
           <EmptyState compact title="Aucune tâche planifiée" hint="Rien d’affecté à ce membre sur la période." />
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: SP[4] }}>
-          {load.tasks.map((task, i) => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: SP[5] }}>
+          {shownTasks.map((task, i) => (
             <div
               key={i}
               {...rowProps(() => onOpenProject(task.projectId))}
               className="row-hover row-focus"
               aria-label={`${task.taskName} · ${task.projectName} · ${task.daysInPeriod} jours`}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", ...TX.caption, minHeight: 24, padding: "3px 4px", borderRadius: R.xxs }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, cursor: "pointer", ...TX.caption, minHeight: 26, padding: "4px 4px", borderRadius: R.xxs }}
             >
               <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 7 }}>
                 <span aria-hidden style={{ width: 5, height: 5, borderRadius: "50%", background: C.ink400, flexShrink: 0 }} />
-                <span style={{ minWidth: 0 }}>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   <span style={{ fontWeight: 500, color: task.done ? C.ink500 : C.ink800 }}>{task.taskName}</span>
                   <span style={{ color: C.ink500 }}> · {task.projectName}</span>
                 </span>
@@ -401,6 +412,24 @@ function MemberCard({
               <span style={{ ...num(12), color: C.ink700, whiteSpace: "nowrap" }}>{task.daysInPeriod}&#8239;j</span>
             </div>
           ))}
+          {hidden > 0 || expanded ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="btn row-focus"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-start",
+                marginTop: 2, padding: "4px 4px", background: "none", border: "none",
+                cursor: "pointer", ...TX.nano, color: C.ink500, borderRadius: R.xxs,
+              }}
+            >
+              <span aria-hidden style={{ display: "flex", transform: expanded ? "rotate(180deg)" : "none", transition: `transform ${DUR.fast} ${EASE.standard}` }}>
+                <CaretDownIcon size={12} />
+              </span>
+              {expanded ? "Réduire" : `${hidden} autre${hidden > 1 ? "s" : ""} tâche${hidden > 1 ? "s" : ""}`}
+            </button>
+          ) : null}
         </div>
       )}
     </Card>
@@ -421,37 +450,6 @@ function isoWeek(d: Date): number {
   const firstDay = (firstThu.getUTCDay() + 6) % 7;
   firstThu.setUTCDate(firstThu.getUTCDate() - firstDay + 3);
   return 1 + Math.round((t.getTime() - firstThu.getTime()) / (7 * 86_400_000));
-}
-
-/** Shared legend, shown once at the top. Minimalism: the heatmap is now a single
- *  monochrome load ramp, so the legend reduces to three meanings: low-to-high
- *  load, the 100% capacity line, and the single-red over-capacity cap. */
-function HeatmapLegend({ mode }: { mode: TeamMode }) {
-  return (
-    <div
-      role="note"
-      aria-label="Légende du graphique de charge"
-      style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 18, padding: "8px 12px", marginBottom: 16, background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, ...TX.nano, color: C.ink500 }}
-    >
-      <span style={{ fontWeight: 600, color: C.ink700 }}>Charge {mode === "semaine" ? "par jour" : "par semaine"}</span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-        <span aria-hidden style={{ display: "inline-flex", borderRadius: 3, overflow: "hidden", border: `1px solid ${C.line}` }}>
-          {[20, 70, 100].map((pct) => (
-            <span key={pct} style={{ width: 16, height: 12, background: heatColor(pct) }} />
-          ))}
-        </span>
-        faible → pleine charge
-      </span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <span aria-hidden style={{ width: 16, height: 0, borderTop: `1px dashed ${C.lineStrong}` }} />
-        ligne = 100 % (capacité)
-      </span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <span aria-hidden style={{ width: 12, height: 12, borderRadius: 3, background: heatColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)" }} />
-        surcharge (au-delà de la capacité)
-      </span>
-    </div>
-  );
 }
 
 /** Workload heatmap: each bar is a SINGLE monochrome load fill rising toward the
@@ -482,6 +480,9 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
 
   return (
     <div role="group" aria-label={`Graphique de charge de ${memberName}`}>
+      <div aria-hidden style={{ ...TX.nano, color: C.ink400, marginBottom: SP[3] }}>
+        Charge {mode === "semaine" ? "par jour" : "par semaine"} <span style={{ color: C.ink300 }}>· repère = 100&#8239;%</span>
+      </div>
       <div role="img" aria-label={summary} style={{ display: "flex", gap: mode === "semaine" ? 5 : 3, alignItems: "flex-end" }}>
         {buckets.map((b, i) => {
           const inThisBucketToday = bucketContainsToday(b, mode);

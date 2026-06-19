@@ -479,10 +479,13 @@ export function ProjectsTable() {
   return (
     <>
       <FilterBar showViews facets={facets} trailing={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <GroupByControl value={groupBy} onChange={changeGroup} />
-          <ColumnsControl columns={COLUMNS} visible={visibleCols} onChange={setVisibleCols} />
-        </div>
+        <DisplayControl
+          groupBy={groupBy}
+          onGroup={changeGroup}
+          columns={COLUMNS}
+          visible={visibleCols}
+          onColumns={setVisibleCols}
+        />
       } />
 
       {/* mobile search (header search is hidden ≤640) */}
@@ -522,15 +525,15 @@ export function ProjectsTable() {
             role="grid"
             aria-label="Projets"
             aria-rowcount={sorted.length}
-            style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760, boxShadow: SH.sm }}
+            style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760 }}
           >
             {/* sticky header */}
             <div
               role="row"
               style={{
-                display: "grid", gridTemplateColumns: gridTemplate, gap: 12, padding: "11px 18px",
-                borderBottom: `1px solid ${C.line}`, ...TX.overline, color: C.ink500, alignItems: "center",
-                position: "sticky", top: 0, zIndex: Z.sticky, background: C.surface, boxShadow: SH.xs,
+                display: "grid", gridTemplateColumns: gridTemplate, gap: 12, padding: "10px 18px",
+                borderBottom: `1px solid ${C.line}`, ...TX.overline, color: C.ink400, alignItems: "center",
+                position: "sticky", top: 0, zIndex: Z.sticky, background: C.surface,
               }}
             >
               <span role="columnheader" style={{ position: "sticky", left: 0, background: C.surface, zIndex: 1 }}>
@@ -633,14 +636,14 @@ function HeaderCell({
   const justify = align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start";
   const stickyStyle: React.CSSProperties = sticky ? { position: "sticky", left: 34, background: C.surface, zIndex: 1 } : {};
   if (!sortKey) {
-    return <span role="columnheader" style={{ display: "flex", justifyContent: justify, ...TX.overline, color: C.ink500, ...stickyStyle }}>{label}</span>;
+    return <span role="columnheader" style={{ display: "flex", justifyContent: justify, ...TX.overline, color: C.ink400, ...stickyStyle }}>{label}</span>;
   }
   return (
     <span role="columnheader" aria-sort={active ? (sort!.dir === 1 ? "ascending" : "descending") : "none"} style={stickyStyle}>
       <button
         className="sortable"
         onClick={() => onSort(sortKey)}
-        style={{ display: "flex", alignItems: "center", justifyContent: justify, width: "100%", gap: 3, color: active ? C.brandText : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.overline }}
+        style={{ display: "flex", alignItems: "center", justifyContent: justify, width: "100%", gap: 3, color: active ? C.brandText : C.ink400, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.overline }}
       >
         {label}
         <span className="sort-caret" style={{ display: "inline-flex", opacity: active ? 1 : 0, transform: active && sort!.dir === -1 ? "rotate(180deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)" }}>
@@ -679,48 +682,49 @@ function GroupHeader({
   );
 }
 
-// ───────────────────────────────────────── group-by control
+// ───────────────────────────────────────── display control (group-by + columns)
 
-function GroupByControl({ value, onChange }: { value: GroupBy; onChange: (g: GroupBy) => void }) {
-  const opts: { v: GroupBy; label: string }[] = [
+/** Hick's law: group-by and column visibility — both "how the table is laid out"
+ *  rather than "what it shows" — live behind ONE "Affichage" popover, so the
+ *  toolbar trailing zone is a single control instead of two peers. Sections use
+ *  progressive disclosure (open only when needed). */
+function DisplayControl({
+  groupBy, onGroup, columns, visible, onColumns,
+}: {
+  groupBy: GroupBy;
+  onGroup: (g: GroupBy) => void;
+  columns: ColDef[];
+  visible: Set<string>;
+  onColumns: (s: Set<string>) => void;
+}) {
+  const groupOpts: { v: GroupBy; label: string }[] = [
     { v: "none", label: "Aucun" }, { v: "status", label: "Statut" }, { v: "phase", label: "Phase" }, { v: "resp", label: "Responsable" },
   ];
   const [open, setOpen] = useState(false);
   const ref = useDismiss(open, () => setOpen(false));
-  const active = value !== "none";
+  const active = groupBy !== "none";
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="btn state-layer" style={controlBtn(active)}>
-        Grouper{active ? ` : ${opts.find((o) => o.v === value)!.label}` : ""}
+      <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="btn state-layer" style={controlBtn(active)}>
+        Affichage{active ? ` : ${groupOpts.find((o) => o.v === groupBy)!.label}` : ""}
         <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .12s", color: C.ink500 }}><CaretDownIcon size={12} /></span>
       </button>
       <AnimatePresence>
         {open ? (
-          <motion.div role="menu" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={SPRING.snappy} style={menuShell}>
-            {opts.map((o) => (
-              <MenuOption key={o.v} selected={value === o.v} label={o.label} onSelect={() => { onChange(o.v); setOpen(false); }} />
+          <motion.div
+            role="dialog" aria-label="Affichage de la table"
+            initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={SPRING.snappy}
+            style={{ ...menuShell, width: 224, right: 0, left: "auto" }}
+          >
+            <div style={{ ...TX.eyebrow, color: C.ink400, padding: "4px 8px 2px" }}>Grouper par</div>
+            {groupOpts.map((o) => (
+              <MenuOption key={o.v} selected={groupBy === o.v} label={o.label} onSelect={() => onGroup(o.v)} />
             ))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
-  );
-}
 
-// ───────────────────────────────────────── columns control
+            <div style={{ height: 1, background: C.line, margin: "4px 0" }} />
 
-function ColumnsControl({ columns, visible, onChange }: { columns: ColDef[]; visible: Set<string>; onChange: (s: Set<string>) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
-  return (
-    <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="btn state-layer" style={controlBtn(false)}>
-        Colonnes
-        <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .12s", color: C.ink500 }}><CaretDownIcon size={12} /></span>
-      </button>
-      <AnimatePresence>
-        {open ? (
-          <motion.div role="menu" aria-label="Colonnes visibles" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={SPRING.snappy} style={{ ...menuShell, minWidth: 190, right: 0, left: "auto" }}>
+            <div style={{ ...TX.eyebrow, color: C.ink400, padding: "4px 8px 2px" }}>Colonnes</div>
             {columns.map((c) => {
               const on = visible.has(c.key);
               const last = on && visible.size === 1;
@@ -728,7 +732,7 @@ function ColumnsControl({ columns, visible, onChange }: { columns: ColDef[]; vis
                 <button
                   key={c.key}
                   type="button" role="menuitemcheckbox" aria-checked={on} disabled={last}
-                  onClick={() => onChange(toggle(visible, c.key))}
+                  onClick={() => onColumns(toggle(visible, c.key))}
                   className="soft-hover"
                   style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 8px", borderRadius: R.xs, background: "transparent", border: "none", cursor: last ? "not-allowed" : "pointer", font: "inherit", textAlign: "left", color: last ? C.ink400 : C.ink800 }}
                 >

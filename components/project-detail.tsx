@@ -114,7 +114,10 @@ function dotColor(st: (typeof STATUSES)[number]): string {
 }
 
 /** Fast-triage summary for the drawer: avancement, next deliverable, margin —
- *  the three numbers you scan before deciding to open the full page. */
+ *  the three numbers you scan before deciding to open the full page. Data-ink:
+ *  no boxed stat cells — the two focal numbers sit side by side on open
+ *  whitespace, with the next deliverable demoted below a hairline rule (Gestalt:
+ *  group by space, separate by a thin line, not by boxes). */
 export function ProjectPeekSummary({ p }: { p: DerivedProject }) {
   const { team } = useProjects();
   const b = buildBudget(p, team);
@@ -122,51 +125,43 @@ export function ProjectPeekSummary({ p }: { p: DerivedProject }) {
   const overdue = p.nextTask && p.renduDays !== null && p.renduDays < 0;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-      {/* avancement */}
-      <PeekCell label="Avancement">
-        <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-          <span style={{ ...num(22), color: C.brand }}>{pct(p.progress)}</span>
-          <span style={{ ...TX.micro, color: C.ink500 }}>{doneCount}/{p.subtasksD.length}</span>
+    <div>
+      {/* the two decision numbers — open, unboxed, focal */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div>
+          <div style={{ ...TX.overline, color: C.ink600 }}>Avancement</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 6 }}>
+            <span style={{ ...num(26), color: C.brand }}>{pct(p.progress)}</span>
+            <span style={{ ...TX.micro, color: C.ink500 }}>{doneCount}/{p.subtasksD.length}</span>
+          </div>
+          <div style={{ marginTop: 9 }}><ProgressBar pct={p.progress} color={C.brand} height={5} /></div>
         </div>
-        <div style={{ marginTop: 7 }}><ProgressBar pct={p.progress} color={C.brand} height={5} /></div>
-      </PeekCell>
-
-      {/* margin */}
-      <PeekCell label="Marge prévue">
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <span style={{ ...num(22), color: b.overBudget ? C.danger : C.ink900 }}>
-            {b.marginPct >= 0 ? "+" : ""}{pct(b.marginPct)}
-          </span>
-          {b.overBudget ? <OverBudgetBadge /> : null}
-        </div>
-        <div style={{ ...TX.micro, color: C.ink500, marginTop: 5 }}>{fmtEur(b.marginEur)}</div>
-      </PeekCell>
-
-      {/* next deliverable — spans both columns */}
-      <div style={{ gridColumn: "1 / -1", ...PEEK_CELL }}>
-        <div style={{ ...TX.overline, color: C.ink600 }}>Prochain rendu</div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 4 }}>
-          <span style={{ ...TX.bodyStrong, color: C.ink900, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {p.renduLabel}
-          </span>
-          {p.nextTask ? (
-            <span style={{ ...TX.caption, fontWeight: 600, color: overdue ? C.danger : C.ink500, whiteSpace: "nowrap" }}>
-              {p.renduFmt} · {p.renduDaysLabel}
+        <div>
+          <div style={{ ...TX.overline, color: C.ink600 }}>Marge prévue</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
+            <span style={{ ...num(26), color: b.overBudget ? C.danger : C.ink900 }}>
+              {b.marginPct >= 0 ? "+" : ""}{pct(b.marginPct)}
             </span>
-          ) : null}
+            {b.overBudget ? <OverBudgetBadge /> : null}
+          </div>
+          <div style={{ ...TX.micro, color: C.ink500, marginTop: 7 }}>{fmtEur(b.marginEur)}</div>
         </div>
       </div>
-    </div>
-  );
-}
 
-const PEEK_CELL: React.CSSProperties = { background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "11px 13px" };
-function PeekCell({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={PEEK_CELL}>
-      <div style={{ ...TX.overline, color: C.ink600 }}>{label}</div>
-      <div style={{ marginTop: 4 }}>{children}</div>
+      {/* next deliverable — demoted below a hairline, label/value row */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 18, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ ...TX.overline, color: C.ink600 }}>Prochain rendu</div>
+          <div style={{ ...TX.bodyStrong, color: C.ink900, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {p.renduLabel}
+          </div>
+        </div>
+        {p.nextTask ? (
+          <span style={{ ...TX.caption, fontWeight: 600, color: overdue ? C.danger : C.ink500, whiteSpace: "nowrap", flexShrink: 0 }}>
+            {p.renduFmt} · {p.renduDaysLabel}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

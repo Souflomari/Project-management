@@ -94,7 +94,6 @@ interface Dnd {
 
 interface DragGhost {
   label: string;
-  color: string;
   x: number;
   y: number;
 }
@@ -204,7 +203,7 @@ export function CalendarView() {
       // Compute the weekend-snap target DURING the move so the highlight tells
       // the truth (audit: the old highlight "lied").
       setSnapISO(iso ? snapToWeekday(iso) : null);
-      setGhost({ label: d.span.taskName, color: d.span.color, x: ev.clientX, y: ev.clientY });
+      setGhost({ label: d.span.taskName, x: ev.clientX, y: ev.clientY });
     },
     onUp: (ev, onOpen) => {
       const d = drag.current;
@@ -685,7 +684,8 @@ function ChipGhost({ ghost }: { ghost: DragGhost }) {
         padding: "5px 10px",
         borderRadius: R.sm,
         background: C.surface,
-        borderLeft: `3px solid ${ghost.color}`,
+        // Neutral, matches the now-quiet bars — colour isn't decoration here either.
+        border: `1px solid ${C.lineStrong}`,
         boxShadow: SH.overlay,
         ...TX.nano,
         fontWeight: 600,
@@ -748,9 +748,7 @@ function SpanBar({
   const { startCol, endCol } = segColumns(seg, weekStartISO);
   const overdue = isOverdue(span);
   const dragging = dnd.dragId === span.subtaskId;
-  // Mono slate ramp value (lib/tokens PHASE_COLORS) — used ONLY as a quiet edge
-  // accent, never a saturated fill. Phase identity is carried by the letter badge.
-  const accent = span.color;
+  const [hover, setHover] = useState(false);
 
   return (
     <div
@@ -766,6 +764,8 @@ function SpanBar({
         dnd.onUp(ev, onOpen);
       }}
       onPointerCancel={dnd.onCancel}
+      onPointerEnter={() => setHover(true)}
+      onPointerLeave={() => setHover(false)}
       tabIndex={0}
       aria-label={`${span.taskName} — ${span.projectName}, ${PHASES_FULL[span.phaseIndex]}, échéance ${fmtFull(span.deadline)}${overdue ? ", en retard" : ""}`}
       title={`${span.projectName} — ${span.taskName} · ${PHASES[span.phaseIndex]} · ${fmtFull(span.deadline)}`}
@@ -785,41 +785,56 @@ function SpanBar({
         gridColumn: `${startCol + 1} / ${endCol + 2}`,
         display: "flex",
         alignItems: "center",
-        gap: 5,
+        gap: 6,
         minWidth: 0,
         height: 22,
-        padding: "0 6px",
-        borderRadius: seg.isStart && seg.isEnd ? R.xs : seg.isStart ? "6px 3px 3px 6px" : seg.isEnd ? "3px 6px 6px 3px" : 3,
-        // Quiet neutral chip — colour carries no decoration. Phase is shown by the
-        // letter badge + a thin slate accent on the start edge, not a tinted fill.
-        background: C.subtle,
+        padding: "0 7px",
+        borderRadius: seg.isStart && seg.isEnd ? R.xs : seg.isStart ? "6px 2px 2px 6px" : seg.isEnd ? "2px 6px 6px 2px" : 2,
+        // Quiet neutral chip — no decorative phase colour. Identity is the letter
+        // badge; the bar carries name + (when overdue) the one status cue.
+        background: hover ? SURFACE.containerHigh : C.subtle,
+        // A solid hairline all round; a continued segment loses its leading edge so
+        // the eye reads it as flowing from the prior week (no noisy dashed border).
         border: `1px solid ${C.line}`,
-        borderLeft: seg.isStart ? `3px solid ${accent}` : `1px dashed ${C.lineStrong}`,
+        borderLeftColor: seg.isStart ? C.line : "transparent",
+        borderRightColor: seg.isEnd ? C.line : "transparent",
         // Overdue is the ONE status colour (red ring); everything else stays neutral.
         boxShadow: overdue ? `inset 0 0 0 1.5px ${C.danger}` : "none",
         cursor: "grab",
         touchAction: "pan-y",
         overflow: "hidden",
-        opacity: dragging ? 0.4 : span.done ? 0.6 : 1,
-        transition: "opacity var(--dur-fast) var(--ease-standard)",
+        opacity: dragging ? 0.4 : span.done ? 0.55 : 1,
+        transition: "background var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard)",
       }}
     >
-      {/* Phase letter carries identity (the colour cue is only the edge accent). */}
-      {seg.isStart ? (
-        <span aria-hidden style={{ ...TX.nano, fontWeight: 700, fontSize: 9.5, letterSpacing: ".02em", color: C.ink400, flexShrink: 0 }}>
-          {PHASES[span.phaseIndex]}
-        </span>
-      ) : null}
-      <span style={{ flex: 1, minWidth: 0, ...TX.nano, fontWeight: 600, color: C.ink800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: span.done ? "line-through" : "none" }}>
+      {/* Phase letter carries identity — a single quiet neutral badge (no colour). */}
+      {seg.isStart ? <PhaseBadge index={span.phaseIndex} /> : null}
+      <span style={{ flex: 1, minWidth: 0, ...TX.nano, fontWeight: 600, color: span.done ? C.ink500 : C.ink800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: span.done ? "line-through" : "none" }}>
         {span.taskName}
       </span>
-      {/* Distinct DEADLINE cap/flag on the end day; red only when overdue, else neutral. */}
-      {seg.isEnd ? (
-        <span style={{ display: "flex", flexShrink: 0, color: overdue ? C.danger : C.ink400 }} title={`Échéance ${fmtFull(span.deadline)}`}>
+      {/* Deadline position (the end day) already conveys the due date, so the flag
+       *  is shown ONLY as the overdue status cue — no redundant neutral flag. */}
+      {seg.isEnd && overdue ? (
+        <span style={{ display: "flex", flexShrink: 0, color: C.danger }} title={`En retard — échéance ${fmtFull(span.deadline)}`}>
           <FlagIcon size={12} />
         </span>
       ) : null}
     </div>
+  );
+}
+
+/** The single phase-identity atom: a quiet neutral letter badge, rendered
+ *  identically in every calendar surface (bars, popover). Phase identity is the
+ *  letter code; colour is reserved for status (overdue) and the today accent. */
+function PhaseBadge({ index }: { index: number }) {
+  return (
+    <span
+      aria-hidden
+      title={`${PHASES[index]} · ${PHASES_FULL[index]}`}
+      style={{ ...TX.nano, fontWeight: 700, fontSize: 9.5, letterSpacing: ".03em", color: C.ink400, flexShrink: 0 }}
+    >
+      {PHASES[index]}
+    </span>
   );
 }
 
@@ -1097,8 +1112,8 @@ function DayPopover({
             }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 30, padding: "5px 6px", border: "none", background: "transparent", borderRadius: R.sm, cursor: "pointer", textAlign: "left" }}
           >
-            {/* Phase letter (with a thin slate accent edge) instead of a colour swatch. */}
-            <span aria-hidden style={{ ...TX.nano, fontWeight: 700, fontSize: 9.5, color: C.ink400, flexShrink: 0, borderLeft: `2px solid ${s.color}`, paddingLeft: 5 }}>{PHASES[s.phaseIndex]}</span>
+            {/* Same neutral phase-letter atom as the bars — one consistent cue. */}
+            <PhaseBadge index={s.phaseIndex} />
             <span style={{ minWidth: 0, flex: 1 }}>
               <span style={{ display: "block", ...TX.nano, fontWeight: 600, color: C.ink900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.taskName}</span>
               <span style={{ display: "block", ...TX.nano, color: C.ink500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.projectName}</span>
@@ -1169,8 +1184,14 @@ function WeekView({
           return (
             <div key={iso} role="columnheader" aria-current={today ? "date" : undefined} style={{ padding: "8px 10px", borderRight: `1px solid ${C.line}` }}>
               <div title={WEEKDAYS_LONG[i]} style={{ ...TX.nano, fontWeight: 600, color: weekend ? C.ink300 : C.ink400 }}>{WEEKDAYS_SHORT[i]}</div>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 4 }}>
-                <div style={{ ...num(18), color: today ? C.brand : C.ink900 }}>{d.getDate()}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                {/* Today is the single accent: a filled green badge (mirrors the month
+                 *  grid), so the lane below needs no redundant column tint. */}
+                {today ? (
+                  <div style={{ ...num(15), width: 26, height: 26, borderRadius: "50%", background: C.brand, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>{d.getDate()}</div>
+                ) : (
+                  <div style={{ ...num(18), color: C.ink900 }}>{d.getDate()}</div>
+                )}
                 {load > 0 ? <span title={`${load} échéance${load > 1 ? "s" : ""}`} style={{ ...TX.nano, fontWeight: 600, color: C.ink500, background: C.subtle, borderRadius: R.pill, padding: "1px 6px" }}>{load}</span> : null}
               </div>
             </div>
@@ -1186,7 +1207,7 @@ function WeekView({
             const today = isToday(iso);
             const weekend = i >= 5;
             return (
-              <DayCell key={iso} iso={iso} dnd={dnd} isToday={today} style={{ borderRight: `1px solid ${C.line}`, minHeight: Math.max(320, rows.length * 26 + 40), background: today ? C.brand50 : weekend ? C.subtle : C.surface }}>
+              <DayCell key={iso} iso={iso} dnd={dnd} isToday={today} style={{ borderRight: `1px solid ${C.line}`, minHeight: Math.max(320, rows.length * 26 + 40), background: weekend ? C.subtle : C.surface }}>
                 <div />
               </DayCell>
             );
@@ -1275,7 +1296,9 @@ function AgendaView({ events, onOpen }: { events: TaskEvent[]; onOpen: (id: numb
                     className="row-hover row-focus"
                     style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 16px", borderTop: i ? `1px solid ${C.line}` : "none", cursor: "pointer", minHeight: 44 }}
                   >
-                    <div style={{ width: 3, alignSelf: "stretch", borderRadius: 2, background: overdue ? C.danger : e.color }} />
+                    {/* Rail spends colour only on meaning: red when overdue, else a
+                     *  quiet hairline. Phase identity lives in the subtitle letter. */}
+                    <div style={{ width: overdue ? 3 : 2, alignSelf: "stretch", borderRadius: 2, background: overdue ? C.danger : C.lineStrong }} />
                     <div style={{ minWidth: 0, flex: 1 }}>
                       {/* Lead with the TASK name; project secondary. */}
                       <div style={{ ...TX.bodyStrong, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: e.done ? "line-through" : "none" }}>{e.taskName}</div>

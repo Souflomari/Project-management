@@ -15,7 +15,7 @@ import { C, FONT_NUM, R, SH, SPRING, SURFACE, TX } from "@/lib/tokens";
 
 const PROJ_ROW_H = 48;
 const SUB_ROW_H = 30;
-const HEADER_H = 46; // two-tier sticky header
+const HEADER_H = 48; // two-tier sticky header — airy two-row rhythm
 const MIN_LEFT_W = 240;
 const MAX_LEFT_W = 560;
 
@@ -152,7 +152,7 @@ function buildAxis(windowStart: string, spanDays: number, pxPerDay: number, zoom
 
 function Legend() {
   const item = { display: "flex", alignItems: "center", gap: 5 } as const;
-  const swatch = { width: 15, height: 8, borderRadius: 2, flexShrink: 0 } as const;
+  const swatch = { width: 14, height: 8, borderRadius: 2, flexShrink: 0 } as const;
   return (
     <span style={{ ...TX.nano, color: C.ink500, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       <span style={item}>
@@ -160,7 +160,9 @@ function Legend() {
         avancement
       </span>
       <span style={item}>
-        <span style={{ ...swatch, background: CP_ACCENT, boxShadow: `0 0 0 1px ${CP_ACCENT}` }} />
+        {/* CP = the one restrained ink ring; legend mirrors the bar exactly (no
+            redundant double-ink). */}
+        <span style={{ ...swatch, background: CP_ACCENT }} />
         chemin critique
       </span>
       <span style={item}>
@@ -349,6 +351,8 @@ export function PlanningGantt() {
               ) : null}
             </div>
             <Button variant="secondary" size="sm" onClick={() => scrollToToday()}>Aujourd&rsquo;hui</Button>
+            {/* hairline chunk-break: view actions | zoom (Hick + Gestalt grouping) */}
+            <span aria-hidden style={{ width: 1, alignSelf: "stretch", background: C.line, margin: "2px 0" }} />
             <Segmented
               value={zoom}
               onChange={setZoom}
@@ -506,7 +510,10 @@ function ProjectLeftCell({ g, isOpen, leftW, cols, cpCount }: { g: GanttRow; isO
         <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
           {g.name}
           {!isOpen && cpCount > 0 ? (
-            <span title={`${cpCount} tâche(s) sur le chemin critique`} style={{ ...TX.nano, fontWeight: 700, color: CP_ACCENT, border: `1px solid ${CP_ACCENT}`, borderRadius: R.xxs, padding: "0 4px", lineHeight: "14px", flexShrink: 0 }}>CC</span>
+            // Collapsed CP hint — quiet tinted chip (no second hard border); the
+            // bar's ring is the primary CP signal, this just surfaces it on a
+            // folded row.
+            <span title={`${cpCount} tâche(s) sur le chemin critique`} style={{ ...TX.nano, fontWeight: 600, color: CP_ACCENT, background: C.subtle, borderRadius: R.xxs, padding: "0 5px", lineHeight: "15px", flexShrink: 0 }}>CC</span>
           ) : null}
         </div>
         <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -548,9 +555,10 @@ function SubtaskLeftCell({ s, leftW, cols }: { s: GanttBar; leftW: number; cols:
 function ChartBackground({ leftW, timelineW, axis, todayPx, topOffset }: { leftW: number; timelineW: number; axis: Axis; todayPx: number; topOffset: number }) {
   return (
     <div aria-hidden style={{ position: "absolute", left: leftW, top: topOffset, width: timelineW, bottom: 0, pointerEvents: "none", zIndex: 0 }}>
-      {/* Weekend bands — barely-there tint; a quiet rhythm cue, not a stripe. */}
+      {/* Weekend bands — barely-there tint; a quiet rhythm cue, not a stripe.
+          Dialled down so weekends read as a whisper, not a stripe pattern. */}
       {axis.weekends.map((b, i) => (
-        <div key={`we${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: b.px, width: b.w, background: SURFACE.container, opacity: 0.45 }} />
+        <div key={`we${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: b.px, width: b.w, background: SURFACE.container, opacity: 0.3 }} />
       ))}
       {/* Period dividers — only the major (year/quarter) lines are drawn, faintly,
           so the field reads as open rather than ruled. Minor month/week lines are
@@ -558,7 +566,9 @@ function ChartBackground({ leftW, timelineW, axis, todayPx, topOffset }: { leftW
       {axis.top.filter((t) => t.major).map((t, i) => (
         <div key={`tl${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, borderLeft: `1px solid ${C.line}` }} />
       ))}
-      <div style={{ position: "absolute", top: 0, bottom: 0, width: 1.5, background: C.brand, opacity: 0.7, left: todayPx }} />
+      {/* Today — ONE quiet brand hairline, full bleed. The header carries the
+          labelled marker; in the field it's just a soft locating line. */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, width: 1, background: C.brand, opacity: 0.5, left: todayPx }} />
     </div>
   );
 }
@@ -591,16 +601,20 @@ function AxisHeader({ leftW, timelineW, axis, todayPx, onResize }: { leftW: numb
             </div>
           ))}
         </div>
-        {/* bottom tier */}
+        {/* bottom tier — labels only, no vertical fence. The top tier carries the
+            structural dividers; repeating a line under every month/week just rules
+            the field. Whitespace + alignment do the grouping. */}
         <div style={{ position: "absolute", top: HEADER_H / 2, left: 0, right: 0, bottom: 0 }}>
           {axis.bottom.map((t, i) => (
-            <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, width: t.w, borderLeft: `1px solid ${C.line}`, display: "flex", alignItems: "center", paddingLeft: 5, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 500, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden" }}>
+            <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, width: t.w, display: "flex", alignItems: "center", paddingLeft: 6, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 500, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden" }}>
               {t.label}
             </div>
           ))}
         </div>
-        <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: C.brand, left: todayPx, zIndex: 2 }}>
-          <span style={{ position: "absolute", top: 3, left: 3, ...TX.nano, fontWeight: 600, color: C.surface, background: C.brand, borderRadius: R.xxs, padding: "0 4px", whiteSpace: "nowrap" }}>Auj.</span>
+        {/* Today marker — one quiet brand hairline + a tinted (not filled-slab)
+            chip, so it locates without shouting. */}
+        <div style={{ position: "absolute", top: 0, bottom: 0, width: 1, background: C.brand, opacity: 0.75, left: todayPx, zIndex: 2 }}>
+          <span style={{ position: "absolute", top: 3, left: 3, ...TX.nano, fontWeight: 600, color: C.brandText, background: C.brand50, borderRadius: R.xxs, padding: "0 4px", whiteSpace: "nowrap" }}>Auj.</span>
         </div>
       </div>
     </div>
@@ -890,7 +904,7 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
         animate={drag ? false : { left: `${left}%`, width: `${width}%` }}
         transition={SPRING.snappy}
         style={{
-          position: "absolute", top: SUB_ROW_H / 2 - 7, height: 14, borderRadius: R.xs,
+          position: "absolute", top: SUB_ROW_H / 2 - 8, height: 16, borderRadius: R.xs,
           ...(drag ? { left: `${left}%`, width: `${width}%` } : {}),
           minWidth: 8, background: barFill, opacity: s.done ? 0.7 : 1,
           // done = diagonal hatch overlay (non-opacity cue); critical = ONE quiet ink ring.
