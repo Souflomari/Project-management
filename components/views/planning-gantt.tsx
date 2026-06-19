@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
 import { ChevronRightIcon } from "../icons";
@@ -33,7 +33,7 @@ function Legend() {
 
 export function PlanningGantt() {
   const { filtered, openProject, updateSubtask, updateProject } = useProjects();
-  const { months, rows, todayLeft, spanDays, windowStart } = buildGantt(filtered);
+  const { months, rows, todayLeft, spanDays, windowStart } = useMemo(() => buildGantt(filtered), [filtered]);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [scrollLeft, setScrollLeft] = useState(0);
   const [zoom, setZoom] = useState<"trimestre" | "mois" | "semaine">("mois");

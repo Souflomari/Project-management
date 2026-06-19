@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
 import { CaretDownIcon } from "../icons";
@@ -41,7 +41,10 @@ export function ProjectsTable() {
   const [sel, setSel] = useState<Set<number>>(new Set());
 
   const sort = tableSort;
-  const rows = sort ? [...filtered].sort((a, b) => compare(a, b, sort.key as SortKey) * sort.dir) : filtered;
+  const rows = useMemo(
+    () => (sort ? [...filtered].sort((a, b) => compare(a, b, sort.key as SortKey) * sort.dir) : filtered),
+    [filtered, sort],
+  );
   const toggleSort = (key: SortKey) =>
     setTableSort(sort && sort.key === key ? { key, dir: sort.dir === 1 ? -1 : 1 } : { key, dir: 1 });
 

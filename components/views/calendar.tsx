@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
 import { Button, IconButton, Modal, rowProps, Segmented, Select, Toolbar } from "../ui";
 import { buildMonthGrid, buildTaskEvents, eventsInRange, type TaskEvent } from "@/lib/derive";
-import { fmtFull, isToday, MONS_LONG, MONTHS_FULL, taskStartForEnd, toDate, WEEKDAYS, monthRange, weekRange } from "@/lib/format";
+import { fmtFull, isToday, MONS_LONG, MONTHS_FULL, shiftISO, taskStartForEnd, toDate, WEEKDAYS, monthRange, weekRange } from "@/lib/format";
 import { useProjects, type CalMode } from "@/lib/store/projects-context";
 import { C, num, PHASE_COLORS, TX } from "@/lib/tokens";
 import { PHASES } from "@/lib/types";
@@ -21,6 +21,14 @@ interface PendingMove {
   date: string;
 }
 
+/** Saturday → Friday, Sunday → Monday; weekdays unchanged. */
+function snapToWeekday(iso: string): string {
+  const dow = toDate(iso).getDay();
+  if (dow === 6) return shiftISO(iso, -1);
+  if (dow === 0) return shiftISO(iso, 1);
+  return iso;
+}
+
 export function CalendarView() {
   const { allDerived, calMode, calAnchor, calProjectFilter, setCalMode, calPrev, calNext, calToday, setCalProjectFilter, openProject, updateSubtask } =
     useProjects();
@@ -28,8 +36,10 @@ export function CalendarView() {
   const dragged = useRef<TaskEvent | null>(null);
   const [pending, setPending] = useState<PendingMove | null>(null);
 
-  const projects = calProjectFilter === null ? allDerived : allDerived.filter((p) => p.id === calProjectFilter);
-  const events = buildTaskEvents(projects);
+  const events = useMemo(() => {
+    const projects = calProjectFilter === null ? allDerived : allDerived.filter((p) => p.id === calProjectFilter);
+    return buildTaskEvents(projects);
+  }, [allDerived, calProjectFilter]);
   const anchor = toDate(calAnchor);
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -40,7 +50,10 @@ export function CalendarView() {
     onDrop: (dateISO: string) => {
       const e = dragged.current;
       dragged.current = null;
-      if (e && e.date !== dateISO) setPending({ event: e, date: dateISO });
+      // Deadlines fall on working days only; snap a weekend drop to the nearest
+      // weekday so the chip lands where the modal says it will (not the prev Fri).
+      const target = snapToWeekday(dateISO);
+      if (e && e.date !== target) setPending({ event: e, date: target });
     },
   };
 
@@ -192,7 +205,7 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
                 )
               ) : null}
               <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
-                {c.events.slice(0, 3).map((e, j) => (<EventChip key={j} e={e} onOpen={onOpen} dnd={dnd} />))}
+                {c.events.slice(0, 3).map((e) => (<EventChip key={`${e.projectId}-${e.subtaskId}`} e={e} onOpen={onOpen} dnd={dnd} />))}
                 {c.events.length > 3 ? <div style={{ fontSize: 11, color: C.ink500, fontWeight: 600, paddingLeft: 2 }}>+{c.events.length - 3} autres</div> : null}
               </div>
             </>
@@ -223,7 +236,7 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
             <div style={{ ...num(18), color: d.isToday ? C.brand : C.ink900 }}>{d.num}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 6 }}>
-            {d.events.map((e, j) => (<EventChip key={j} e={e} onOpen={onOpen} dnd={dnd} />))}
+            {d.events.map((e) => (<EventChip key={`${e.projectId}-${e.subtaskId}`} e={e} onOpen={onOpen} dnd={dnd} />))}
           </div>
         </DayCell>
       ))}

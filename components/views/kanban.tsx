@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
 import { MinusIcon } from "../icons";
@@ -17,7 +17,7 @@ const numTab: React.CSSProperties = { fontVariantNumeric: "tabular-nums" };
 
 export function Kanban() {
   const { filtered, setPhase, openProject } = useProjects();
-  const columns = buildKanban(filtered);
+  const columns = useMemo(() => buildKanban(filtered), [filtered]);
   const dragId = useRef<number | null>(null);
   const [overPhase, setOverPhase] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);

@@ -37,7 +37,10 @@ export function Team() {
 
   const anchor = toDate(teamAnchor);
   const range = teamMode === "semaine" ? weekRange(teamAnchor) : monthRange(anchor.getFullYear(), anchor.getMonth());
-  const loads = buildTeamLoad(allDerived, team, range, teamMode === "semaine" ? "day" : "week");
+  const loads = useMemo(
+    () => buildTeamLoad(allDerived, team, range, teamMode === "semaine" ? "day" : "week"),
+    [allDerived, team, range.start, range.end, teamMode],
+  );
   const capacity = loads[0]?.capacity ?? 0;
   const periodLabel =
     teamMode === "semaine"

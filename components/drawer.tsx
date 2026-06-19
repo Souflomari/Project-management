@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { CloseIcon, PlusIcon, TrashIcon } from "./icons";
 import { Avatar, Button, Checkbox, IconButton, Input, prefersReducedMotion, ProgressBar, Select, useFocusTrap } from "./ui";
@@ -43,9 +43,9 @@ export function ProjectDrawer() {
   }, [closeDrawer]);
   useFocusTrap(asideRef, requestClose);
 
-  if (!selected) return null;
-
-  const p = deriveProject(selected, team);
+  const derived = useMemo(() => (selected ? deriveProject(selected, team) : null), [selected, team]);
+  if (!selected || !derived) return null;
+  const p = derived;
   const canAdvance = selected.phaseIndex < FINAL_PHASE_INDEX;
   const doneCount = p.subtasksD.filter((s) => s.done).length;
   const assigneeDefault = ntAssignee ?? p.responsableId;

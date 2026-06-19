@@ -285,14 +285,26 @@ export function Segmented<T extends string>({
   options: { value: T; label: string }[];
   onChange: (v: T) => void;
 }) {
+  const move = (dir: 1 | -1) => {
+    const i = options.findIndex((o) => o.value === value);
+    if (i < 0) return;
+    onChange(options[(i + dir + options.length) % options.length].value);
+  };
   return (
-    <div style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3 }}>
+    <div role="radiogroup" style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3 }}>
       {options.map((o) => {
         const active = o.value === value;
         return (
           <button
             key={o.value}
+            role="radio"
+            aria-checked={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(o.value)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(1); }
+              else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(-1); }
+            }}
             className="btn"
             style={{
               border: "none",
