@@ -69,7 +69,13 @@ export function ProjectOverview({ p }: { p: DerivedProject }) {
           </div>
           <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{p.budgetFmt}</div>
         </div>
-        <Stat label="Avancement" value={`${p.progress} %`} hint={`${doneCount} / ${p.subtasksD.length} tâches`}>
+        <Stat
+          label="Avancement"
+          value={`${p.progress} %`}
+          hint={`${doneCount} / ${p.subtasksD.length} tâches`}
+          title={`Avancement pondéré par la durée des tâches (jours terminés ÷ jours planifiés). Le décompte ${doneCount} / ${p.subtasksD.length} indique le nombre de tâches.`}
+        >
+          <div style={{ ...TX.micro, color: C.ink400, marginTop: 3 }}>pondéré par durée</div>
           <div style={{ marginTop: 8 }}><ProgressBar pct={p.progress} color={C.brand} height={5} /></div>
         </Stat>
       </div>
@@ -429,9 +435,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Stat({ label, value, hint, children }: { label: string; value: string; hint?: string; children?: React.ReactNode }) {
+function Stat({ label, value, hint, title, children }: { label: string; value: string; hint?: string; title?: string; children?: React.ReactNode }) {
   return (
-    <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
+    <div title={title} style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
       <div style={{ ...TX.eyebrow, color: C.ink500 }}>{label}</div>
       <div style={{ ...num(22), marginTop: 4, color: C.ink900 }}>{value}</div>
       {hint ? <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{hint}</div> : null}

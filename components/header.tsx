@@ -50,9 +50,12 @@ export function Header() {
   const isListe = item.key === "projets";
   const { search, setSearch, searched, filtered, openAdd } = useProjects();
 
-  const [kbd, setKbd] = useState("⌘K");
+  // Resolve the platform-specific hint only after mount to avoid a visible swap
+  // from the SSR/first-paint guess. `null` until then renders a stable-width
+  // placeholder so the launcher layout doesn't shift.
+  const [kbd, setKbd] = useState<string | null>(null);
   useEffect(() => {
-    if (!/Mac|iPhone|iPad/.test(navigator.platform)) setKbd("Ctrl K");
+    setKbd(/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K");
   }, []);
 
   // Lift the sticky header (shadow + denser glass) once content scrolls under it.
@@ -133,7 +136,7 @@ export function Header() {
           >
             <SearchIcon />
             <span style={{ fontSize: 14, flex: 1, textAlign: "left" }}>Rechercher…</span>
-            <kbd style={{ fontSize: 11, fontWeight: 600, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit" }}>{kbd}</kbd>
+            <kbd style={{ fontSize: 11, fontWeight: 600, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit", minWidth: "3ch", textAlign: "center", visibility: kbd ? "visible" : "hidden" }}>{kbd ?? " "}</kbd>
           </button>
         )}
         <Button onClick={openAdd} icon={<PlusIcon size={15} />} aria-label="Nouveau projet">

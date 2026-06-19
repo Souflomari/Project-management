@@ -8,7 +8,6 @@ import { buildHistory, buildKanban, computeKpis, statusDistribution, upcomingRen
 import { WEEK_SHORT } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, num, PHASE_COLORS, R, SURFACE, STATUS_META, TX } from "@/lib/tokens";
-import { useCountUp } from "@/lib/use-count-up";
 
 const STALE_DAYS = 90;
 
@@ -40,7 +39,6 @@ export function Dashboard() {
   const lateCount = countOf("en retard");
   const done = countOf("terminé");
   const health = Math.round((100 * (onTrack + done + atRisk * 0.5)) / distTotal);
-  const healthShown = useCountUp(health);
   const healthColor = health >= 75 ? C.brand : health >= 55 ? "#B45309" : C.danger;
   const healthLabel = health >= 75 ? "Sous contrôle" : health >= 55 ? "À surveiller" : "Sous tension";
 
@@ -66,11 +64,11 @@ export function Dashboard() {
             {/* command-viz: radial health gauge on the governed load ramp */}
             <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14 }}>
               <Gauge
-                value={healthShown}
+                value={health}
                 size={128}
                 thickness={11}
                 color={healthColor}
-                label={<span style={{ ...num(38), color: healthColor }}>{healthShown}</span>}
+                label={<span style={{ ...num(38), color: healthColor }}>{health}</span>}
                 sublabel={<span style={{ ...TX.nano, color: C.ink400 }}>/ 100</span>}
               />
               <div style={{ minWidth: 0 }}>
@@ -214,8 +212,7 @@ function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: 
 
 function Kpi({ title, value, sub, color, accent, delta, onClick, className }: { title: string; value: string | number; sub: string; color?: string; accent?: string; delta?: number; onClick?: () => void; className?: string }) {
   const cls = [className, onClick ? "lift-hover row-focus" : ""].filter(Boolean).join(" ") || undefined;
-  const counted = useCountUp(typeof value === "number" ? value : 0);
-  const display = typeof value === "number" ? counted : value;
+  const display = value;
   return (
     <div className={cls} {...(onClick ? rowProps(onClick) : {})} style={{ borderRadius: R.lg, ...(onClick ? { cursor: "pointer" } : {}) }}>
       <Card padding="16px 18px" style={{ height: "100%", ...(accent ? { borderTop: `2px solid ${accent}` } : {}) }}>

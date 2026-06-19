@@ -34,7 +34,21 @@ async function main() {
   check("clear projects", (await sb.from("projects").delete().gt("id", 0)).error);
 
   const team = buildSampleTeam();
-  check("upsert team_members", (await sb.from("team_members").upsert(team)).error);
+  check(
+    "upsert team_members",
+    (
+      await sb.from("team_members").upsert(
+        team.map((m) => ({
+          id: m.id,
+          name: m.name,
+          initials: m.initials,
+          color: m.color,
+          role: m.role,
+          cost_per_day: m.costPerDay,
+        })),
+      )
+    ).error,
+  );
 
   const projects = buildSampleProjects();
   let count = 0;

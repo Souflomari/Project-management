@@ -8,11 +8,12 @@
 -- ---------------------------------------------------------------- tables
 
 create table if not exists team_members (
-  id       int  primary key,          -- explicit ids (app references them)
-  name     text not null,
-  initials text not null,
-  color    text not null,
-  role     text not null
+  id           int  primary key,          -- explicit ids (app references them)
+  name         text not null,
+  initials     text not null,
+  color        text not null,
+  role         text not null,
+  cost_per_day int  not null default 0    -- loaded daily rate (€/working day) — drives EVM
 );
 
 create table if not exists projects (

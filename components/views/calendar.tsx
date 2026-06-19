@@ -195,10 +195,10 @@ function EventChip({ e, onOpen, dnd, compact }: { e: TaskEvent; onOpen: (id: num
       aria-label={`${e.projectName} — ${e.taskName}`}
       onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onOpen(e.projectId); } }}
       className="cal-chip"
-      style={{ background: C.subtle, borderLeft: `3px solid ${e.color}`, borderRadius: 4, padding: "3px 7px", cursor: "grab", touchAction: "none", overflow: "hidden" }}
+      style={{ background: C.subtle, borderLeft: `3px solid ${e.color}`, borderRadius: 4, padding: "3px 7px", cursor: "grab", touchAction: "none", overflow: "hidden", minWidth: 0, maxWidth: "100%" }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <div style={{ flex: 1, fontSize: 11, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName}</div>
         <span style={{ width: 5, height: 5, borderRadius: "50%", background: e.statusColor, flexShrink: 0 }} />
       </div>
       {!compact ? <div style={{ fontSize: 10.5, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.taskName}</div> : null}
@@ -220,6 +220,15 @@ function DayCell({ iso, dnd, children, style }: { iso: string; dnd: Dnd; childre
 
 function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: number; events: TaskEvent[]; onOpen: (id: number) => void; dnd: Dnd }) {
   const cells = buildMonthGrid(year, month, events);
+  // ISOs of day cells the user has expanded to reveal events beyond the first 3.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (iso: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(iso) ? next.delete(iso) : next.add(iso);
+      return next;
+    });
+
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.subtle, borderBottom: `1px solid ${C.line}` }}>
@@ -228,13 +237,18 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
         {cells.map((c, i) => {
           const weekend = i % 7 >= 5;
+          const isExpanded = c.iso ? expanded.has(c.iso) : false;
           const base: React.CSSProperties = {
+            minWidth: 0,
             minHeight: 98,
             borderRight: `1px solid ${C.line}`,
             borderBottom: `1px solid ${C.line}`,
             padding: "5px 6px",
             background: c.day === null ? C.subtle : weekend ? C.canvas : C.surface,
+            overflow: "hidden",
           };
+          const shown = isExpanded ? c.events : c.events.slice(0, 3);
+          const hidden = c.events.length - shown.length;
           const inner = (
             <>
               {c.day !== null ? (
@@ -244,9 +258,36 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
                   <div style={{ ...num(13), color: C.ink600, padding: "1px 2px" }}>{c.day}</div>
                 )
               ) : null}
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
-                {c.events.slice(0, 3).map((e) => (<EventChip key={`${e.projectId}-${e.subtaskId}`} e={e} onOpen={onOpen} dnd={dnd} />))}
-                {c.events.length > 3 ? <div style={{ fontSize: 11, color: C.ink500, fontWeight: 600, paddingLeft: 2 }}>+{c.events.length - 3} autres</div> : null}
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4, minWidth: 0 }}>
+                {shown.map((e) => (<EventChip key={`${e.projectId}-${e.subtaskId}`} e={e} onOpen={onOpen} dnd={dnd} />))}
+                {hidden > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => c.iso && toggle(c.iso)}
+                    className="cal-more row-focus"
+                    style={{
+                      appearance: "none", border: "none", background: "transparent", cursor: "pointer",
+                      textAlign: "left", padding: "1px 4px", borderRadius: 4, font: "inherit",
+                      fontSize: 11, fontWeight: 600, color: C.brand, width: "fit-content", maxWidth: "100%",
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}
+                  >
+                    +{hidden} autres
+                  </button>
+                ) : isExpanded && c.events.length > 3 ? (
+                  <button
+                    type="button"
+                    onClick={() => c.iso && toggle(c.iso)}
+                    className="cal-more row-focus"
+                    style={{
+                      appearance: "none", border: "none", background: "transparent", cursor: "pointer",
+                      textAlign: "left", padding: "1px 4px", borderRadius: 4, font: "inherit",
+                      fontSize: 11, fontWeight: 600, color: C.ink500, width: "fit-content", maxWidth: "100%",
+                    }}
+                  >
+                    Réduire
+                  </button>
+                ) : null}
               </div>
             </>
           );
@@ -270,12 +311,12 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(7,1fr)", minWidth: 640 }}>
       {days.map((d) => (
-        <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320 }}>
+        <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320, minWidth: 0, overflow: "hidden" }}>
           <div style={{ padding: "9px 10px", background: d.isToday ? C.brand50 : C.subtle, borderBottom: `1px solid ${C.line}` }}>
             <div style={{ ...TX.eyebrow, color: C.ink500 }}>{d.dow}</div>
             <div style={{ ...num(18), color: d.isToday ? C.brand : C.ink900 }}>{d.num}</div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 6, minWidth: 0 }}>
             {d.events.map((e) => (<EventChip key={`${e.projectId}-${e.subtaskId}`} e={e} onOpen={onOpen} dnd={dnd} />))}
           </div>
         </DayCell>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { FilterBar } from "../filter-bar";
 import { ChevronRightIcon } from "../icons";
@@ -58,20 +58,35 @@ export function PlanningGantt() {
     ? { backgroundImage: `repeating-linear-gradient(90deg, rgba(28,25,23,.045) 0 1px, transparent 1px ${weekPx}px)`, backgroundPosition: `${weekOffsetPx}px 0` }
     : {};
 
+  // drag-to-pan
+  const scroller = useRef<HTMLDivElement>(null);
+  const pan = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
+
   const scrollToToday = (smooth = true) => {
     const sc = scroller.current;
     if (!sc) return;
     sc.scrollTo({ left: Math.max(0, LEFT_W + (todayLeft / 100) * timelineW - sc.clientWidth / 2), behavior: smooth ? "smooth" : "auto" });
   };
 
-  // Land on "today" (where the active work is) on load and whenever the zoom
-  // changes — otherwise a wide timeline opens on empty early history.
+  // Center on "today" (where the active work is) on first paint and whenever the
+  // zoom changes — otherwise a wide timeline opens on empty early history. The
+  // scroller may not have measured its width before paint, so retry on rAF until
+  // it has a layout box; bail out once it does (or after a few frames).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { scrollToToday(false); }, [zoom]);
-
-  // drag-to-pan
-  const scroller = useRef<HTMLDivElement>(null);
-  const pan = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
+  useLayoutEffect(() => {
+    let raf = 0;
+    let tries = 0;
+    const attempt = () => {
+      const sc = scroller.current;
+      if (sc && sc.clientWidth > 0) {
+        scrollToToday(false);
+        return;
+      }
+      if (tries++ < 20) raf = requestAnimationFrame(attempt);
+    };
+    attempt();
+    return () => cancelAnimationFrame(raf);
+  }, [zoom]);
 
   const toggle = (id: number) =>
     setExpanded((prev) => {

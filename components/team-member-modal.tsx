@@ -25,8 +25,16 @@ export function TeamMemberModal({ member, onClose }: { member: TeamMember | null
   const [role, setRole] = useState(member?.role ?? "");
   const [initials, setInitials] = useState(member?.initials ?? "");
   const [color, setColor] = useState(member?.color ?? PALETTE[0]);
+  // Once the user types in the Initiales field, stop auto-deriving from the name.
+  // Editing a member whose stored initials differ from what the name derives is
+  // treated as a pre-existing override so we don't clobber it on first render.
+  const [initialsTouched, setInitialsTouched] = useState(
+    member !== null && (member.initials ?? "") !== "" && member.initials !== initialsFrom(member.name),
+  );
 
-  const finalInitials = (initials.trim() || initialsFrom(name)).slice(0, 3);
+  // The derived value follows the name live, unless the user has overridden it.
+  const derivedInitials = initialsTouched && initials.trim() ? initials.trim() : initialsFrom(name);
+  const finalInitials = derivedInitials.slice(0, 3);
   const canSubmit = name.trim().length > 0;
 
   function submit() {
@@ -67,7 +75,12 @@ export function TeamMemberModal({ member, onClose }: { member: TeamMember | null
       <Input value={role} onChange={(e) => setRole(e.target.value)} onKeyDown={onEnter} placeholder="ex. Ingénieur structures" style={{ marginBottom: 14 }} />
 
       <label style={label}>Initiales</label>
-      <Input value={initials} onChange={(e) => setInitials(e.target.value)} placeholder={initialsFrom(name)} style={{ width: 90, marginBottom: 14 }} />
+      <Input
+        value={initialsTouched ? initials : finalInitials}
+        onChange={(e) => { setInitialsTouched(true); setInitials(e.target.value); }}
+        placeholder={initialsFrom(name)}
+        style={{ width: 90, marginBottom: 14 }}
+      />
 
       <label style={label}>Couleur</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
