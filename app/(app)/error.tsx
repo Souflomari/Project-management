@@ -8,7 +8,7 @@ export default function AppError({ reset }: { error: Error & { digest?: string }
     <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: 420, maxWidth: "100%", background: C.surface, border: `1px solid ${C.lineStrong}`, borderRadius: R.xl, boxShadow: SH.md, padding: 28, textAlign: "center" }}>
         {/* brand mark — keeps the app identity on the error surface */}
-        <div style={{ display: "inline-flex", alignItems: "baseline", gap: 1, fontFamily: "inherit", fontSize: 18, fontWeight: 700, letterSpacing: "-.02em", color: C.ink900, marginBottom: SP[6] }}>
+        <div style={{ display: "inline-flex", alignItems: "baseline", gap: 1, fontFamily: "inherit", fontSize: 20, fontWeight: 600, letterSpacing: "-.02em", color: C.ink900, marginBottom: SP[6] }}>
           <span>setec</span>
           <span style={{ color: C.brandDot }}>.</span>
         </div>

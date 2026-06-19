@@ -96,7 +96,7 @@ export default function ProjectPage() {
                   className="btn"
                   style={{
                     ...TX.bodyStrong,
-                    fontSize: 13.5,
+                    fontSize: 14,
                     color: active ? C.ink900 : C.ink500,
                     background: "none",
                     border: "none",

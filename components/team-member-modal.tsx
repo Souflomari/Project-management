@@ -88,7 +88,7 @@ export function TeamMemberModal({
       }
     >
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 4 }}>
-        <div style={{ width: 46, height: 46, borderRadius: "50%", background: color, color: C.surface, fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: `background ${DUR.base} ${EASE.standard}` }}>
+        <div style={{ width: 46, height: 46, borderRadius: "50%", background: color, color: C.surface, fontSize: 16, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: `background ${DUR.base} ${EASE.standard}` }}>
           {finalInitials}
         </div>
         <div style={{ ...TX.caption, color: C.ink500 }}>Aperçu de l’avatar</div>
@@ -142,7 +142,7 @@ export function TeamMemberModal({
                     position: "relative",
                   }}
                 >
-                  {taken ? <span aria-hidden style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.surface, fontSize: 11, fontWeight: 700 }}>•</span> : null}
+                  {taken ? <span aria-hidden style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.surface, fontSize: 12, fontWeight: 600 }}>•</span> : null}
                 </button>
               );
             })}

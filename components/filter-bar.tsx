@@ -68,7 +68,7 @@ function FacetPopover({
         onClick={() => setOpen((o) => !o)}
         className="btn state-layer"
         style={{
-          cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 600, padding: "6px 10px 6px 12px", borderRadius: R.sm,
+          cursor: "pointer", font: "inherit", fontSize: 14, fontWeight: 600, padding: "6px 10px 6px 12px", borderRadius: R.sm,
           display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
           // Calm: an active facet reads as neutral-ink with a stronger border, not
           // a green-tinted control — colour is saved for row-level meaning.
@@ -78,7 +78,7 @@ function FacetPopover({
       >
         {label}
         {badge ? (
-          <span style={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 16, textAlign: "center", padding: "1px 5px", borderRadius: R.xs, background: C.ink800, color: "#fff" }}>{badge}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", minWidth: 16, textAlign: "center", padding: "1px 5px", borderRadius: R.xs, background: C.ink800, color: "#fff" }}>{badge}</span>
         ) : null}
         <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .12s", color: C.ink500 }}>
           <CaretDownIcon size={12} />
@@ -126,8 +126,8 @@ function FacetOption({
         {selected ? <CheckIcon size={11} /> : null}
       </span>
       {dot ? <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, flexShrink: 0 }} /> : null}
-      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
-      <span style={{ fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: C.ink400 }}>{count}</span>
+      <span style={{ flex: 1, fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: C.ink400 }}>{count}</span>
     </button>
   );
 }
@@ -165,7 +165,7 @@ function FilterPopover({ facets, team }: { facets: FacetControls; team: { id: nu
         onClick={() => setOpen((o) => !o)}
         className="btn state-layer"
         style={{
-          cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 600, padding: "7px 11px 7px 10px", borderRadius: R.sm,
+          cursor: "pointer", font: "inherit", fontSize: 14, fontWeight: 600, padding: "7px 11px 7px 10px", borderRadius: R.sm,
           display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap", minHeight: 34,
           border: `1px solid ${active ? C.lineStrong : C.line}`, background: active ? C.subtle : C.surface, color: active ? C.ink900 : C.ink700,
           transition: "background .12s, border-color .12s",
@@ -174,7 +174,7 @@ function FilterPopover({ facets, team }: { facets: FacetControls; team: { id: nu
         <span style={{ display: "inline-flex", color: active ? C.ink700 : C.ink500 }}><FilterIcon size={14} /></span>
         Filtrer
         {active ? (
-          <span style={{ fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 16, textAlign: "center", padding: "1px 5px", borderRadius: R.xs, background: C.ink800, color: "#fff" }}>{total}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", minWidth: 16, textAlign: "center", padding: "1px 5px", borderRadius: R.xs, background: C.ink800, color: "#fff" }}>{total}</span>
         ) : null}
         <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .12s", color: C.ink500 }}>
           <CaretDownIcon size={12} />
@@ -274,14 +274,14 @@ export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNod
                 onClick={() => setFilter(f.key)}
                 className={`btn state-layer${a ? " state-on-light" : ""}`}
                 style={{
-                  cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 600, padding: "6px 12px", borderRadius: R.sm,
+                  cursor: "pointer", font: "inherit", fontSize: 14, fontWeight: 600, padding: "6px 12px", borderRadius: R.sm,
                   display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap",
                   border: `1px solid ${a ? C.solid : C.line}`, background: a ? C.solid : C.surface, color: a ? "#fff" : C.ink700,
                   transition: "background .12s, border-color .12s",
                 }}
               >
                 {f.label}
-                <span style={{ fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums", padding: "1px 6px", borderRadius: R.xs, background: a ? "rgba(255,255,255,.20)" : C.subtle, color: a ? "#fff" : C.ink500 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", padding: "1px 6px", borderRadius: R.xs, background: a ? "rgba(255,255,255,.20)" : C.subtle, color: a ? "#fff" : C.ink500 }}>
                   {f.count}
                 </span>
               </button>

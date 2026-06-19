@@ -81,24 +81,32 @@ export const SURFACE = {
 // regardless of the surface beneath it.
 export const STATE = { hover: 0.06, focus: 0.1, press: 0.1, drag: 0.16 } as const;
 
-// Shape scale (M3-aligned, kept tighter for the Linear/Vercel feel). `xxl` (28)
-// is the expressive tier for sheets / FAB / hero containers.
-export const R = { none: 0, xxs: 4, xs: 6, sm: 8, md: 10, lg: 14, xl: 18, xxl: 28, pill: 999 } as const;
+// Locked radius scale — only three values (token-discipline migration):
+//   6  = control  (buttons, inputs, chips, segmented, icon-buttons)
+//   12 = card     (cards, drawer, popovers, menus, modals, tiles)
+//   999 = full    (pills, avatars)
+// Keys are kept so existing references resolve; control-ish keys (xxs/xs/sm) map
+// to 6, surface-ish keys (md/lg/xl/xxl) to 12. A handful of CONTROLS that used a
+// surface key are repointed to `sm` at their call site.
+export const R = { none: 0, xxs: 6, xs: 6, sm: 6, md: 12, lg: 12, xl: 12, xxl: 12, pill: 999 } as const;
 
 /** 4px-based spacing scale. Use instead of ad-hoc inline magic numbers. */
 export const SP = { 0: 0, 1: 2, 2: 4, 3: 8, 4: 12, 5: 16, 6: 20, 7: 24, 8: 32, 9: 40, 10: 48, 11: 64 } as const;
 
-// Monotonic two-layer elevation: every tier pairs a tight contact shadow (low y,
-// low blur) with a soft key shadow (higher y, large blur, negative spread), one
-// constant top-light direction. The resting `sm` is now actually visible so cards
-// read as raised on the white field instead of painted-on. `overlay` is the
-// deepest tier reserved for modal / drawer / command-palette / toast — nothing
-// in-canvas (incl. hover) should reach it, so the elevation hierarchy stays legible.
+// Elevation — token discipline: ONE in-canvas shadow (`card`). Every in-canvas
+// tier (xs/sm/md/lg) aliases to it, so cards/tiles never carry a heavier
+// decorative shadow ("préférer surface + bordure 1px à l'ombre"). Depth at rest
+// comes from the hairline border; `card` is just a whisper of lift.
+// `overlay` / `drawer` are FUNCTIONAL elevation kept for true overlays (modal /
+// drawer / command-palette / toast) — removing them would collapse overlay
+// separation; `focus` is the accessibility ring. These are not decoration.
+const SHADOW_CARD = "0 1px 2px rgba(28,25,23,.06), 0 1px 1px rgba(28,25,23,.04)";
 export const SH = {
-  xs: "0 1px 1px rgba(28,25,23,.04), 0 1px 2px -1px rgba(28,25,23,.05)",
-  sm: "0 1px 2px rgba(28,25,23,.05), 0 2px 6px -1px rgba(28,25,23,.06)",
-  md: "0 2px 4px -1px rgba(28,25,23,.06), 0 8px 20px -4px rgba(28,25,23,.10)",
-  lg: "0 4px 8px -2px rgba(28,25,23,.07), 0 16px 36px -8px rgba(28,25,23,.14)",
+  card: SHADOW_CARD,
+  xs: SHADOW_CARD,
+  sm: SHADOW_CARD,
+  md: SHADOW_CARD,
+  lg: SHADOW_CARD,
   overlay: "0 8px 16px -6px rgba(28,25,23,.10), 0 28px 60px -16px rgba(28,25,23,.22)",
   drawer: "-16px 0 48px -24px rgba(28,25,23,.22), -1px 0 1px rgba(28,25,23,.05)",
   // brand-green focus ring with a white gap — solid green clears the WCAG 2.4.11
@@ -176,36 +184,37 @@ export const ELEV: Record<0 | 1 | 2 | 3, CSSProperties> = {
   3: { background: "#FFFFFF", boxShadow: SH.lg },
 };
 
-/** Type scale by role. Headings use Inter Tight (tight tracking, real weight);
- *  body recedes at 14/440. Hierarchy is carried by SIZE first, then weight and
- *  colour — an editorial range from 11px eyebrow up to a 40px display. */
+/** Locked type scale — 6 sizes (12·14·16·20·28·40) × 3 weights (400·500·600).
+ *  Token-discipline migration: hierarchy is carried by size first, then weight.
+ *  No off-scale sizes/weights anywhere (an audit demanded "0 valeur hors-liste").
+ *  12px is the floor; the dense tier (Gantt axis, table micro) also lands on 12. */
 export const TX: Record<
   | "displayLg" | "display" | "h1" | "h2" | "sectionHd"
   | "bodyLg" | "body" | "bodyStrong" | "caption" | "micro" | "nano"
   | "overline" | "eyebrow",
   CSSProperties
 > = {
-  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 44, fontWeight: 600, letterSpacing: "-.027em", lineHeight: 1.05 },
-  display: { fontFamily: FONT_DISPLAY, fontSize: 35, fontWeight: 600, letterSpacing: "-.024em", lineHeight: 1.1 },
+  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 600, letterSpacing: "-.026em", lineHeight: 1.08 },
+  display: { fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.14 },
   h1: { fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.18 },
-  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 23, fontWeight: 600, letterSpacing: "-.018em", lineHeight: 1.2 },
+  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.2 },
   h2: { fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.28 },
-  bodyLg: { fontSize: 16, fontWeight: 450, lineHeight: 1.55 },
-  body: { fontSize: 15, fontWeight: 450, lineHeight: 1.55 },
-  bodyStrong: { fontSize: 15, fontWeight: 560, lineHeight: 1.5 },
-  caption: { fontSize: 14, fontWeight: 450, lineHeight: 1.5 },
-  micro: { fontSize: 12.5, fontWeight: 500, lineHeight: 1.42 },
-  nano: { fontSize: 11.5, fontWeight: 500, lineHeight: 1.35 },
+  bodyLg: { fontSize: 16, fontWeight: 400, lineHeight: 1.5 },
+  body: { fontSize: 14, fontWeight: 400, lineHeight: 1.5 },
+  bodyStrong: { fontSize: 14, fontWeight: 600, lineHeight: 1.45 },
+  caption: { fontSize: 14, fontWeight: 400, lineHeight: 1.5 },
+  micro: { fontSize: 12, fontWeight: 500, lineHeight: 1.42 },
+  nano: { fontSize: 12, fontWeight: 500, lineHeight: 1.35 },
   // quiet sentence-case label (no uppercase, no heavy tracking)
-  overline: { fontSize: 12.5, fontWeight: 560, letterSpacing: "0", lineHeight: 1.35 },
+  overline: { fontSize: 12, fontWeight: 600, letterSpacing: "0", lineHeight: 1.35 },
   // category/metadata label — uppercase, tracked (use sparingly, ≤2-word tags)
-  eyebrow: { fontSize: 11.5, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", lineHeight: 1.3 },
+  eyebrow: { fontSize: 12, fontWeight: 600, letterSpacing: ".06em", textTransform: "uppercase", lineHeight: 1.3 },
 };
 
-/** Tabular numeric display (Geist). Geist's figures are even and well-spaced;
- *  a slight negative tracking tightens large readouts without cramping. */
+/** Tabular numeric display (Geist). `size` MUST come from the locked scale
+ *  (12·14·16·20·28·40); weight is the 600 "bold" tier (KPI values / counts). */
 export function num(size: number): CSSProperties {
-  return { fontFamily: FONT_NUM, fontWeight: 560, lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-.02em", fontSize: size };
+  return { fontFamily: FONT_NUM, fontWeight: 600, lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-.02em", fontSize: size };
 }
 
 export interface StatusMeta {

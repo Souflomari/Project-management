@@ -27,8 +27,8 @@ function navLinkStyle(active: boolean): React.CSSProperties {
     gap: 11,
     width: "100%",
     minHeight: 40, // Fitts: generous nav target
-    fontSize: 13.5,
-    fontWeight: active ? 560 : 450,
+    fontSize: 14,
+    fontWeight: active ? 600 : 400,
     padding: "0 10px",
     borderRadius: R.sm,
     color: active ? C.ink900 : C.ink500,
@@ -146,8 +146,8 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
                       gap: 9,
                       width: "100%",
                       minHeight: 36, // Fitts: sub-row still comfortably tappable
-                      fontSize: 13,
-                      fontWeight: active ? 560 : 450,
+                      fontSize: 14,
+                      fontWeight: active ? 600 : 400,
                       padding: "0 10px 0 33px",
                       borderRadius: R.sm,
                       // Same calm model as primary rows: quiet neutral container,
@@ -215,8 +215,8 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
     border: "none",
     cursor: "pointer",
     color: C.ink700,
-    fontSize: 13,
-    fontWeight: 450,
+    fontSize: 14,
+    fontWeight: 400,
     padding: "0 10px",
     borderRadius: R.sm,
   };
@@ -302,8 +302,8 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
           {initials}
         </div>
         <div className="rail-hide" style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 540, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-          <div style={{ fontSize: 11.5, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{role}</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+          <div style={{ fontSize: 12, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{role}</div>
         </div>
         {/* Conventional disclosure caret (Jakob): the avatar signals identity, the
             caret signals "opens a menu" — clearer than a redundant person icon. */}
@@ -342,12 +342,12 @@ export function Sidebar() {
         className="soft-hover"
         style={{ display: "block", textDecoration: "none", borderRadius: R.sm, padding: "2px 10px 0", margin: "-2px -10px 0" }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 19, fontWeight: 600, fontFamily: FONT_DISPLAY, letterSpacing: "-.02em", color: C.ink900 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 20, fontWeight: 600, fontFamily: FONT_DISPLAY, letterSpacing: "-.02em", color: C.ink900 }}>
           <span className="rail-hide">setec</span>
           <span className="rail-only" style={{ fontFamily: FONT_DISPLAY }}>s</span>
           <span style={{ color: C.brandDot }}>.</span>
         </div>
-        <div className="rail-hide" style={{ ...TX.caption, fontSize: 11.5, color: C.ink500, fontWeight: 440, paddingTop: 2 }}>Direction technique</div>
+        <div className="rail-hide" style={{ ...TX.caption, fontSize: 12, color: C.ink500, fontWeight: 400, paddingTop: 2 }}>Direction technique</div>
       </Link>
       <div style={{ height: 22 }} />
 

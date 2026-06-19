@@ -21,7 +21,7 @@ const DISCIPLINES = [
   "Mobilité & transport",
 ];
 
-const labelStyle: React.CSSProperties = { ...TX.micro, color: C.ink700, fontWeight: 560, display: "block", margin: "0 0 6px" };
+const labelStyle: React.CSSProperties = { ...TX.micro, color: C.ink700, fontWeight: 600, display: "block", margin: "0 0 6px" };
 
 export function AddProjectModal() {
   const router = useRouter();

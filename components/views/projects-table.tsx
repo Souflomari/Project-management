@@ -131,7 +131,7 @@ function MenuOption({ selected, label, dot, onSelect }: { selected: boolean; lab
       style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 8px", borderRadius: R.xs, background: "transparent", border: "none", cursor: "pointer", font: "inherit", textAlign: "left", color: C.ink800 }}
     >
       {dot ? <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, flexShrink: 0 }} /> : null}
-      <span style={{ flex: 1, fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ flex: 1, fontSize: 14, fontWeight: 500, whiteSpace: "nowrap" }}>{label}</span>
       <span style={{ width: 14, display: "inline-flex", color: C.brandText }}>{selected ? <CheckIcon size={13} /> : null}</span>
     </button>
   );
@@ -168,7 +168,7 @@ function QuietPhaseChip({ label, title }: { label: string; title?: string }) {
     <span
       title={title}
       style={{
-        ...TX.eyebrow, fontSize: 10.5, letterSpacing: ".05em",
+        ...TX.eyebrow, fontSize: 12, letterSpacing: ".05em",
         display: "inline-flex", alignItems: "center", padding: "3px 8px",
         borderRadius: R.xs, whiteSpace: "nowrap", color: C.ink600, background: C.subtle,
       }}
@@ -201,7 +201,7 @@ function RespCell({ p, team, setResp }: { p: DerivedProject; team: TeamMember[];
       label={`Responsable de ${p.name}`}
       trigger={(open, toggle) => (
         <button type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} className="soft-hover" style={{ ...editTrigger, borderRadius: "50%" }} title={`${p.responsable.name} · ${p.responsable.role}`}>
-          <Avatar initials={p.responsable.initials} color={p.responsable.color} size={30} fontSize={11} />
+          <Avatar initials={p.responsable.initials} color={p.responsable.color} size={30} fontSize={12} />
         </button>
       )}
     >
@@ -259,8 +259,8 @@ function HealthDot({ b }: { b: ProjectBudget | undefined }) {
   const state = b.overBudget ? "dépassement" : b.marginPct < 15 ? "marge faible" : "marge saine";
   return (
     <span title={`${state} · marge ${b.marginPct}%`} aria-label={`${state}, marge ${b.marginPct}%`} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-      <span aria-hidden style={{ width: 9, height: 9, borderRadius: b.overBudget ? 1 : "50%", background: color, display: "inline-block" }} />
-      <span style={{ ...num(12), color }}>{b.marginPct}<span style={{ fontSize: 10 }}>%</span></span>
+      <span aria-hidden style={{ width: 9, height: 9, borderRadius: b.overBudget ? 0 : "50%", background: color, display: "inline-block" }} />
+      <span style={{ ...num(12), color }}>{b.marginPct}<span style={{ fontSize: 12 }}>%</span></span>
     </span>
   );
 }
@@ -272,11 +272,11 @@ function TeamStack({ members }: { members: TeamMember[] }) {
     <span style={{ display: "inline-flex", alignItems: "center" }}>
       {show.map((m, i) => (
         <span key={m.id} style={{ marginLeft: i === 0 ? 0 : -8, zIndex: show.length - i }} title={`${m.name} · ${m.role}`}>
-          <Avatar initials={m.initials} color={m.color} size={24} fontSize={9} ring />
+          <Avatar initials={m.initials} color={m.color} size={24} fontSize={12} ring />
         </span>
       ))}
       {extra > 0 ? (
-        <span style={{ marginLeft: -8, width: 24, height: 24, borderRadius: "50%", border: `2px solid ${C.surface}`, background: C.subtle, color: C.ink600, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600 }}>+{extra}</span>
+        <span style={{ marginLeft: -8, width: 24, height: 24, borderRadius: "50%", border: `2px solid ${C.surface}`, background: C.subtle, color: C.ink600, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600 }}>+{extra}</span>
       ) : null}
     </span>
   );
@@ -290,7 +290,7 @@ function renderCell(key: ColKey, p: DerivedProject, ctx: CellCtx): ReactNode {
       // / due-soon stays neutral so the column isn't a second traffic light.
       return (
         <div style={{ minWidth: 0 }}>
-          <div style={{ ...TX.caption, fontWeight: 540, color: C.ink800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.renduLabel}</div>
+          <div style={{ ...TX.caption, fontWeight: 500, color: C.ink800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.renduLabel}</div>
           <div style={{ ...TX.caption, color: C.ink500 }}>{p.renduFmt} · <span style={{ color: p.renduDays != null && p.renduDays < 0 ? C.danger : C.ink600, fontWeight: 600 }}>{p.renduDaysLabel}</span></div>
         </div>
       );
@@ -309,7 +309,7 @@ function renderCell(key: ColKey, p: DerivedProject, ctx: CellCtx): ReactNode {
       return (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ProgressBar pct={p.progress} color={C.brand} label={`Avancement de ${p.name}`} />
-          <span style={{ ...num(13), width: 38, textAlign: "right", color: C.ink700 }}>{p.progress}&#8239;%</span>
+          <span style={{ ...num(14), width: 38, textAlign: "right", color: C.ink700 }}>{p.progress}&#8239;%</span>
         </div>
       );
     case "budget": return <BudgetCell p={p} updateProject={ctx.updateProject} />;
@@ -496,7 +496,7 @@ export function ProjectsTable() {
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Rechercher un projet…"
           aria-label="Rechercher un projet"
-          style={{ width: "100%", height: 38, padding: "0 12px", marginBottom: 12, border: `1px solid ${C.line}`, borderRadius: R.sm, fontFamily: "inherit", fontSize: 15, color: C.ink900, outline: "none" }}
+          style={{ width: "100%", height: 38, padding: "0 12px", marginBottom: 12, border: `1px solid ${C.line}`, borderRadius: R.sm, fontFamily: "inherit", fontSize: 14, color: C.ink900, outline: "none" }}
         />
       ) : null}
 
@@ -684,8 +684,8 @@ function GroupHeader({
       <span style={{ ...TX.bodyStrong, color: C.ink900 }}>{label || "—"}</span>
       <span style={{ ...num(12), color: C.ink500 }}>{count}</span>
       <span style={{ marginLeft: "auto", display: "inline-flex", gap: 16, ...TX.caption, color: C.ink500 }}>
-        <span>Σ <span style={{ ...num(13), color: C.ink700 }}>{fmtBudget(fees)}</span></span>
-        <span>moy. <span style={{ ...num(13), color: C.ink700 }}>{avg}&#8239;%</span></span>
+        <span>Σ <span style={{ ...num(14), color: C.ink700 }}>{fmtBudget(fees)}</span></span>
+        <span>moy. <span style={{ ...num(14), color: C.ink700 }}>{avg}&#8239;%</span></span>
       </span>
     </button>
   );
@@ -748,7 +748,7 @@ function DisplayControl({
                   <span style={{ width: 16, height: 16, borderRadius: R.xxs, flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", border: on ? `1px solid ${C.solid}` : `1.5px solid ${C.lineStrong}`, background: on ? C.solid : C.surface, color: "#fff" }}>
                     {on ? <CheckIcon size={11} /> : null}
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>{c.label}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{c.label}</span>
                 </button>
               );
             })}
@@ -768,7 +768,7 @@ function controlBtn(active: boolean): React.CSSProperties {
   // Quiet toolbar control: an active group-by reads as neutral ink on a subtle
   // well, not a green-tinted chip — matches the calmed filter facets.
   return {
-    cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 600, padding: "6px 10px 6px 12px", borderRadius: R.sm,
+    cursor: "pointer", font: "inherit", fontSize: 14, fontWeight: 600, padding: "6px 10px 6px 12px", borderRadius: R.sm,
     display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
     border: `1px solid ${active ? C.lineStrong : C.line}`, background: active ? C.subtle : C.surface, color: active ? C.ink900 : C.ink700,
     transition: "background .12s, border-color .12s",
@@ -836,7 +836,7 @@ function MobileCards({
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                       <PhaseCell p={p} setPhase={cellCtx.setPhase} />
                       <div style={{ flex: 1 }}><ProgressBar pct={p.progress} color={C.brand} label={`Avancement de ${p.name}`} /></div>
-                      <span style={{ ...num(13), color: C.ink700 }}>{p.progress}&#8239;%</span>
+                      <span style={{ ...num(14), color: C.ink700 }}>{p.progress}&#8239;%</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, ...TX.caption, color: C.ink500 }}>
                       <span>{p.renduFmt} · <span style={{ color: p.renduDays != null && p.renduDays < 0 ? C.danger : C.ink600, fontWeight: 600 }}>{p.renduDaysLabel}</span></span>

@@ -138,7 +138,7 @@ export function Dashboard() {
       {/* period / date context — anchors every figure below to a window */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ ...TX.caption, color: C.ink500 }}>
-          Vue d’ensemble du portefeuille — <span style={{ color: C.ink700, fontWeight: 560 }}>{WEEK_LABEL}</span>
+          Vue d’ensemble du portefeuille — <span style={{ color: C.ink700, fontWeight: 600 }}>{WEEK_LABEL}</span>
         </div>
         <div style={{ ...TX.nano, color: C.ink400 }}>{kpis.total} projet{kpis.total > 1 ? "s" : ""} suivi{kpis.total > 1 ? "s" : ""}</div>
       </div>
@@ -157,7 +157,7 @@ export function Dashboard() {
                 size={132}
                 thickness={11}
                 color={healthColor}
-                label={<span style={{ ...num(54), color: healthColor }}>{Math.round(healthAnim)}</span>}
+                label={<span style={{ ...num(40), color: healthColor }}>{Math.round(healthAnim)}</span>}
               />
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -192,7 +192,7 @@ export function Dashboard() {
                 <button key={s.status} onClick={() => goProjects(s.status)} title={`${s.label} · ${s.count} — filtrer`} aria-label={`Filtrer : ${s.label}`} className="soft-hover row-focus" style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
                   <span style={{ width: 8, height: 8, borderRadius: R.xs, background: s.color, flexShrink: 0 }} />
                   {s.label}{" "}
-                  <span style={{ ...num(13), color: s.status === "à jour" ? C.brand : C.ink900 }}>
+                  <span style={{ ...num(14), color: s.status === "à jour" ? C.brand : C.ink900 }}>
                     {s.status === "à jour" ? Math.round(onTrackAnim) : s.count}
                   </span>
                 </button>
@@ -202,7 +202,7 @@ export function Dashboard() {
             <div style={{ marginTop: "auto", paddingTop: 22 }}>
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", ...TX.caption, color: C.ink500 }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>Avancement moyen <Delta v={avgDelta} unit="pts" /></span>
-                <span style={{ ...num(15), color: C.ink900 }}>{pct(Math.round(avgAnim))}</span>
+                <span style={{ ...num(14), color: C.ink900 }}>{pct(Math.round(avgAnim))}</span>
               </div>
               <div style={{ marginTop: 10, paddingRight: 30 }}>
                 {/* progress trend → the one accent (green): "avancement" is the
@@ -283,7 +283,7 @@ export function Dashboard() {
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ ...SPRING.gentle, delay: i * 0.03 }}
-                style={{ display: "flex", gap: 11, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: 4 }}
+                style={{ display: "flex", gap: 11, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: R.xs }}
               >
                 <span style={{ display: "flex", color: C.brand, flexShrink: 0 }}><CheckIcon size={15} /></span>
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -305,18 +305,18 @@ export function Dashboard() {
               key={r.id}
               {...rowProps(() => openProject(r.id))}
               className="row-hover row-focus"
-              style={{ display: "flex", gap: 12, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: 4 }}
+              style={{ display: "flex", gap: 12, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: R.xs }}
             >
               <div style={{ textAlign: "center", minWidth: 42 }}>
                 <div style={num(20)}>{r.renduDay}</div>
                 <div style={{ ...TX.eyebrow, color: C.ink500, marginTop: 1 }}>{r.renduMon}</div>
               </div>
-              <div style={{ width: 3, alignSelf: "stretch", borderRadius: 2, background: r.renduDueColor }} />
+              <div style={{ width: 3, alignSelf: "stretch", borderRadius: R.xs, background: r.renduDueColor }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ ...TX.bodyStrong, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.renduLabel}</div>
                 <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", color: r.renduDueColor }}>{r.renduDaysLabel}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", color: r.renduDueColor }}>{r.renduDaysLabel}</span>
             </div>
           ))}
           {staleCount > 0 ? (
@@ -348,13 +348,13 @@ export function Dashboard() {
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={SPRING.gentle}
-                style={{ display: "flex", gap: 11, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: 4, overflow: "hidden" }}
+                style={{ display: "flex", gap: 11, alignItems: "center", padding: "9px 6px", cursor: "pointer", borderRadius: R.xs, overflow: "hidden" }}
               >
                 <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: a.statusColor }} />
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ ...TX.bodyStrong, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</div>
                   <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    <span style={{ color: a.causeColor, fontWeight: 560 }}>{a.cause}</span> · {a.responsable.name}
+                    <span style={{ color: a.causeColor, fontWeight: 600 }}>{a.cause}</span> · {a.responsable.name}
                   </div>
                 </div>
                 <StatusPill color={a.statusColor} bg={a.statusBg} label={a.statusLabel} filled />
@@ -365,7 +365,7 @@ export function Dashboard() {
             <button
               onClick={() => setShowAllAlerts((v) => !v)}
               className="soft-hover row-focus"
-              style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 6px", marginTop: 4, background: "none", border: "none", cursor: "pointer", ...TX.caption, color: C.ink500, fontWeight: 560 }}
+              style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 6px", marginTop: 4, background: "none", border: "none", cursor: "pointer", ...TX.caption, color: C.ink500, fontWeight: 600 }}
             >
               {showAllAlerts ? "Réduire" : `Voir tout (${alerts.length})`}
             </button>
@@ -386,7 +386,7 @@ function Panel({ title, meta, count, children }: { title: string; meta?: string;
       <h2 style={{ ...TX.overline, color: C.ink700, margin: "0 0 4px", display: "flex", alignItems: "baseline", gap: 8, padding: "0 6px" }}>
         {title}
         {meta ? <span style={{ ...TX.nano, color: C.ink400, fontWeight: 500 }}>· {meta}</span> : null}
-        {count !== undefined ? <span style={{ ...num(13), color: C.ink400, marginLeft: "auto" }}>{count}</span> : null}
+        {count !== undefined ? <span style={{ ...num(14), color: C.ink400, marginLeft: "auto" }}>{count}</span> : null}
       </h2>
       <div style={{ display: "flex", flexDirection: "column" }}>{children}</div>
     </section>
@@ -481,8 +481,8 @@ function Kpi({ title, value, sub, subColor, dot, delta, onClick, className }: { 
       <div style={{ ...TX.overline, color: C.ink700 }}>{title}</div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
         {/* Secondary KPIs sit a step below the hero gauge readout so the portfolio
-            health stays the single focal point (was num(36), competing with it). */}
-        <span style={{ ...num(30), color: C.ink900 }}>{value}</span>
+            health stays the single focal point (was larger, competing with it). */}
+        <span style={{ ...num(28), color: C.ink900 }}>{value}</span>
         {delta !== undefined ? <Delta v={delta} /> : null}
       </div>
       <div style={{ ...TX.nano, color: subColor ?? C.ink400, marginTop: "auto", paddingTop: 7, display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -510,7 +510,7 @@ function WorkloadTile({ avgCharge, band, overloaded, members, peakName, peakPct,
         <div style={{ ...TX.nano, color: C.ink400 }}>4 sem. · {members} pers.</div>
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
-        <span style={{ ...num(32), color: C.ink900 }}>{pct(shown)}</span>
+        <span style={{ ...num(28), color: C.ink900 }}>{pct(shown)}</span>
         <span style={{ ...TX.nano, color: C.ink400 }}>capacité moyenne</span>
       </div>
       <div style={{ display: "flex", height: 6, borderRadius: R.pill, overflow: "hidden", marginTop: 14, background: SURFACE.container }}>
@@ -555,7 +555,7 @@ function PhaseStrip({ className, columns, total, onPhase }: { className?: string
           c.count > 0 ? (
             <button key={c.phaseIndex} onClick={() => onPhase(c.phaseIndex)} className="soft-hover row-focus" title={`${c.full} · ${c.count} — filtrer`} aria-label={`Filtrer : ${c.full}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...TX.caption, color: C.ink500, background: "none", border: "none", padding: "2px 4px", borderRadius: R.xs, cursor: "pointer" }}>
               <span style={{ width: 8, height: 8, borderRadius: R.xs, background: PHASE_COLORS[c.phaseIndex], flexShrink: 0 }} />
-              {c.label} <span style={{ ...num(13), color: C.ink900 }}>{c.count}</span>
+              {c.label} <span style={{ ...num(14), color: C.ink900 }}>{c.count}</span>
             </button>
           ) : null,
         )}

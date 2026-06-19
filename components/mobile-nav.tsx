@@ -71,7 +71,7 @@ export function MobileNav() {
                 className="state-layer"
                 style={{
                   flexShrink: 0,
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: active ? 600 : 500,
                   padding: "0 14px",
                   borderRadius: R.pill,

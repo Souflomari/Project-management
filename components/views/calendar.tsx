@@ -347,7 +347,7 @@ function MiniMonthTitle({ label, anchorISO }: { label: string; anchorISO: string
           minWidth: 200,
         }}
       >
-        <h2 style={{ ...num(21), margin: 0, color: C.ink900 }}>{label}</h2>
+        <h2 style={{ ...num(20), margin: 0, color: C.ink900 }}>{label}</h2>
         <span style={{ color: C.ink400, display: "flex" }}>
           <CalendarIcon size={16} />
         </span>
@@ -455,8 +455,7 @@ function MiniMonth({ anchorISO, onPick }: { anchorISO: string; onPick: (iso: str
                 color: today ? C.surface : C.ink700,
                 borderRadius: R.xs,
                 height: 28,
-                ...num(13),
-                fontSize: 12.5,
+                ...num(12),
               }}
             >
               {d}
@@ -523,7 +522,7 @@ function ProjectFacet({
           borderRadius: R.sm,
           cursor: "pointer",
           ...TX.caption,
-          fontWeight: 560,
+          fontWeight: 600,
         }}
       >
         {labelText}
@@ -651,7 +650,7 @@ function PhaseLegend({
               color: explicit ? C.ink800 : on ? C.ink500 : C.ink300,
               cursor: "pointer",
               ...TX.nano,
-              fontWeight: explicit ? 700 : 600,
+              fontWeight: 600,
             }}
           >
             {ph}
@@ -794,11 +793,11 @@ function SpanBar({
         gridColumn: `${startCol + 1} / ${endCol + 2}`,
         display: "flex",
         alignItems: "center",
-        gap: 6,
+        gap: 5,
         minWidth: 0,
-        height: 22,
-        padding: "0 7px",
-        borderRadius: seg.isStart && seg.isEnd ? R.xs : seg.isStart ? "6px 2px 2px 6px" : seg.isEnd ? "2px 6px 6px 2px" : 2,
+        height: 24,
+        padding: "0 6px",
+        borderRadius: seg.isStart && seg.isEnd ? R.xs : seg.isStart ? "6px 0 0 6px" : seg.isEnd ? "0 6px 6px 0" : 0,
         // Quiet neutral chip — no decorative phase colour. Identity is the letter
         // badge; the bar carries name + (when overdue) the one status cue. Hover
         // is the `.cal-chip` wash, so the resting fill is the neutral well.
@@ -842,7 +841,7 @@ function PhaseBadge({ index }: { index: number }) {
     <span
       aria-hidden
       title={`${PHASES[index]} · ${PHASES_FULL[index]}`}
-      style={{ ...TX.nano, fontWeight: 700, fontSize: 9.5, letterSpacing: ".03em", color: C.ink400, flexShrink: 0 }}
+      style={{ ...TX.nano, fontWeight: 600, fontSize: 12, letterSpacing: ".03em", color: C.ink400, flexShrink: 0 }}
     >
       {PHASES[index]}
     </span>
@@ -953,7 +952,7 @@ function MonthView({
       className="enter-rise"
       role="grid"
       aria-label={`Calendrier ${MONS_LONG[month]} ${year}`}
-      style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}
+      style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}
     >
       {/* Quiet weekday header: white field, separation carried by the hairline only. */}
       <div role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.surface, borderBottom: `1px solid ${C.line}` }}>
@@ -992,11 +991,11 @@ function MonthView({
                   }}
                 >
                   {today ? (
-                    <div style={{ ...num(13), width: 22, height: 22, borderRadius: "50%", background: C.brand, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>{d.getDate()}</div>
+                    <div style={{ ...num(14), width: 22, height: 22, borderRadius: "50%", background: C.brand, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>{d.getDate()}</div>
                   ) : (
-                    <div style={{ ...num(13), color: inMonth ? C.ink600 : C.ink300, padding: "1px 2px" }}>{d.getDate()}</div>
+                    <div style={{ ...num(14), color: inMonth ? C.ink600 : C.ink300, padding: "1px 2px" }}>{d.getDate()}</div>
                   )}
-                  <div aria-hidden style={{ height: week.rows.length ? Math.min(week.rows.length, MAX_VISIBLE) * 25 + (overflow ? 18 : 0) : 0 }} />
+                  <div aria-hidden style={{ height: week.rows.length ? Math.min(week.rows.length, MAX_VISIBLE) * 27 + (overflow ? 18 : 0) : 0 }} />
                 </DayCell>
               );
             })}
@@ -1184,7 +1183,7 @@ function WeekView({
   }, [events]);
 
   return (
-    <div className="enter-rise" role="grid" aria-label={weekLabel(anchorISO)} style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}>
+    <div className="enter-rise" role="grid" aria-label={weekLabel(anchorISO)} style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}>
       {/* Quiet day headers with per-day load summary; today carried by the green date. */}
       <div role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.surface, borderBottom: `1px solid ${C.line}` }}>
         {days.map((d, i) => {
@@ -1199,9 +1198,9 @@ function WeekView({
                 {/* Today is the single accent: a filled green badge (mirrors the month
                  *  grid), so the lane below needs no redundant column tint. */}
                 {today ? (
-                  <div style={{ ...num(15), width: 26, height: 26, borderRadius: "50%", background: C.brand, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>{d.getDate()}</div>
+                  <div style={{ ...num(14), width: 26, height: 26, borderRadius: "50%", background: C.brand, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>{d.getDate()}</div>
                 ) : (
-                  <div style={{ ...num(18), color: C.ink900 }}>{d.getDate()}</div>
+                  <div style={{ ...num(20), color: C.ink900 }}>{d.getDate()}</div>
                 )}
                 {load > 0 ? <span title={`${load} échéance${load > 1 ? "s" : ""}`} style={{ ...TX.nano, fontWeight: 600, color: C.ink500, background: C.subtle, borderRadius: R.pill, padding: "1px 6px" }}>{load}</span> : null}
               </div>
@@ -1269,7 +1268,7 @@ function AgendaView({ events, onOpen }: { events: TaskEvent[]; onOpen: (id: numb
   }, [list]);
 
   return (
-    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", boxShadow: SH.sm }}>
+    <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden", boxShadow: SH.sm }}>
       {groups.length === 0 ? (
         <div style={{ padding: 24, ...TX.body, color: C.ink500 }}>Aucune échéance à venir.</div>
       ) : (
@@ -1294,7 +1293,7 @@ function AgendaView({ events, onOpen }: { events: TaskEvent[]; onOpen: (id: numb
                   borderBottom: `1px solid ${C.line}`,
                 }}
               >
-                <span style={{ ...num(15), color: today ? C.brand : C.ink900 }}>{d.getDate()}</span>
+                <span style={{ ...num(14), color: today ? C.brand : C.ink900 }}>{d.getDate()}</span>
                 <span style={{ ...TX.overline, color: C.ink600 }}>{WEEKDAYS_LONG[(d.getDay() + 6) % 7]} {MONTHS_FULL[d.getMonth()]}</span>
                 <span style={{ marginLeft: "auto", ...TX.nano, fontWeight: 600, color: past ? C.danger : today ? C.brandText : C.ink500 }}>{relativeLabel(iso)}</span>
               </div>
@@ -1309,14 +1308,14 @@ function AgendaView({ events, onOpen }: { events: TaskEvent[]; onOpen: (id: numb
                   >
                     {/* Rail spends colour only on meaning: red when overdue, else a
                      *  quiet hairline. Phase identity lives in the subtitle letter. */}
-                    <div style={{ width: overdue ? 3 : 2, alignSelf: "stretch", borderRadius: 2, background: overdue ? C.danger : C.lineStrong }} />
+                    <div style={{ width: overdue ? 3 : 2, alignSelf: "stretch", borderRadius: 6, background: overdue ? C.danger : C.lineStrong }} />
                     <div style={{ minWidth: 0, flex: 1 }}>
                       {/* Lead with the TASK name; project secondary. */}
                       <div style={{ ...TX.bodyStrong, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: e.done ? "line-through" : "none" }}>{e.taskName}</div>
                       <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.projectName} · {PHASES[e.phaseIndex]}</div>
                     </div>
                     {overdue ? <span style={{ color: C.danger, display: "flex" }} title="En retard"><FlagIcon size={14} /></span> : null}
-                    <div title={e.assigneeInitials} style={{ width: 26, height: 26, borderRadius: "50%", background: e.assigneeColor, color: C.surface, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div title={e.assigneeInitials} style={{ width: 26, height: 26, borderRadius: "50%", background: e.assigneeColor, color: C.surface, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       {e.assigneeInitials}
                     </div>
                   </div>

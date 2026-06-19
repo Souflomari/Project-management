@@ -115,7 +115,7 @@ export function Button({
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const sizes: Record<string, CSSProperties> = {
     sm: { fontSize: 12, padding: "6px 12px" },
-    md: { fontSize: 13, padding: "8px 14px" },
+    md: { fontSize: 14, padding: "8px 14px" },
   };
   const variants: Record<ButtonVariant, CSSProperties> = {
     primary: { background: C.solid, color: C.surface },
@@ -288,7 +288,7 @@ export function Input({
   leading?: ReactNode;
   trailing?: ReactNode;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "size">) {
-  const s = size === "sm" ? { height: 30, fontSize: 13 } : { height: 36, fontSize: 14 };
+  const s = size === "sm" ? { height: 30, fontSize: 14 } : { height: 36, fontSize: 14 };
   const padL = leading ? 32 : 12;
   const padR = trailing ? 32 : 12;
   return (
@@ -329,7 +329,7 @@ export function Select({
   invalid?: boolean;
   leading?: ReactNode;
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, "size">) {
-  const s = size === "sm" ? { height: 30, fontSize: 13 } : { height: 36, fontSize: 14 };
+  const s = size === "sm" ? { height: 30, fontSize: 14 } : { height: 36, fontSize: 14 };
   return (
     <span style={{ position: "relative", display: "inline-flex", width: style?.width ?? "auto" }}>
       {leading ? <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", display: "flex", color: C.ink500, pointerEvents: "none" }}>{leading}</span> : null}
@@ -425,7 +425,7 @@ export function Field({
   const invalid = !!error;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, ...style }}>
-      <label htmlFor={id} style={{ ...TX.micro, color: C.ink700, fontWeight: 560 }}>
+      <label htmlFor={id} style={{ ...TX.micro, color: C.ink700, fontWeight: 600 }}>
         {label}
         {required ? <span aria-hidden style={{ color: C.danger, marginLeft: 3 }}>*</span> : null}
       </label>
@@ -458,7 +458,7 @@ export function Segmented<T extends string>({
     onChange(options[(i + dir + options.length) % options.length].value);
   };
   return (
-    <div role="radiogroup" aria-disabled={disabled || undefined} style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.md, padding: 3, opacity: disabled ? 0.5 : 1 }}>
+    <div role="radiogroup" aria-disabled={disabled || undefined} style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.sm, padding: 3, opacity: disabled ? 0.5 : 1 }}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -580,7 +580,7 @@ export function SectionHeader({
         {eyebrow ? <div style={{ ...TX.eyebrow, color: C.ink400, marginBottom: 6 }}>{eyebrow}</div> : null}
         <h2 style={{ ...TX.sectionHd, margin: 0, color: C.ink900, display: "flex", alignItems: "baseline", gap: 10 }}>
           {title}
-          {count != null ? <span style={{ ...num(15), color: C.ink400 }}>{count}</span> : null}
+          {count != null ? <span style={{ ...num(14), color: C.ink400 }}>{count}</span> : null}
         </h2>
         {description ? <p style={{ ...TX.caption, color: C.ink500, margin: "6px 0 0", maxWidth: 560 }}>{description}</p> : null}
       </div>
@@ -723,7 +723,7 @@ export function Avatar({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: fontSize ?? Math.round(size * 0.36),
+        fontSize: fontSize ?? Math.max(12, Math.round(size * 0.36)),
         fontWeight: 600,
         color: C.surface,
         background: color,
@@ -764,7 +764,7 @@ export function Chip({
     tone === "soft" ? { background: C.subtle } : tone === "outline" ? { border: `1px solid ${C.line}` } : {};
   const base: CSSProperties = {
     ...TX.eyebrow,
-    fontSize: 10.5,
+    fontSize: 12,
     letterSpacing: ".05em",
     display: "inline-flex",
     alignItems: "center",
@@ -829,7 +829,7 @@ export function ToggleButton({
   icon?: ReactNode;
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "color">) {
   const accent = tone === "brand" ? C.brand : tone === "danger" ? C.danger : C.ink900;
-  const sizes = size === "sm" ? { fontSize: 12, padding: "5px 10px" } : { fontSize: 13, padding: "7px 12px" };
+  const sizes = size === "sm" ? { fontSize: 12, padding: "5px 10px" } : { fontSize: 14, padding: "7px 12px" };
   return (
     <button
       type="button"
@@ -892,7 +892,7 @@ export function StatusPill({
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         whiteSpace: "nowrap",
         color: filled && bg ? C.ink700 : C.ink600,
@@ -1023,7 +1023,7 @@ export function Sparkline({
             top: `${(lastY / height) * 100}%`,
             transform: "translateY(-50%)",
             marginTop: -1,
-            ...num(13),
+            ...num(14),
             fontSize: 12,
             color,
             background: C.surface,
@@ -1196,7 +1196,7 @@ export function Badge({
         height: 18,
         padding: "0 6px",
         borderRadius: R.pill,
-        ...num(11),
+        ...num(12),
         fontWeight: 600,
         justifyContent: "center",
         color: t.fg,
@@ -1230,7 +1230,7 @@ export function Kbd({ children, style }: { children: ReactNode; style?: CSSPrope
         background: C.surface,
         color: C.ink600,
         fontFamily: "inherit",
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         lineHeight: 1,
         ...style,
@@ -1346,7 +1346,7 @@ export function Tabs({
       style={{
         display: "inline-flex",
         gap: pill ? 2 : 4,
-        ...(pill ? { background: C.subtle, borderRadius: R.md, padding: 3 } : { borderBottom: `1px solid ${C.line}` }),
+        ...(pill ? { background: C.subtle, borderRadius: R.sm, padding: 3 } : { borderBottom: `1px solid ${C.line}` }),
         ...style,
       }}
     >
@@ -1371,7 +1371,7 @@ export function Tabs({
               gap: 6,
               cursor: "pointer",
               fontFamily: "inherit",
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 600,
               border: "none",
               background: pill ? (active ? C.surface : "transparent") : "transparent",

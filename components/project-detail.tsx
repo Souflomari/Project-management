@@ -51,7 +51,7 @@ export function ProjectIdentity({ p, titleId, titleStyle }: { p: DerivedProject;
           value={p.name}
           onSave={(v) => updateProject(p.id, { name: v })}
           ariaLabel="Nom du projet"
-          style={titleStyle ?? { fontFamily: FONT_DISPLAY, fontSize: 21, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.2, color: C.ink900 }}
+          style={titleStyle ?? { fontFamily: FONT_DISPLAY, fontSize: 20, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.2, color: C.ink900 }}
         />
       </h2>
       <div style={{ display: "flex", alignItems: "center", gap: 2, ...TX.caption, color: C.ink500 }}>
@@ -87,7 +87,7 @@ export function StatusPicker({ p, size = "sm" }: { p: DerivedProject; size?: "sm
             aria-pressed={active}
             className="btn"
             style={{
-              cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 540, whiteSpace: "nowrap",
+              cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
               display: "inline-flex", alignItems: "center", gap: 6, padding: pad, borderRadius: R.sm,
               background: active ? SURFACE.container : C.surface,
               color: active ? C.ink900 : C.ink500,
@@ -131,7 +131,7 @@ export function ProjectPeekSummary({ p }: { p: DerivedProject }) {
         <div>
           <div style={{ ...TX.overline, color: C.ink600 }}>Avancement</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 6 }}>
-            <span style={{ ...num(26), color: C.brand }}>{pct(p.progress)}</span>
+            <span style={{ ...num(28), color: C.brand }}>{pct(p.progress)}</span>
             <span style={{ ...TX.micro, color: C.ink500 }}>{doneCount}/{p.subtasksD.length}</span>
           </div>
           <div style={{ marginTop: 9 }}><ProgressBar pct={p.progress} color={C.brand} height={5} /></div>
@@ -139,7 +139,7 @@ export function ProjectPeekSummary({ p }: { p: DerivedProject }) {
         <div>
           <div style={{ ...TX.overline, color: C.ink600 }}>Marge prévue</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
-            <span style={{ ...num(26), color: b.overBudget ? C.danger : C.ink900 }}>
+            <span style={{ ...num(28), color: b.overBudget ? C.danger : C.ink900 }}>
               {b.marginPct >= 0 ? "+" : ""}{pct(b.marginPct)}
             </span>
             {b.overBudget ? <OverBudgetBadge /> : null}
@@ -198,7 +198,7 @@ export function ProjectProperties({ p }: { p: DerivedProject }) {
         <div style={{ display: "flex", alignItems: "center", paddingLeft: 7 }}>
           {p.members.map((m) => (
             <div key={m.id} style={{ marginLeft: -7 }}>
-              <Avatar initials={m.initials} color={m.color} size={28} fontSize={10} ring title={`${m.name} · ${m.role}`} />
+              <Avatar initials={m.initials} color={m.color} size={28} fontSize={12} ring title={`${m.name} · ${m.role}`} />
             </div>
           ))}
         </div>
@@ -256,7 +256,7 @@ export function PhaseStepper({ p, compact = false }: { p: DerivedProject; compac
                         : { background: C.surface, border: `3px solid ${C.line}` }),
                   }}
                 />
-                <span style={{ ...TX.micro, fontSize: compact ? 10.5 : undefined, color: cur ? C.ink900 : isDone ? C.ink700 : C.ink400, fontWeight: cur ? 600 : 500 }}>{ph}</span>
+                <span style={{ ...TX.micro, fontSize: compact ? 12 : undefined, color: cur ? C.ink900 : isDone ? C.ink700 : C.ink400, fontWeight: cur ? 600 : 500 }}>{ph}</span>
               </button>
             );
           })}
@@ -338,7 +338,7 @@ export function ProjectOverview({ p }: { p: DerivedProject }) {
       <div style={{ display: "flex", alignItems: "center", paddingLeft: 7 }}>
         {p.members.map((m) => (
           <div key={m.id} style={{ marginLeft: -7 }}>
-            <Avatar initials={m.initials} color={m.color} size={28} fontSize={10} ring title={`${m.name} · ${m.role}`} />
+            <Avatar initials={m.initials} color={m.color} size={28} fontSize={12} ring title={`${m.name} · ${m.role}`} />
           </div>
         ))}
       </div>
@@ -356,7 +356,7 @@ function AvancementBar({ p, height = 6 }: { p: DerivedProject; height?: number }
         {/* "attendu aujourd'hui" marker */}
         <div
           aria-hidden
-          style={{ position: "absolute", top: -2, bottom: -2, left: `${expected}%`, width: 2, background: C.ink700, transform: "translateX(-1px)", borderRadius: 1 }}
+          style={{ position: "absolute", top: -2, bottom: -2, left: `${expected}%`, width: 2, background: C.ink700, transform: "translateX(-1px)", borderRadius: 0 }}
         />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", ...TX.micro, color: C.ink500, marginTop: 5 }}>
@@ -373,7 +373,7 @@ function OverBudgetBadge() {
   return (
     <span
       style={{
-        ...TX.eyebrow, fontSize: 9.5, letterSpacing: ".04em", color: C.danger,
+        ...TX.eyebrow, fontSize: 12, letterSpacing: ".04em", color: C.danger,
         border: `1px solid ${C.danger}`, padding: "1px 6px", borderRadius: R.xs, whiteSpace: "nowrap",
       }}
     >
@@ -585,7 +585,7 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
                 className="btn soft-hover"
                 style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", border: "none", background: "transparent", borderRadius: R.sm, padding: "6px 8px", cursor: "pointer", textAlign: "left" }}
               >
-                <Avatar initials={tm.initials} color={tm.color} size={22} fontSize={9} />
+                <Avatar initials={tm.initials} color={tm.color} size={22} fontSize={12} />
                 <span style={{ ...TX.caption, color: C.ink900 }}>{tm.name}</span>
               </button>
             ))}
@@ -621,7 +621,7 @@ function CommentItem({ cm, teamFirstNames }: { cm: { author: string; initials: s
   return (
     <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
       {/* neutral author avatar — identity is the name + initials, not a hue */}
-      <Avatar initials={cm.initials} color={C.ink400} size={28} fontSize={10} title={cm.author} />
+      <Avatar initials={cm.initials} color={C.ink400} size={28} fontSize={12} title={cm.author} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ ...TX.caption }}>
           <span style={{ fontWeight: 600, color: C.ink900 }}>{cm.author}</span>{" "}
@@ -695,7 +695,7 @@ function SubtaskRow({
             {subtask.name}
           </span>
           {subtask.onCriticalPath && !subtask.done ? (
-            <span style={{ ...TX.eyebrow, fontSize: 9.5, letterSpacing: ".03em", color: C.ink600, border: `1px solid ${C.lineStrong}`, padding: "0 5px", borderRadius: R.xs, flexShrink: 0 }} title="Sur le chemin critique — aucun retard possible sans décaler la fin">
+            <span style={{ ...TX.eyebrow, fontSize: 12, letterSpacing: ".03em", color: C.ink600, border: `1px solid ${C.lineStrong}`, padding: "0 5px", borderRadius: R.xs, flexShrink: 0 }} title="Sur le chemin critique — aucun retard possible sans décaler la fin">
               critique
             </span>
           ) : subtask.float > 0 && !subtask.done ? (
@@ -705,7 +705,7 @@ function SubtaskRow({
           ) : null}
         </button>
 
-        <Avatar initials={subtask.assignee.initials} color={subtask.assignee.color} size={22} fontSize={9} title={subtask.assignee.name} />
+        <Avatar initials={subtask.assignee.initials} color={subtask.assignee.color} size={22} fontSize={12} title={subtask.assignee.name} />
         <span style={{ ...TX.micro, color: overdue ? C.danger : C.ink500, whiteSpace: "nowrap", width: 64, textAlign: "right" }}>
           {fmtShort(subtask.end)}
         </span>
@@ -742,7 +742,7 @@ function SubtaskRow({
             {subtask.dependsOn.map((id) => (
               <span
                 key={id}
-                style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 4px 1px 8px", color: C.ink700 }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 4px 1px 8px", color: C.ink700 }}
               >
                 {depNames.get(id) ?? `#${id}`}
                 <button onClick={() => removeDep(id)} aria-label="Retirer la dépendance" className="btn soft-hover" style={{ border: "none", background: "transparent", cursor: "pointer", color: C.ink500, lineHeight: 1, padding: 0, display: "flex", borderRadius: R.xs }}>
@@ -802,7 +802,7 @@ function Stat({ label, value, hint, title, valueColor, children }: { label: stri
   return (
     <div title={title} style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
       <div style={{ ...TX.overline, color: C.ink600 }}>{label}</div>
-      <div style={{ ...num(22), marginTop: 4, color: valueColor ?? C.ink900 }}>{value}</div>
+      <div style={{ ...num(28), marginTop: 4, color: valueColor ?? C.ink900 }}>{value}</div>
       {hint ? <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{hint}</div> : null}
       {children}
     </div>

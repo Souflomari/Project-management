@@ -154,7 +154,7 @@ function buildAxis(windowStart: string, spanDays: number, pxPerDay: number, zoom
 
 function Legend() {
   const item = { display: "flex", alignItems: "center", gap: 5 } as const;
-  const swatch = { width: 14, height: 8, borderRadius: 2, flexShrink: 0 } as const;
+  const swatch = { width: 14, height: 8, borderRadius: 6, flexShrink: 0 } as const;
   return (
     <span style={{ ...TX.nano, color: C.ink500, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       {/* avancement = the green progress fill on its light neutral track (mirrors a bar). */}
@@ -494,7 +494,7 @@ export function PlanningGantt() {
 
 function colCells(cols: Set<ColKey>, vals: Partial<Record<ColKey, string>>) {
   return ALL_COLS.filter((c) => cols.has(c.key)).map((c) => (
-    <span key={c.key} style={{ width: 52, flexShrink: 0, textAlign: "right", fontFamily: FONT_NUM, fontSize: 10.5, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden" }}>
+    <span key={c.key} style={{ width: 56, flexShrink: 0, textAlign: "right", fontFamily: FONT_NUM, fontSize: 12, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden" }}>
       {vals[c.key] ?? "—"}
     </span>
   ));
@@ -510,7 +510,7 @@ function ProjectLeftCell({ g, isOpen, leftW, cols, cpCount }: { g: GanttRow; isO
       }}
     >
       <span style={{ color: C.ink400, display: "flex", flexShrink: 0, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard)" }}><ChevronRightIcon size={14} /></span>
-      <Avatar initials={g.responsableInitials} color={g.responsableColor} size={28} fontSize={11} title={`${g.responsable} · ${g.responsableRole}`} />
+      <Avatar initials={g.responsableInitials} color={g.responsableColor} size={28} fontSize={12} title={`${g.responsable} · ${g.responsableRole}`} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
           {g.name}
@@ -540,7 +540,7 @@ function SubtaskLeftCell({ s, leftW, cols }: { s: GanttBar; leftW: number; cols:
         display: "flex", alignItems: "center", gap: 7, zIndex: 2,
       }}
     >
-      <Avatar initials={s.assigneeInitials} color={s.color} size={18} fontSize={9} title={s.assigneeInitials} />
+      <Avatar initials={s.assigneeInitials} color={s.color} size={20} fontSize={12} title={s.assigneeInitials} />
       <span style={{ ...TX.micro, color: s.done ? C.ink400 : C.ink900, textDecoration: s.done ? "line-through" : "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, minWidth: 0 }}>
         {s.name}
       </span>
@@ -601,7 +601,7 @@ function AxisHeader({ leftW, timelineW, axis, todayPx, onResize }: { leftW: numb
         {/* top tier */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: HEADER_H / 2, borderBottom: `1px solid ${C.line}` }}>
           {axis.top.map((t, i) => (
-            <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, width: t.w, borderLeft: `1px solid ${t.major ? C.lineStrong : C.line}`, display: "flex", alignItems: "center", paddingLeft: 6, fontFamily: FONT_NUM, fontSize: 11, fontWeight: 600, color: C.ink700, whiteSpace: "nowrap", overflow: "hidden" }}>
+            <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, width: t.w, borderLeft: `1px solid ${t.major ? C.lineStrong : C.line}`, display: "flex", alignItems: "center", paddingLeft: 6, fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, color: C.ink700, whiteSpace: "nowrap", overflow: "hidden" }}>
               {t.label}
             </div>
           ))}
@@ -611,7 +611,7 @@ function AxisHeader({ leftW, timelineW, axis, todayPx, onResize }: { leftW: numb
             the field. Whitespace + alignment do the grouping. */}
         <div style={{ position: "absolute", top: HEADER_H / 2, left: 0, right: 0, bottom: 0 }}>
           {axis.bottom.map((t, i) => (
-            <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, width: t.w, display: "flex", alignItems: "center", paddingLeft: 6, fontFamily: FONT_NUM, fontSize: 10, fontWeight: 500, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden" }}>
+            <div key={i} style={{ position: "absolute", top: 0, bottom: 0, left: t.px, width: t.w, display: "flex", alignItems: "center", paddingLeft: 6, fontFamily: FONT_NUM, fontSize: 12, fontWeight: 500, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden" }}>
               {t.label}
             </div>
           ))}
@@ -797,7 +797,7 @@ function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: Gantt
     >
       <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: PROGRESS, borderRadius: `${R.xs}px 0 0 ${R.xs}px` }} />
       {/* % label: white on the green fill when filled enough to sit on it, ink otherwise. */}
-      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 10.5, fontWeight: 600, color: g.fill > 82 ? C.surface : C.ink700 }}>
+      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, color: g.fill > 82 ? C.surface : C.ink700 }}>
         {g.progress} %
       </span>
       {drag ? <DatePill text={drag.mode === "move" ? `${fmtShort(pStart)} → ${fmtShort(pEnd)}` : fmtShort(pEnd)} /> : null}
@@ -880,7 +880,7 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
         <div
           aria-hidden
           style={{
-            position: "absolute", top: SUB_ROW_H / 2 - 5, height: 10, borderRadius: R.xs,
+            position: "absolute", top: SUB_ROW_H / 2 - 7, height: 14, borderRadius: R.xs,
             left: `${s.left + s.width}%`, width: `${s.floatWidth}%`, minWidth: 4,
             background: `repeating-linear-gradient(90deg, ${C.ink350}55 0 3px, transparent 3px 6px)`,
             border: `1px dashed ${C.ink350}`, pointerEvents: "none", opacity: drag ? 0.4 : 0.9,
@@ -888,7 +888,7 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
           }}
         >
           {showFloatNum ? (
-            <span style={{ fontFamily: FONT_NUM, fontSize: 9, fontWeight: 600, color: C.ink500 }}>+{s.float}j</span>
+            <span style={{ fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, color: C.ink500 }}>+{s.float}j</span>
           ) : null}
         </div>
       ) : null}

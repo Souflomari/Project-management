@@ -33,12 +33,12 @@ export function AppSkeleton() {
         style={{ width: 232, flexShrink: 0, background: C.canvas, borderRight: `1px solid ${C.line}`, display: "flex", flexDirection: "column", padding: "20px 12px 16px", position: "sticky", top: 0, height: "100dvh" }}
       >
         <div style={{ padding: "2px 10px 0" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 19, fontWeight: 600, fontFamily: FONT_DISPLAY, letterSpacing: "-.02em", color: C.ink900 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 20, fontWeight: 600, fontFamily: FONT_DISPLAY, letterSpacing: "-.02em", color: C.ink900 }}>
             <span className="rail-hide">setec</span>
             <span className="rail-only" style={{ fontFamily: FONT_DISPLAY }}>s</span>
             <span style={{ color: C.brandDot }}>.</span>
           </div>
-          <div className="rail-hide" style={{ fontSize: 11.5, color: C.ink500, fontWeight: 440, paddingTop: 2 }}>Direction technique</div>
+          <div className="rail-hide" style={{ fontSize: 12, color: C.ink500, fontWeight: 400, paddingTop: 2 }}>Direction technique</div>
         </div>
         <div style={{ height: 22 }} />
         <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -59,12 +59,12 @@ export function AppSkeleton() {
         {/* header shell */}
         <header style={{ minHeight: 64, borderBottom: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, padding: "12px 28px" }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 600, fontFamily: FONT_DISPLAY, color: C.ink900, letterSpacing: "-.02em" }}>{item.label}</div>
-            <div style={{ marginTop: 7 }}><Skeleton w={120} h={9} r={4} /></div>
+            <div style={{ fontSize: 20, fontWeight: 600, fontFamily: FONT_DISPLAY, color: C.ink900, letterSpacing: "-.02em" }}>{item.label}</div>
+            <div style={{ marginTop: 7 }}><Skeleton w={120} h={9} r={6} /></div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Skeleton className="header-search" w={240} h={36} r={8} />
-            <Skeleton w={132} h={36} r={8} />
+            <Skeleton className="header-search" w={240} h={36} r={6} />
+            <Skeleton w={132} h={36} r={6} />
           </div>
         </header>
 
@@ -98,9 +98,9 @@ function ContentSkeleton({ viewKey }: { viewKey: string }) {
 function SkelKpi({ className }: { className?: string }) {
   return (
     <div className={className} style={{ border: `1px solid ${C.line}`, borderRadius: R.lg, background: C.surface, padding: 16, display: "flex", flexDirection: "column" }}>
-      <Skeleton w={90} h={10} r={4} />
-      <div style={{ marginTop: 12 }}><Skeleton w={70} h={30} /></div>
-      <div style={{ marginTop: "auto", paddingTop: 14 }}><Skeleton w={120} h={9} r={4} /></div>
+      <Skeleton w={90} h={10} r={6} />
+      <div style={{ marginTop: 12 }}><Skeleton w={70} h={28} /></div>
+      <div style={{ marginTop: "auto", paddingTop: 14 }}><Skeleton w={120} h={9} r={6} /></div>
     </div>
   );
 }
@@ -110,12 +110,12 @@ function SkelKpi({ className }: { className?: string }) {
 function SkelListPanel({ rows = 4 }: { rows?: number }) {
   return (
     <section style={{ padding: "2px 6px" }}>
-      <Skeleton w={150} h={11} r={4} />
+      <Skeleton w={150} h={11} r={6} />
       <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 0 }}>
         {Array.from({ length: rows }).map((_, i) => (
           <div key={i} style={{ display: "flex", gap: 11, alignItems: "center", padding: "10px 0" }}>
             <Skeleton w={10} h={10} r={999} />
-            <div style={{ flex: 1 }}><Skeleton w="60%" /><div style={{ marginTop: 7 }}><Skeleton w="40%" h={9} r={4} /></div></div>
+            <div style={{ flex: 1 }}><Skeleton w="60%" /><div style={{ marginTop: 7 }}><Skeleton w="40%" h={9} r={6} /></div></div>
             <Skeleton w={56} h={20} r={999} />
           </div>
         ))}
@@ -131,26 +131,26 @@ function DashboardSkeleton() {
     <>
       {/* period / date context header row */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
-        <Skeleton w={280} h={11} r={4} />
-        <Skeleton w={90} h={9} r={4} />
+        <Skeleton w={280} h={11} r={6} />
+        <Skeleton w={90} h={9} r={6} />
       </div>
 
       <div className="bento">
         {/* 2x2 health hero — the only elevated/framed tile */}
         <div className="b-hero">
           <SkelCard padding="26px 28px">
-            <Skeleton w={150} h={10} r={4} />
+            <Skeleton w={150} h={10} r={6} />
             <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 18 }}>
               <Skeleton w={132} h={132} r={999} />
               <div style={{ flex: 1 }}>
                 <Skeleton w="70%" h={18} />
-                <div style={{ marginTop: 12 }}><Skeleton w="90%" h={9} r={4} /></div>
-                <div style={{ marginTop: 6 }}><Skeleton w="60%" h={9} r={4} /></div>
+                <div style={{ marginTop: 12 }}><Skeleton w="90%" h={9} r={6} /></div>
+                <div style={{ marginTop: 6 }}><Skeleton w="60%" h={9} r={6} /></div>
               </div>
             </div>
             <div style={{ marginTop: 24 }}><Skeleton h={6} r={999} /></div>
             <div style={{ marginTop: 12, display: "flex", gap: 16 }}>
-              {Array.from({ length: 4 }).map((_, i) => (<Skeleton key={i} w={64} h={10} r={4} />))}
+              {Array.from({ length: 4 }).map((_, i) => (<Skeleton key={i} w={64} h={10} r={6} />))}
             </div>
             <div style={{ marginTop: 24 }}><Skeleton h={42} r={6} /></div>
           </SkelCard>
@@ -164,10 +164,10 @@ function DashboardSkeleton() {
 
         {/* full-width borderless phase strip */}
         <div className="b-phase" style={{ padding: "2px 6px" }}>
-          <Skeleton w={150} h={11} r={4} />
+          <Skeleton w={150} h={11} r={6} />
           <div style={{ marginTop: 12 }}><Skeleton h={6} r={999} /></div>
           <div style={{ marginTop: 12, display: "flex", gap: 16 }}>
-            {Array.from({ length: 5 }).map((_, i) => (<Skeleton key={i} w={70} h={10} r={4} />))}
+            {Array.from({ length: 5 }).map((_, i) => (<Skeleton key={i} w={70} h={10} r={6} />))}
           </div>
         </div>
 
@@ -175,12 +175,12 @@ function DashboardSkeleton() {
         <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px,100%), 1fr))", gap: 28 }}>
           <section style={{ padding: "2px 6px" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <Skeleton w={120} h={11} r={4} />
-              <Skeleton w={110} h={9} r={4} />
+              <Skeleton w={120} h={11} r={6} />
+              <Skeleton w={110} h={9} r={6} />
             </div>
             <div style={{ marginTop: 12 }}><Skeleton w={80} h={28} /></div>
             <div style={{ marginTop: 14 }}><Skeleton h={6} r={999} /></div>
-            <div style={{ marginTop: 14 }}><Skeleton w="70%" h={9} r={4} /></div>
+            <div style={{ marginTop: 14 }}><Skeleton w="70%" h={9} r={6} /></div>
           </section>
           <SkelListPanel rows={3} />
         </div>
@@ -197,12 +197,12 @@ function TableSkeleton() {
   return (
     <>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {Array.from({ length: 5 }).map((_, i) => (<Skeleton key={i} w={92} h={32} r={8} />))}
+        {Array.from({ length: 5 }).map((_, i) => (<Skeleton key={i} w={92} h={32} r={6} />))}
       </div>
       <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden" }}>
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", borderTop: i ? `1px solid ${C.line}` : "none" }}>
-            <Skeleton w={18} h={18} r={4} />
+            <Skeleton w={18} h={18} r={6} />
             <div style={{ flex: 2 }}><Skeleton w="70%" /></div>
             <div style={{ flex: 1 }}><Skeleton w={60} h={20} r={999} /></div>
             <div style={{ flex: 1 }}><Skeleton w="80%" /></div>
@@ -221,7 +221,7 @@ function GanttSkeleton() {
       {Array.from({ length: 9 }).map((_, i) => (
         <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "13px 18px", borderTop: i ? `1px solid ${C.line}` : "none" }}>
           <div style={{ width: 220 }}><Skeleton w="80%" /></div>
-          <div style={{ flex: 1, paddingLeft: `${(i % 4) * 12}%` }}><Skeleton w={`${30 + (i % 5) * 10}%`} h={16} r={4} /></div>
+          <div style={{ flex: 1, paddingLeft: `${(i % 4) * 12}%` }}><Skeleton w={`${30 + (i % 5) * 10}%`} h={16} r={6} /></div>
         </div>
       ))}
     </div>
@@ -233,7 +233,7 @@ function CalendarSkeleton() {
     <>
       <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
         <Skeleton w={200} h={28} />
-        <Skeleton w={120} h={28} r={8} style={{ marginLeft: "auto" }} />
+        <Skeleton w={120} h={28} r={6} style={{ marginLeft: "auto" }} />
       </div>
       <div className="cal-scroll">
         <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 640 }}>
@@ -241,7 +241,7 @@ function CalendarSkeleton() {
             {Array.from({ length: 35 }).map((_, i) => (
               <div key={i} style={{ minHeight: 98, borderRight: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, padding: 6 }}>
                 <Skeleton w={18} h={18} r={999} />
-                {i % 3 === 0 ? <div style={{ marginTop: 8 }}><Skeleton h={16} r={4} /></div> : null}
+                {i % 3 === 0 ? <div style={{ marginTop: 8 }}><Skeleton h={16} r={6} /></div> : null}
               </div>
             ))}
           </div>
@@ -258,11 +258,11 @@ function CardsSkeleton() {
         <SkelCard key={i}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Skeleton w={42} h={42} r={999} />
-            <div style={{ flex: 1 }}><Skeleton w="60%" /><div style={{ marginTop: 8 }}><Skeleton w="40%" h={9} r={4} /></div></div>
+            <div style={{ flex: 1 }}><Skeleton w="60%" /><div style={{ marginTop: 8 }}><Skeleton w="40%" h={9} r={6} /></div></div>
           </div>
           <div style={{ marginTop: 16 }}><Skeleton w={70} h={24} /></div>
           <div style={{ marginTop: 12, display: "flex", gap: 4 }}>
-            {Array.from({ length: 5 }).map((_, j) => (<Skeleton key={j} h={42} r={4} />))}
+            {Array.from({ length: 5 }).map((_, j) => (<Skeleton key={j} h={42} r={6} />))}
           </div>
         </SkelCard>
       ))}

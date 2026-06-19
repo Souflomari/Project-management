@@ -190,7 +190,7 @@ export function CommandPalette() {
         list.push({
           id: `ctx-resp-${m.id}`, cat: "Actions", label: `Réassigner à ${m.name}`,
           sub: `Actions sur ${scope}`, keywords: "responsable reassigner selection bulk",
-          leading: <Avatar initials={m.initials} color={m.color} size={20} fontSize={9} />,
+          leading: <Avatar initials={m.initials} color={m.color} size={20} fontSize={12} />,
           run: close(() => { bulkSetResponsable(ids, m.id); clearSelected(); }),
         });
       }
@@ -221,7 +221,7 @@ export function CommandPalette() {
         list.push({
           id: `ctx-resp-${m.id}`, cat: "Actions", label: `Réassigner à ${m.name}`,
           sub: `Actions sur ${scope}`, keywords: "responsable reassigner",
-          leading: <Avatar initials={m.initials} color={m.color} size={20} fontSize={9} />,
+          leading: <Avatar initials={m.initials} color={m.color} size={20} fontSize={12} />,
           run: close(() => updateProject(p.id, { responsableId: m.id })),
         });
       }
@@ -277,7 +277,7 @@ export function CommandPalette() {
       list.push({
         id: `mem-${m.id}`, cat: "Personnes", label: m.name, sub: `${m.role} · voir ses projets`,
         keywords: "personne equipe",
-        leading: <Avatar initials={m.initials} color={m.color} size={20} fontSize={9} />,
+        leading: <Avatar initials={m.initials} color={m.color} size={20} fontSize={12} />,
         recentId: `mem-${m.id}`,
         run: close(() => { setSearch(m.name); router.push("/projets"); }, `mem-${m.id}`),
       });
@@ -365,7 +365,7 @@ export function CommandPalette() {
             aria-expanded
             aria-controls="cmdk-list"
             aria-activedescendant={results.length ? `cmdk-row-${active}` : undefined}
-            style={{ flex: 1, border: "none", padding: 0, fontSize: 15, outline: "none", color: C.ink900, fontFamily: "inherit", background: "transparent" }}
+            style={{ flex: 1, border: "none", padding: 0, fontSize: 14, outline: "none", color: C.ink900, fontFamily: "inherit", background: "transparent" }}
           />
         </div>
         <div

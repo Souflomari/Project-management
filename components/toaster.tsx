@@ -137,7 +137,7 @@ export function Toaster() {
             {t.action ? (
               <button
                 onClick={() => { t.action!.onClick(); dismiss(t.id); }}
-                style={{ background: "transparent", border: "none", color: C.inversePrimary, fontWeight: 600, fontSize: 13, cursor: "pointer", padding: "2px 6px", borderRadius: R.xs, whiteSpace: "nowrap" }}
+                style={{ background: "transparent", border: "none", color: C.inversePrimary, fontWeight: 600, fontSize: 14, cursor: "pointer", padding: "2px 6px", borderRadius: R.xs, whiteSpace: "nowrap" }}
               >
                 {t.action.label}
               </button>

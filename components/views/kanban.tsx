@@ -392,7 +392,7 @@ export function Kanban() {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: SP[3] }}>
                     <div style={{ display: "flex", alignItems: "center", gap: SP[3], minWidth: 0 }}>
                       <span style={{ width: 7, height: 7, borderRadius: "50%", background: col.accent, flexShrink: 0 }} />
-                      <span style={{ fontFamily: FONT_NUM, fontSize: 13, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={col.full}>{col.label}</span>
+                      <span style={{ fontFamily: FONT_NUM, fontSize: 14, fontWeight: 600, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={col.full}>{col.label}</span>
                       <span
                         title={tier === "over" ? `Limite dépassée (${col.cards.length}/${col.limit})` : tier === "warn" ? `Limite atteinte (${col.cards.length}/${col.limit})` : `${col.cards.length} sur ${col.limit}`}
                         style={{ ...numTab, display: "inline-flex", alignItems: "center", gap: 3, fontSize: 12, fontWeight: 600, color: tier === "ok" ? C.ink400 : wip.color, flexShrink: 0, transition: "color var(--dur-fast) var(--ease-standard)" }}
@@ -515,16 +515,16 @@ function CardBody({ c }: { c: DerivedProject }) {
           style={{ width: 8, height: 8, borderRadius: "50%", background: c.statusColor, flexShrink: 0, marginTop: 5 }}
         />
         <div style={{ minWidth: 0 }}>
-          <div title={c.name} style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-.011em", color: C.ink900, lineHeight: 1.32, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.name}</div>
+          <div title={c.name} style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.011em", color: C.ink900, lineHeight: 1.32, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.name}</div>
           {/* secondary — client recedes immediately under the name */}
-          <div title={c.client} style={{ fontSize: 12, fontWeight: 450, color: C.ink500, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.client}</div>
+          <div title={c.client} style={{ fontSize: 12, fontWeight: 400, color: C.ink500, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.client}</div>
         </div>
       </div>
 
       {/* progress — green fill (the app's one accent), thin; the at-a-glance signal */}
       <div style={{ display: "flex", alignItems: "center", gap: SP[3], marginTop: SP[5] }} title={`Avancement ${c.progress}%`}>
         <ProgressBar pct={c.progress} height={4} />
-        <span style={{ ...numTab, fontSize: 11.5, fontWeight: 600, color: C.ink500, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
+        <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: C.ink500, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
       </div>
 
       {/* footer — one quiet meta row: deadline (the actionable date, reddens only
@@ -533,7 +533,7 @@ function CardBody({ c }: { c: DerivedProject }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: SP[4], gap: SP[3] }}>
         <span
           title={`Échéance contractuelle : ${c.deadlineFull}`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 500, color: overdue ? STATUS_META["en retard"].color : C.ink500, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 500, color: overdue ? STATUS_META["en retard"].color : C.ink500, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
         >
           <ClockIcon size={11} />
           {c.deadlineDaysLabel}
@@ -541,11 +541,11 @@ function CardBody({ c }: { c: DerivedProject }) {
         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }} title={`Équipe : ${c.members.map((m) => m.name).join(", ") || "—"}`}>
           {shown.map((m, i) => (
             <span key={m.id} style={{ marginLeft: i === 0 ? 0 : -7, position: "relative", zIndex: shown.length - i }}>
-              <Avatar initials={m.initials} color={m.color} size={22} fontSize={9} ring title={`${m.name} · ${m.role}`} />
+              <Avatar initials={m.initials} color={m.color} size={22} fontSize={12} ring title={`${m.name} · ${m.role}`} />
             </span>
           ))}
           {extra > 0 ? (
-            <span style={{ marginLeft: -7, width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: C.ink600, background: C.subtle, border: `2px solid ${C.surface}` }}>+{extra}</span>
+            <span style={{ marginLeft: -7, width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.ink600, background: C.subtle, border: `2px solid ${C.surface}` }}>+{extra}</span>
           ) : null}
         </div>
       </div>
@@ -556,7 +556,7 @@ function CardBody({ c }: { c: DerivedProject }) {
 function addBtnStyle(primary: boolean): React.CSSProperties {
   return {
     display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4,
-    flex: 1, cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600,
+    flex: 1, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600,
     padding: "5px 8px", borderRadius: R.sm, whiteSpace: "nowrap",
     border: `1px solid ${primary ? C.solid : C.line}`,
     background: primary ? C.solid : C.surface,

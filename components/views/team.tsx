@@ -196,7 +196,7 @@ export function Team() {
           the first row never exceeds ~5 simultaneous choices (Hick/Miller). */}
       <Toolbar style={{ marginBottom: SP[4] }}>
         <IconButton onClick={teamPrev} aria-label="Période précédente"><ChevronLeftIcon /></IconButton>
-        <h2 style={{ ...num(18), minWidth: 150, textAlign: "center" }}>{periodLabel}</h2>
+        <h2 style={{ ...num(20), minWidth: 150, textAlign: "center" }}>{periodLabel}</h2>
         <IconButton onClick={teamNext} aria-label="Période suivante"><ChevronRightIcon /></IconButton>
         <Button variant="secondary" size="sm" onClick={teamToday}>Aujourd’hui</Button>
         <Segmented value={teamMode} options={MODE_OPTS} onChange={setTeamMode} />
@@ -329,7 +329,7 @@ function MemberCard({
           aria-label={`Voir les projets de ${m.name}`}
           style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, background: "none", border: "none", padding: "4px 6px", margin: "-4px -6px", borderRadius: R.sm, cursor: "pointer", textAlign: "left" }}
         >
-          <Avatar initials={m.initials} color={m.color} size={42} fontSize={15} />
+          <Avatar initials={m.initials} color={m.color} size={42} fontSize={14} />
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: C.ink900 }}>{m.name}</div>
             <div style={{ ...TX.caption, color: C.ink500 }}>{m.role}</div>
@@ -354,11 +354,11 @@ function MemberCard({
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
           {lens === "charge" ? (
             <>
-              <span style={{ ...num(30), color: headColor }}>{shown}&#8239;%{over ? " +" : ""}</span>
+              <span style={{ ...num(28), color: headColor }}>{shown}&#8239;%{over ? " +" : ""}</span>
               <span style={{ ...TX.caption, color: C.ink500 }}>
                 {load.periodDays} / {load.capacity} j
                 {over ? (
-                  <span style={{ color: C.danger, fontWeight: 540 }}> · +{load.periodDays - load.capacity}&#8239;j de surcapacité</span>
+                  <span style={{ color: C.danger, fontWeight: 500 }}> · +{load.periodDays - load.capacity}&#8239;j de surcapacité</span>
                 ) : freeDays > 0 ? (
                   <span style={{ color: C.ink500 }}> · {freeDays}&#8239;j libres</span>
                 ) : ""}
@@ -366,7 +366,7 @@ function MemberCard({
             </>
           ) : (
             <>
-              <span style={{ ...num(30), color: C.ink900 }}>{fmtEur(costEur)}</span>
+              <span style={{ ...num(28), color: C.ink900 }}>{fmtEur(costEur)}</span>
               <span style={{ ...TX.caption, color: C.ink500 }}>
                 {fmtEur(m.costPerDay ?? 0)}/j · {load.periodDays}&#8239;j
               </span>
@@ -497,7 +497,7 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
           const delay = `${Math.min(i * 25, 200)}ms`;
           const cellLabel = `${bucketLabel(b, mode, true)} : ${b.days} / ${b.capacity} j · ${b.pct} %${overDays > 0 ? ` · +${overDays} j au-delà` : ""}`;
           return (
-            <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+            <div key={i} style={{ flex: 1, minWidth: 28, display: "flex", flexDirection: "column" }}>
               {/* the Tooltip wrapper is inline-flex; the column + stretch lets the
                   cell fill the bucket's full width without touching the primitive. */}
               <Tooltip label={cellLabel}>
@@ -512,13 +512,13 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
                 {/* single monochrome in-capacity load fill — one calm gradient, not a rainbow of project segments */}
                 <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: mounted ? base : 0, background: heatColor(b.pct), transition: grow, transitionDelay: delay }} />
                 {over > 0 ? <div style={{ position: "absolute", left: 0, right: 0, bottom: FULL, height: mounted ? over : 0, background: heatColor(120), backgroundImage: "repeating-linear-gradient(135deg, rgba(255,255,255,.28) 0 2px, transparent 2px 4px)", transition: grow, transitionDelay: delay }} /> : null}
-                {overDays > 0 ? <span aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: C.ink900, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
+                {overDays > 0 ? <span aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: C.ink900, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
                 {/* today marker: a small ink dot (non-colour cue — position + the
                     bold weekday label below), so "today" is found without a heavy ring. */}
                 {inThisBucketToday ? <span aria-hidden style={{ position: "absolute", bottom: 3, left: "50%", transform: "translateX(-50%)", width: 3, height: 3, borderRadius: "50%", background: C.ink700 }} /> : null}
               </div>
               </Tooltip>
-              <div style={{ fontSize: 10, fontWeight: inThisBucketToday ? 700 : 450, color: inThisBucketToday ? C.ink900 : C.ink500, textAlign: "center", marginTop: 4 }}>{lab}</div>
+              <div style={{ fontSize: 12, fontWeight: inThisBucketToday ? 600 : 400, color: inThisBucketToday ? C.ink900 : C.ink500, textAlign: "center", marginTop: 4 }}>{lab}</div>
             </div>
           );
         })}

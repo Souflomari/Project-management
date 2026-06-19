@@ -82,7 +82,7 @@ export default function LoginPage() {
           backgroundSize: "100% 100%, 32px 32px, 32px 32px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 26, fontWeight: 700, letterSpacing: "-.02em" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 1, fontSize: 28, fontWeight: 600, letterSpacing: "-.02em" }}>
           <span>setec</span>
           <span style={{ color: C.inversePrimary }}>.</span>
         </div>
@@ -124,7 +124,7 @@ export default function LoginPage() {
           }}
         >
           {/* wordmark repeated for the stacked (mobile) layout where the hero is hidden */}
-          <div className="login-card-mark" style={{ display: "none", alignItems: "baseline", gap: 1, fontSize: 24, fontWeight: 700, letterSpacing: "-.02em", marginBottom: SP[5] }}>
+          <div className="login-card-mark" style={{ display: "none", alignItems: "baseline", gap: 1, fontSize: 28, fontWeight: 600, letterSpacing: "-.02em", marginBottom: SP[5] }}>
             <span>setec</span>
             <span style={{ color: C.brandDot }}>.</span>
           </div>
