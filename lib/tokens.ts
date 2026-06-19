@@ -49,10 +49,12 @@ export const C = {
 } as const;
 
 /** Curated assignee/avatar palette — one governed set used by the modal,
- *  sample data, and repository so colours never diverge. */
+ *  sample data, and repository so colours never diverge. Every swatch is tuned
+ *  so white initials clear WCAG AA (≥4.5:1): the lighter teals/green/amber were
+ *  darkened (e.g. #4C8AA3→#37718A, #2C7A8C→#236877, #15803D→#136B33). */
 export const AVATAR_PALETTE = [
-  "#15803D", "#2C7A8C", "#4C8AA3", "#B45309", "#B5392E",
-  "#3B7179", "#8A6F5C", "#2F4A63", "#6A6F7A", "#6E6486",
+  "#136B33", "#236877", "#37718A", "#9A4708", "#B5392E",
+  "#356A72", "#7C6353", "#2F4A63", "#585D67", "#615877",
 ] as const;
 
 // ── M3 tonal surface roles ──────────────────────────────────────────────────
@@ -92,7 +94,9 @@ export const SH = {
   md: "0 4px 16px -4px rgba(28,25,23,.10), 0 2px 4px -2px rgba(28,25,23,.06)",
   lg: "0 16px 48px -12px rgba(28,25,23,.18), 0 4px 12px -4px rgba(28,25,23,.08)",
   drawer: "-12px 0 40px -16px rgba(28,25,23,.18)",
-  focus: "0 0 0 3px rgba(21,128,61,.20)", // brand-green focus ring (identity-forward)
+  // brand-green focus ring with a white gap — solid green clears the WCAG 2.4.11
+  // ≥3:1 indicator-contrast bar (the prior .20-alpha wash was ~1.3:1, invisible).
+  focus: "0 0 0 2px #FFFFFF, 0 0 0 4px #15803D",
 } as const;
 
 // ── M3 colour roles ──────────────────────────────────────────────────────────

@@ -87,7 +87,7 @@ textarea::placeholder {
 }
 .inline-edit:focus {
   background: #fff !important;
-  box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.2);
+  box-shadow: 0 0 0 2px #15803d;
 }
 .cal-chip {
   transition: box-shadow 0.12s ease, background 0.12s ease;
@@ -131,7 +131,7 @@ textarea::placeholder {
 }
 .btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.22);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #15803d;
 }
 .btn:hover {
   transform: translateY(-1px);
@@ -181,7 +181,7 @@ textarea::placeholder {
 .ui-field:focus-visible,
 .ui-field:focus-within {
   border-color: var(--c-brand) !important;
-  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.18);
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.85);
 }
 
 /* Global focus fallback for any interactive element that doesn't set its own. */
