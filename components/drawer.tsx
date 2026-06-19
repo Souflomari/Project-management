@@ -11,7 +11,7 @@ import { useProjects } from "@/lib/store/projects-context";
 import { C, FONT_DISPLAY, num, R, SH, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
 
-const LABEL: React.CSSProperties = { ...TX.overline, color: C.ink500 };
+const LABEL: React.CSSProperties = { ...TX.eyebrow, color: C.ink500 };
 
 export function ProjectDrawer() {
   const {
@@ -113,7 +113,7 @@ export function ProjectDrawer() {
           {/* stats */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
             <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
-              <div style={{ ...TX.overline, color: C.ink500 }}>Honoraires</div>
+              <div style={{ ...TX.eyebrow, color: C.ink500 }}>Honoraires</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
                 <input
                   key={selected.budget}
@@ -430,7 +430,7 @@ function EditableText({ value, onSave, ariaLabel, style }: { value: string; onSa
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: "block" }}>
-      <span style={{ ...TX.overline, color: C.ink500, display: "block", marginBottom: 5 }}>{label}</span>
+      <span style={{ ...TX.eyebrow, color: C.ink500, display: "block", marginBottom: 5 }}>{label}</span>
       {children}
     </label>
   );
@@ -439,7 +439,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Stat({ label, value, hint, children }: { label: string; value: string; hint?: string; children?: React.ReactNode }) {
   return (
     <div style={{ background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
-      <div style={{ ...TX.overline, color: C.ink500 }}>{label}</div>
+      <div style={{ ...TX.eyebrow, color: C.ink500 }}>{label}</div>
       <div style={{ ...num(22), marginTop: 4, color: C.ink900 }}>{value}</div>
       {hint ? <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{hint}</div> : null}
       {children}

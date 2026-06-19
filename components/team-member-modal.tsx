@@ -9,7 +9,7 @@ import type { TeamMember } from "@/lib/types";
 
 const PALETTE = AVATAR_PALETTE;
 
-const label: React.CSSProperties = { ...TX.overline, color: C.ink500, display: "block", margin: "0 0 6px" };
+const label: React.CSSProperties = { ...TX.eyebrow, color: C.ink500, display: "block", margin: "0 0 6px" };
 
 function initialsFrom(name: string): string {
   const parts = name.trim().split(/\s+/);

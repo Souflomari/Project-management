@@ -138,7 +138,7 @@ export function PlanningGantt() {
                   width: LEFT_W,
                   flexShrink: 0,
                   padding: "8px 14px",
-                  ...TX.overline,
+                  ...TX.eyebrow,
                   color: C.ink400,
                   position: "sticky",
                   left: 0,

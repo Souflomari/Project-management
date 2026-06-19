@@ -7,7 +7,7 @@ import { Button, Input, Modal } from "./ui";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, TX } from "@/lib/tokens";
 
-const label: React.CSSProperties = { ...TX.overline, color: C.ink500, display: "block", margin: "0 0 6px" };
+const label: React.CSSProperties = { ...TX.eyebrow, color: C.ink500, display: "block", margin: "0 0 6px" };
 
 export function AddProjectModal() {
   const router = useRouter();

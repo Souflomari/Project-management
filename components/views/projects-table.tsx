@@ -81,7 +81,7 @@ export function ProjectsTable() {
             gap: 12,
             padding: "11px 18px",
             borderBottom: `1px solid ${C.line}`,
-            ...TX.overline,
+            ...TX.eyebrow,
             color: C.ink400,
             alignItems: "center",
           }}
@@ -96,7 +96,7 @@ export function ProjectsTable() {
                 className="sortable"
                 onClick={() => toggleSort(h.key)}
                 aria-sort={active ? (sort!.dir === 1 ? "ascending" : "descending") : "none"}
-                style={{ display: "flex", alignItems: "center", justifyContent: right ? "flex-end" : "flex-start", gap: 3, color: active ? C.ink700 : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.overline }}
+                style={{ display: "flex", alignItems: "center", justifyContent: right ? "flex-end" : "flex-start", gap: 3, color: active ? C.ink700 : C.ink500, background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.eyebrow }}
               >
                 {h.label}
                 <span className="sort-caret" style={{ display: "inline-flex", opacity: active ? 1 : 0, transform: active && sort!.dir === -1 ? "rotate(180deg)" : "none", transition: "transform .12s, opacity .12s" }}>

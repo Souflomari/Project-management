@@ -170,7 +170,7 @@ function MonthView({ year, month, events, onOpen, dnd }: { year: number; month: 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 14, overflow: "hidden", minWidth: 640 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.subtle, borderBottom: `1px solid ${C.line}` }}>
-        {WEEKDAYS.map((w) => (<div key={w} style={{ padding: "9px 12px", ...TX.overline, color: C.ink500 }}>{w}</div>))}
+        {WEEKDAYS.map((w) => (<div key={w} style={{ padding: "9px 12px", ...TX.eyebrow, color: C.ink500 }}>{w}</div>))}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
         {cells.map((c, i) => {
@@ -219,7 +219,7 @@ function WeekView({ anchorISO, events, onOpen, dnd }: { anchorISO: string; event
       {days.map((d) => (
         <DayCell key={d.iso} iso={d.iso} dnd={dnd} style={{ borderRight: `1px solid ${C.line}`, minHeight: 320 }}>
           <div style={{ padding: "9px 10px", background: d.isToday ? C.brand50 : C.subtle, borderBottom: `1px solid ${C.line}` }}>
-            <div style={{ ...TX.overline, color: C.ink500 }}>{d.dow}</div>
+            <div style={{ ...TX.eyebrow, color: C.ink500 }}>{d.dow}</div>
             <div style={{ ...num(18), color: d.isToday ? C.brand : C.ink900 }}>{d.num}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 6 }}>

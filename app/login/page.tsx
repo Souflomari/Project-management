@@ -83,7 +83,7 @@ export default function LoginPage() {
             <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 18px" }}>
               Recevez un lien de connexion par e-mail.
             </p>
-            <label htmlFor="login-email" style={{ ...TX.overline, color: C.ink500, display: "block", marginBottom: 6 }}>
+            <label htmlFor="login-email" style={{ ...TX.eyebrow, color: C.ink500, display: "block", marginBottom: 6 }}>
               Adresse e-mail
             </label>
             <Input
