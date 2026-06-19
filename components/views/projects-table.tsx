@@ -55,13 +55,13 @@ function Check({ checked, onToggle, label }: { checked: boolean; onToggle: () =>
 }
 
 export function ProjectsTable() {
-  const { filtered, searched, team, openProject, openAdd, bulkSetStatus, bulkAdvancePhase, bulkSetResponsable } = useProjects();
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 } | null>(null);
+  const { filtered, searched, team, openProject, openAdd, bulkSetStatus, bulkAdvancePhase, bulkSetResponsable, tableSort, setTableSort } = useProjects();
   const [sel, setSel] = useState<Set<number>>(new Set());
 
-  const rows = sort ? [...filtered].sort((a, b) => compare(a, b, sort.key) * sort.dir) : filtered;
+  const sort = tableSort;
+  const rows = sort ? [...filtered].sort((a, b) => compare(a, b, sort.key as SortKey) * sort.dir) : filtered;
   const toggleSort = (key: SortKey) =>
-    setSort((cur) => (cur && cur.key === key ? { key, dir: cur.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
+    setTableSort(sort && sort.key === key ? { key, dir: sort.dir === 1 ? -1 : 1 } : { key, dir: 1 });
 
   const selectedIds = rows.filter((r) => sel.has(r.id)).map((r) => r.id);
   const allOn = rows.length > 0 && selectedIds.length === rows.length;
@@ -71,7 +71,7 @@ export function ProjectsTable() {
 
   return (
     <>
-      <FilterBar />
+      <FilterBar showViews />
 
       {selectedIds.length > 0 ? (
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px 9px 16px", marginBottom: 12, background: C.ink900, color: "#fff", borderRadius: R.md, boxShadow: SH.md, flexWrap: "wrap" }}>

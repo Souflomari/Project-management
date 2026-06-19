@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -31,6 +32,7 @@ import { STATUS_META } from "../tokens";
 import {
   FINAL_PHASE_INDEX,
   PHASES,
+  STATUSES,
   type NewSubtaskInput,
   type NewTeamMemberInput,
   type Project,
@@ -41,6 +43,17 @@ import {
 type FilterKey = "all" | Status;
 export type CalMode = "mois" | "semaine" | "agenda";
 export type TeamMode = "semaine" | "mois";
+export interface TableSort { key: string; dir: 1 | -1 }
+export interface SavedView {
+  id: string;
+  name: string;
+  filter: FilterKey;
+  search: string;
+  respFilter: number | null;
+  phaseFilter: number | null;
+  tableSort: TableSort | null;
+}
+const VIEWS_KEY = "setec.views";
 
 interface ProjectsContextValue {
   projects: Project[];
@@ -55,6 +68,10 @@ interface ProjectsContextValue {
 
   search: string;
   filter: FilterKey;
+  respFilter: number | null;
+  phaseFilter: number | null;
+  tableSort: TableSort | null;
+  savedViews: SavedView[];
   selectedId: number | null;
   showAdd: boolean;
   newName: string;
@@ -71,6 +88,13 @@ interface ProjectsContextValue {
 
   setSearch: (v: string) => void;
   setFilter: (f: FilterKey) => void;
+  setRespFilter: (id: number | null) => void;
+  setPhaseFilter: (i: number | null) => void;
+  setTableSort: (s: TableSort | null) => void;
+  resetFilters: () => void;
+  saveView: (name: string) => void;
+  applyView: (v: SavedView) => void;
+  deleteView: (id: string) => void;
   openProject: (id: number) => void;
   closeDrawer: () => void;
   openAdd: () => void;
@@ -139,6 +163,10 @@ export function ProjectsProvider({
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [respFilter, setRespFilter] = useState<number | null>(null);
+  const [phaseFilter, setPhaseFilter] = useState<number | null>(null);
+  const [tableSort, setTableSort] = useState<TableSort | null>(null);
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState("");
@@ -386,6 +414,60 @@ export function ProjectsProvider({
     [projects, serverBacked, failToast, reconcile, team],
   );
 
+  // ---- facets / saved views / url sync ----
+  const resetFilters = useCallback(() => { setFilter("all"); setRespFilter(null); setPhaseFilter(null); setSearch(""); }, []);
+
+  const applyView = useCallback((v: SavedView) => {
+    setFilter(v.filter); setSearch(v.search); setRespFilter(v.respFilter); setPhaseFilter(v.phaseFilter); setTableSort(v.tableSort);
+  }, []);
+
+  const saveView = useCallback((name: string) => {
+    const v: SavedView = { id: `${Date.now()}`, name: name.trim() || "Vue", filter, search, respFilter, phaseFilter, tableSort };
+    setSavedViews((prev) => {
+      const next = [...prev.filter((x) => x.name !== v.name), v];
+      try { localStorage.setItem(VIEWS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    toast({ message: `Vue « ${v.name} » enregistrée`, variant: "success" });
+  }, [filter, search, respFilter, phaseFilter, tableSort]);
+
+  const deleteView = useCallback((id: string) => {
+    setSavedViews((prev) => {
+      const next = prev.filter((x) => x.id !== id);
+      try { localStorage.setItem(VIEWS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  // hydrate saved views + filters from localStorage / URL once on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(VIEWS_KEY);
+      if (raw) setSavedViews(JSON.parse(raw));
+    } catch {}
+    const sp = new URLSearchParams(window.location.search);
+    const st = sp.get("statut");
+    if (st === "all" || (STATUSES as readonly string[]).includes(st ?? "")) setFilter(st as FilterKey);
+    const q = sp.get("q"); if (q) setSearch(q);
+    const rp = sp.get("resp"); if (rp != null && rp !== "") setRespFilter(Number(rp));
+    const ph = sp.get("phase"); if (ph != null && ph !== "") setPhaseFilter(Number(ph));
+    const tri = sp.get("tri");
+    if (tri) { const [k, d] = tri.split("."); if (k) setTableSort({ key: k, dir: d === "-1" ? -1 : 1 }); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // mirror project filters to the URL (shareable, refresh-proof) without a route push
+  useEffect(() => {
+    const sp = new URLSearchParams();
+    if (filter !== "all") sp.set("statut", filter);
+    if (search.trim()) sp.set("q", search.trim());
+    if (respFilter != null) sp.set("resp", String(respFilter));
+    if (phaseFilter != null) sp.set("phase", String(phaseFilter));
+    if (tableSort) sp.set("tri", `${tableSort.key}.${tableSort.dir}`);
+    const qs = sp.toString();
+    window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+  }, [filter, search, respFilter, phaseFilter, tableSort]);
+
   // ---- ui actions ----
   const openProject = useCallback((id: number) => setSelectedId(id), []);
   const closeDrawer = useCallback(() => setSelectedId(null), []);
@@ -425,10 +507,12 @@ export function ProjectsProvider({
     );
   }, [allDerived, search]);
 
-  const filtered = useMemo(
-    () => (filter === "all" ? searched : searched.filter((p) => p.status === filter)),
-    [searched, filter],
-  );
+  const filtered = useMemo(() => {
+    let r = filter === "all" ? searched : searched.filter((p) => p.status === filter);
+    if (respFilter != null) r = r.filter((p) => p.responsableId === respFilter);
+    if (phaseFilter != null) r = r.filter((p) => p.phaseIndex === phaseFilter);
+    return r;
+  }, [searched, filter, respFilter, phaseFilter]);
 
   const filters = useMemo(() => buildFilters(searched, filter), [searched, filter]);
   const selected = useMemo(
@@ -458,8 +542,19 @@ export function ProjectsProvider({
     calProjectFilter,
     teamMode,
     teamAnchor,
+    respFilter,
+    phaseFilter,
+    tableSort,
+    savedViews,
     setSearch,
     setFilter,
+    setRespFilter,
+    setPhaseFilter,
+    setTableSort,
+    resetFilters,
+    saveView,
+    applyView,
+    deleteView,
     openProject,
     closeDrawer,
     openAdd,
