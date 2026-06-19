@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 
 import { FlagIcon } from "../icons";
-import { Card, ProgressBar, rowProps, StatusPill } from "../ui";
-import { computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
+import { Card, ProgressBar, rowProps, Sparkline, StatusPill } from "../ui";
+import { buildHistory, computeKpis, statusDistribution, upcomingRendus, vigilanceAlerts } from "@/lib/derive";
 import { WEEK_SHORT } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, num, R, STATUS_META, TX } from "@/lib/tokens";
@@ -21,6 +21,12 @@ export function Dashboard() {
   const kpis = computeKpis(allDerived);
   const dist = statusDistribution(allDerived);
   const distTotal = Math.max(1, allDerived.length);
+
+  const history = buildHistory(allDerived);
+  const lastH = history[history.length - 1];
+  const prevH = history[history.length - 2] ?? lastH;
+  const avgDelta = lastH.avg - prevH.avg;
+  const rendusDelta = lastH.rendus - prevH.rendus;
 
   // Portfolio health: a single composite the director can read at a glance.
   // à jour & terminé count fully, à risque half, en retard zero.
@@ -83,16 +89,17 @@ export function Dashboard() {
 
             <div style={{ marginTop: "auto", paddingTop: 16 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...TX.caption, color: C.ink500 }}>
-                <span>Avancement moyen</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>Avancement moyen <Delta v={avgDelta} unit="pts" /></span>
                 <span style={{ ...num(15), color: C.ink900 }}>{kpis.avg}&#8239;%</span>
               </div>
-              <div style={{ marginTop: 6 }}><ProgressBar pct={kpis.avg} color={C.brand} height={6} /></div>
+              <div style={{ marginTop: 8 }}><Sparkline values={history.map((h) => h.avg)} height={34} /></div>
+              <div style={{ ...TX.nano, color: C.ink400, marginTop: 4 }}>8 dernières semaines</div>
             </div>
           </Card>
         </div>
 
         <Kpi title="En retard" value={kpis.late} sub="à traiter" color={STATUS_META["en retard"].color} accent={kpis.late > 0 ? STATUS_META["en retard"].color : undefined} onClick={kpis.late > 0 ? goLate : undefined} />
-        <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} onClick={goWeek} />
+        <Kpi title="Rendus 7 jours" value={kpis.rendus} sub={WEEK_SHORT} color={C.brand} delta={rendusDelta} onClick={goWeek} />
         <Kpi title="Projets actifs" value={kpis.active} sub={`portefeuille · ${kpis.total}`} onClick={() => goProjects("all")} />
         <Kpi title="Honoraires engagés" value={kpis.budgetFmt} sub={`${kpis.total} projets`} onClick={() => goProjects("all")} />
       </div>
@@ -167,12 +174,27 @@ export function Dashboard() {
   );
 }
 
-function Kpi({ title, value, sub, color, accent, onClick }: { title: string; value: string | number; sub: string; color?: string; accent?: string; onClick?: () => void }) {
+/** Week-over-week delta chip; neutral when flat. `goodUp` flips the colour sense. */
+function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: boolean }) {
+  if (!v) return <span style={{ ...TX.nano, color: C.ink400 }}>±0{unit ? ` ${unit}` : ""}</span>;
+  const up = v > 0;
+  const good = up === goodUp;
+  return (
+    <span style={{ ...TX.nano, fontWeight: 600, color: good ? C.brand : STATUS_META["à risque"].color, display: "inline-flex", alignItems: "center", gap: 1 }}>
+      {up ? "↑" : "↓"}{Math.abs(v)}{unit ? ` ${unit}` : ""}
+    </span>
+  );
+}
+
+function Kpi({ title, value, sub, color, accent, delta, onClick }: { title: string; value: string | number; sub: string; color?: string; accent?: string; delta?: number; onClick?: () => void }) {
   return (
     <div {...(onClick ? { ...rowProps(onClick), className: "lift-hover row-focus" } : {})} style={onClick ? { borderRadius: R.lg, cursor: "pointer" } : undefined}>
       <Card padding="16px 18px" style={accent ? { borderTop: `2px solid ${accent}` } : undefined}>
         <div style={{ ...TX.overline, color: C.ink400 }}>{title}</div>
-        <div style={{ ...num(34), marginTop: 10, color: color ?? C.ink900 }}>{value}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
+          <span style={{ ...num(34), color: color ?? C.ink900 }}>{value}</span>
+          {delta !== undefined ? <Delta v={delta} /> : null}
+        </div>
         <div style={{ fontSize: 11.5, color: C.ink400, marginTop: 7 }}>{sub}</div>
       </Card>
     </div>

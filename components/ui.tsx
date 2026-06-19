@@ -443,3 +443,23 @@ export function ProgressBar({
     </div>
   );
 }
+
+/** Compact trend line. Scales to its container width; non-scaling stroke. */
+export function Sparkline({ values, height = 30, color = C.brand, fill = true }: { values: number[]; height?: number; color?: string; fill?: boolean }) {
+  if (values.length < 2) return null;
+  const W = 100;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const x = (i: number) => (i / (values.length - 1)) * W;
+  const y = (v: number) => height - 3 - ((v - min) / range) * (height - 6);
+  const line = values.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ");
+  const area = `0,${height} ${line} ${W},${height}`;
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" style={{ display: "block", overflow: "visible" }}>
+      {fill ? <polygon points={area} fill={color} opacity={0.08} /> : null}
+      <polyline points={line} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r={2.4} fill={color} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}

@@ -152,6 +152,50 @@ export interface Kpis {
   total: number;
 }
 
+// ---- portfolio history (schedule-derived, deterministic — for trends/deltas) ----
+
+export interface HistoryPoint {
+  date: string;
+  avg: number; // mean schedule-progress across the portfolio
+  rendus: number; // projects with a deliverable due within 7 days
+}
+
+const DAY = 86_400_000;
+
+/** A project's progress "as of" date D, derived purely from its task schedule:
+ *  task-days whose planned window has elapsed by D ÷ total task-days. */
+function progressAsOf(p: DerivedProject, dISO: string, dTs: number): number {
+  let total = 0;
+  let done = 0;
+  for (const s of p.subtasksD) {
+    total += s.plannedDays;
+    if (toDate(s.start).getTime() > dTs) continue;
+    const upto = s.end <= dISO ? s.end : dISO;
+    done += Math.min(s.plannedDays, workingDaysBetween(s.start, upto));
+  }
+  if (total === 0) return p.progress;
+  return Math.min(100, Math.round((100 * done) / total));
+}
+
+/** Weekly portfolio metrics over the trailing `points` weeks, ending today.
+ *  Derived from the schedule so the curve is real and reproducible. */
+export function buildHistory(all: DerivedProject[], points = 8, stepDays = 7): HistoryPoint[] {
+  const out: HistoryPoint[] = [];
+  for (let i = points - 1; i >= 0; i--) {
+    const dTs = REFERENCE_TS - i * stepDays * DAY;
+    const dISO = toISO(new Date(dTs));
+    const d7ISO = toISO(new Date(dTs + 7 * DAY));
+    let sum = 0;
+    let rendus = 0;
+    for (const p of all) {
+      sum += progressAsOf(p, dISO, dTs);
+      if (p.subtasksD.some((s) => s.end > dISO && s.end <= d7ISO)) rendus++;
+    }
+    out.push({ date: dISO, avg: all.length ? Math.round(sum / all.length) : 0, rendus });
+  }
+  return out;
+}
+
 export function computeKpis(all: DerivedProject[]): Kpis {
   const active = all.filter((p) => p.status !== "terminé").length;
   const rendus = all.filter(
