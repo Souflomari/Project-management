@@ -21,7 +21,7 @@ export const C = {
   ink700: "#44403C", // body
   ink600: "#574F4A", // tertiary text (bridges the 700→500 gap)
   ink500: "#78716C", // secondary (receded) — AA floor for body text ≈ 4.7:1
-  ink400: "#9B948F", // muted text floor / placeholder (evened ramp)
+  ink400: "#857E78", // muted label / eyebrow — darkened to ~3.6:1 (was #9B948F ≈ 2.9:1, failed AA)
   ink300: "#BDB8B2", // disabled text/control
   line: "#EEECE9", // soft warm hairline (low contrast — structure, not noise)
   lineStrong: "#E3E0DB", // hover / modal border
@@ -71,7 +71,9 @@ export const SURFACE = {
 // regardless of the surface beneath it.
 export const STATE = { hover: 0.06, focus: 0.1, press: 0.1, drag: 0.16 } as const;
 
-export const R = { xxs: 4, xs: 6, sm: 8, md: 10, lg: 14, xl: 18, pill: 999 } as const;
+// Shape scale (M3-aligned, kept tighter for the Linear/Vercel feel). `xxl` (28)
+// is the expressive tier for sheets / FAB / hero containers.
+export const R = { none: 0, xxs: 4, xs: 6, sm: 8, md: 10, lg: 14, xl: 18, xxl: 28, pill: 999 } as const;
 
 /** 4px-based spacing scale. Use instead of ad-hoc inline magic numbers. */
 export const SP = { 0: 0, 1: 2, 2: 4, 3: 8, 4: 12, 5: 16, 6: 20, 7: 24, 8: 32, 9: 40, 10: 48, 11: 64 } as const;
@@ -86,15 +88,76 @@ export const SH = {
   focus: "0 0 0 3px rgba(28,25,23,.10)",
 } as const;
 
+// ── M3 colour roles ──────────────────────────────────────────────────────────
+// Semantic role layer over the raw `C` palette. Components speak roles
+// ("primary", "onSurfaceVariant", "outline") so the visual language is governed
+// and a future theme is a remap, not a rewrite. Action-primary is near-black
+// (the Vercel/Geist identity); the one governed green is the positive accent;
+// `tertiary` is a muted slate-teal drawn from AVATAR_PALETTE — info-only, never a
+// second brand and never a success signal (that stays green).
+export const ROLE = {
+  primary: C.solid, // #1C1917 — near-black action
+  onPrimary: "#FFFFFF",
+  primaryContainer: SURFACE.containerHighest, // tonal "filled" well for quiet actions
+  onPrimaryContainer: C.ink900,
+  secondary: C.brand, // #15803D — positive / brand
+  onSecondary: "#FFFFFF",
+  secondaryContainer: C.brand50,
+  onSecondaryContainer: C.brandText,
+  tertiary: "#2F6E7A", // governed muted teal (info / neutral accent only)
+  onTertiary: "#FFFFFF",
+  tertiaryContainer: "#E2EEF0",
+  onTertiaryContainer: "#1E4D55",
+  error: C.danger,
+  onError: "#FFFFFF",
+  errorContainer: "#FAEEEB",
+  onErrorContainer: "#7A2820",
+  surface: SURFACE.base,
+  onSurface: C.ink900,
+  onSurfaceVariant: C.ink500, // AA secondary text
+  outline: C.lineStrong, // stronger divider / control border
+  outlineVariant: C.line, // hairline
+  inverseSurface: C.ink900,
+  inverseOnSurface: C.subtle,
+  inversePrimary: C.inversePrimary,
+} as const;
+
+// ── Motion tokens ────────────────────────────────────────────────────────────
+// M3 easing + Linear snappiness. One source for every transition/animation so
+// timing is consistent (was a copy-pasted cubic-bezier across 4 files).
+export const EASE = {
+  standard: "cubic-bezier(.2,0,0,1)", // most UI changes
+  decel: "cubic-bezier(0,0,0,1)", // elements entering
+  accel: "cubic-bezier(.3,0,1,1)", // elements leaving
+  emphasized: "cubic-bezier(.05,.7,.1,1)", // expressive enter
+  out: "cubic-bezier(.2,.7,.2,1)", // the existing pop curve — keep
+} as const;
+export const DUR = { fast: "120ms", base: "180ms", slow: "260ms" } as const;
+
+// ── Elevation (tone-first) ───────────────────────────────────────────────────
+// M3 expresses elevation primarily as surface TONE; we add a whisper of shadow
+// only to confirm a lift. Border-first identity preserved.
+export const ELEV: Record<0 | 1 | 2 | 3, CSSProperties> = {
+  0: { background: SURFACE.base, boxShadow: "none" },
+  1: { background: SURFACE.containerLow, boxShadow: SH.sm },
+  2: { background: SURFACE.container, boxShadow: SH.md },
+  3: { background: SURFACE.containerHigh, boxShadow: SH.lg },
+};
+
 /** Type scale by role. Headings use Inter Tight (tight tracking, real weight);
- *  body recedes at 14/440. Hierarchy by size + weight + colour, not boxes. */
+ *  body recedes at 14/440. Hierarchy is carried by SIZE first, then weight and
+ *  colour — an editorial range from 11px eyebrow up to a 40px display. */
 export const TX: Record<
-  "display" | "h1" | "h2" | "bodyLg" | "body" | "bodyStrong" | "caption" | "micro" | "nano" | "overline",
+  | "displayLg" | "display" | "h1" | "h2" | "sectionHd"
+  | "bodyLg" | "body" | "bodyStrong" | "caption" | "micro" | "nano"
+  | "overline" | "eyebrow",
   CSSProperties
 > = {
-  display: { fontFamily: FONT_DISPLAY, fontSize: 30, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.12 },
-  h1: { fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.22 },
-  h2: { fontFamily: FONT_DISPLAY, fontSize: 16, fontWeight: 600, letterSpacing: "-.012em", lineHeight: 1.35 },
+  displayLg: { fontFamily: FONT_DISPLAY, fontSize: 40, fontWeight: 600, letterSpacing: "-.028em", lineHeight: 1.05 },
+  display: { fontFamily: FONT_DISPLAY, fontSize: 32, fontWeight: 600, letterSpacing: "-.024em", lineHeight: 1.1 },
+  h1: { fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, letterSpacing: "-.022em", lineHeight: 1.18 },
+  sectionHd: { fontFamily: FONT_DISPLAY, fontSize: 22, fontWeight: 600, letterSpacing: "-.018em", lineHeight: 1.2 },
+  h2: { fontFamily: FONT_DISPLAY, fontSize: 19, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.3 },
   bodyLg: { fontSize: 15, fontWeight: 440, lineHeight: 1.55 },
   body: { fontSize: 14, fontWeight: 440, lineHeight: 1.55 },
   bodyStrong: { fontSize: 14, fontWeight: 540, lineHeight: 1.5 },
@@ -103,6 +166,8 @@ export const TX: Record<
   nano: { fontSize: 11, fontWeight: 500, lineHeight: 1.35 },
   // quiet sentence-case label (no uppercase, no heavy tracking)
   overline: { fontSize: 12, fontWeight: 520, letterSpacing: "0", lineHeight: 1.35 },
+  // design.google-style category/metadata label — uppercase, tracked
+  eyebrow: { fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", lineHeight: 1.3 },
 };
 
 /** Tabular numeric display (Inter Tight), tight tracking for large figures. */
@@ -200,6 +265,9 @@ export function tokenCssVars(): string {
   for (const [k, v] of Object.entries(C)) decls.push(`--c-${kebab(k)}:${v}`);
   for (const [k, v] of Object.entries(SURFACE)) decls.push(`--surface-${kebab(k)}:${v}`);
   for (const [k, v] of Object.entries(STATE)) decls.push(`--state-${k}:${v}`);
+  for (const [k, v] of Object.entries(ROLE)) decls.push(`--role-${kebab(k)}:${v}`);
+  for (const [k, v] of Object.entries(EASE)) decls.push(`--ease-${kebab(k)}:${v}`);
+  for (const [k, v] of Object.entries(DUR)) decls.push(`--dur-${k}:${v}`);
   return `:root{${decls.join(";")}}`;
 }
 
@@ -211,3 +279,5 @@ const refs = <T extends Record<string, unknown>>(o: T, prefix: string): Ref<T> =
 export const CV = refs(C, "c");
 /** `var(--surface-*)` references for the tonal surface roles (mirrors `SURFACE`). */
 export const SV = refs(SURFACE, "surface");
+/** `var(--role-*)` references for the M3 colour roles (mirrors `ROLE`). */
+export const ROLEV = refs(ROLE, "role");
