@@ -51,6 +51,26 @@ export const AVATAR_PALETTE = [
   "#3B7179", "#8A6F5C", "#2F4A63", "#6A6F7A", "#6E6486",
 ] as const;
 
+// ── M3 tonal surface roles ──────────────────────────────────────────────────
+// Material 3 models elevation as *tone*, not just shadow: higher containers sit
+// on progressively deeper tints of the neutral. Mapped onto our warm scale so a
+// component asks for a role ("a container, one step up") instead of a raw hex —
+// and a future dark theme only has to remap these six values.
+export const SURFACE = {
+  base: "#FAFAF9", // app canvas
+  containerLowest: "#FFFFFF", // raised cards & dialogs (rest on the canvas)
+  containerLow: "#FCFBFA", // faintly raised overlays
+  container: "#F7F6F4", // default filled container / track
+  containerHigh: "#F5F4F2", // insets, rails, hover wells
+  containerHighest: "#EFEDEA", // deepest inset / pressed track
+} as const;
+
+// ── M3 state-layer opacities ─────────────────────────────────────────────────
+// Interaction is a translucent overlay of an "on" colour at a fixed opacity per
+// state (M3's state-layer model), so feedback is uniform across every control
+// regardless of the surface beneath it.
+export const STATE = { hover: 0.06, focus: 0.1, press: 0.1, drag: 0.16 } as const;
+
 export const R = { xxs: 4, xs: 6, sm: 8, md: 10, lg: 14, xl: 18, pill: 999 } as const;
 
 /** 4px-based spacing scale. Use instead of ad-hoc inline magic numbers. */
@@ -165,3 +185,29 @@ export function heatColor(pct: number): string {
   if (pct <= 110) return "#D2895F"; // slightly over (clearly darker + warmer)
   return "#B5532E"; // well over — matches chargeColor "crit"
 }
+
+// ── CSS-variable bridge ──────────────────────────────────────────────────────
+// The JS token objects above stay the single source of truth; this projects them
+// onto CSS custom properties so stylesheets (which can't import TS) reference the
+// *same* values, and a theme swap becomes "remap :root", not "edit every file".
+
+const kebab = (s: string) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+
+/** A `:root { … }` block declaring every token as a custom property. Injected
+ *  once in the root layout; safe to render server-side (values are static). */
+export function tokenCssVars(): string {
+  const decls: string[] = [];
+  for (const [k, v] of Object.entries(C)) decls.push(`--c-${kebab(k)}:${v}`);
+  for (const [k, v] of Object.entries(SURFACE)) decls.push(`--surface-${kebab(k)}:${v}`);
+  for (const [k, v] of Object.entries(STATE)) decls.push(`--state-${k}:${v}`);
+  return `:root{${decls.join(";")}}`;
+}
+
+type Ref<T> = Record<keyof T, string>;
+const refs = <T extends Record<string, unknown>>(o: T, prefix: string): Ref<T> =>
+  Object.fromEntries(Object.keys(o).map((k) => [k, `var(--${prefix}-${kebab(k)})`])) as Ref<T>;
+
+/** `var(--c-*)` references for opt-in themeable inline styles (mirrors `C`). */
+export const CV = refs(C, "c");
+/** `var(--surface-*)` references for the tonal surface roles (mirrors `SURFACE`). */
+export const SV = refs(SURFACE, "surface");

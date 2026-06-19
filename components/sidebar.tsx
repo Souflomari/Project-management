@@ -47,7 +47,7 @@ export function Sidebar() {
               key={item.key}
               href={item.href}
               title={item.label}
-              className={`app-nav-link${active ? "" : " nav-hover"}`}
+              className="app-nav-link state-layer"
               style={{
                 display: "flex",
                 alignItems: "center",

@@ -7,7 +7,7 @@ import { MinusIcon } from "../icons";
 import { Avatar, IconButton, ProgressBar } from "../ui";
 import { buildKanban } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, FONT_NUM, PHASE_COLORS, R, SH, STATUS_META, TX } from "@/lib/tokens";
+import { C, FONT_NUM, PHASE_COLORS, R, SH, STATUS_META, SV, TX } from "@/lib/tokens";
 
 const WIP_LIMIT = 6;
 const WIP_COLOR = STATUS_META["à risque"].color;
@@ -59,7 +59,7 @@ export function Kanban() {
                 {...dropHandlers(col.phaseIndex)}
                 onClick={() => toggleCollapse(col.phaseIndex)}
                 title={`${col.full} — déplier`}
-                style={{ width: 46, flexShrink: 0, background: C.subtle, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer", transition: "box-shadow .12s ease" }}
+                style={{ width: 46, flexShrink: 0, background: SV.containerHigh, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer", transition: "box-shadow .12s ease" }}
               >
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: accent, flexShrink: 0 }} />
                 <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: overWip ? WIP_COLOR : C.ink700 }}>{col.count}</span>
@@ -72,7 +72,7 @@ export function Kanban() {
             <div
               key={col.phaseIndex}
               {...dropHandlers(col.phaseIndex)}
-              style={{ width: 256, flexShrink: 0, background: C.subtle, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 230px)", transition: "box-shadow .12s ease" }}
+              style={{ width: 256, flexShrink: 0, background: SV.containerHigh, borderRadius: R.md, border: `1px solid ${C.line}`, boxShadow: isOver ? `inset 0 0 0 2px ${C.ink900}1f` : undefined, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 230px)", transition: "box-shadow .12s ease" }}
             >
               <div style={{ padding: "11px 12px 9px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>

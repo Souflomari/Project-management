@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Inter_Tight } from "next/font/google";
 
 import "./globals.css";
+import { tokenCssVars } from "@/lib/tokens";
 
 // Self-hosted at build time (no runtime CDN dependency) — fonts always load.
 // Loaded as VARIABLE fonts (no fixed `weight`) so in-between weights like 440 /
@@ -31,6 +32,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" className={`${inter.variable} ${interTight.variable}`}>
+      <head>
+        {/* design-token bridge: projects lib/tokens onto :root custom properties */}
+        <style dangerouslySetInnerHTML={{ __html: tokenCssVars() }} />
+      </head>
       <body>{children}</body>
     </html>
   );

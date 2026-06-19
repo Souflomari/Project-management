@@ -25,7 +25,7 @@ export function FilterBar({ trailing, showViews }: { trailing?: ReactNode; showV
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className="btn"
+            className={`btn state-layer${a ? " state-on-light" : ""}`}
             style={{
               cursor: "pointer", font: "inherit", fontSize: 13, fontWeight: 600, padding: "6px 12px", borderRadius: R.sm,
               display: "inline-flex", alignItems: "center", gap: 7, whiteSpace: "nowrap",

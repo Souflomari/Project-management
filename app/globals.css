@@ -48,27 +48,27 @@ textarea::placeholder {
   transition: background 0.12s ease;
 }
 .row-hover:hover {
-  background: #f5f4f2 !important;
+  background: var(--c-subtle) !important;
 }
 .soft-hover {
   transition: background 0.12s ease;
 }
 .soft-hover:hover {
-  background: #f5f4f2 !important;
+  background: var(--c-subtle) !important;
 }
 .lift-hover {
   transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 .lift-hover:hover {
-  border-color: #e3e0db !important;
+  border-color: var(--c-line-strong) !important;
   box-shadow: 0 4px 16px -4px rgba(28, 25, 23, 0.1), 0 2px 4px -2px rgba(28, 25, 23, 0.06);
 }
 .nav-hover {
   transition: background 0.12s ease, color 0.12s ease;
 }
 .nav-hover:hover {
-  background: #f5f4f2 !important;
-  color: #1c1917 !important;
+  background: var(--c-subtle) !important;
+  color: var(--c-ink900) !important;
 }
 /* inline click-to-edit text (drawer title, client, discipline) */
 .inline-edit {
@@ -76,7 +76,7 @@ textarea::placeholder {
   cursor: text;
 }
 .inline-edit:hover {
-  background: #f5f4f2 !important;
+  background: var(--c-subtle) !important;
 }
 .inline-edit:focus {
   background: #fff !important;
@@ -86,7 +86,7 @@ textarea::placeholder {
   transition: box-shadow 0.12s ease, background 0.12s ease;
 }
 .cal-chip:hover {
-  background: #efedea !important;
+  background: var(--surface-container-highest) !important;
   box-shadow: 0 1px 2px rgba(28, 25, 23, 0.06);
 }
 .cal-chip:active {
@@ -98,7 +98,7 @@ textarea::placeholder {
   transition: color 0.12s ease;
 }
 .sortable:hover {
-  color: #1c1917 !important;
+  color: var(--c-ink900) !important;
 }
 .sortable:hover .sort-caret {
   opacity: 0.4 !important;
@@ -130,35 +130,35 @@ textarea::placeholder {
   transform: translateY(0.5px);
 }
 .btn-primary:hover {
-  background: #000000 !important;
+  background: var(--c-solid-hover) !important;
 }
 .btn-primary:active {
-  background: #000 !important;
+  background: var(--c-solid-hover) !important;
   filter: brightness(0.9);
 }
 .btn-secondary:hover {
-  background: #f5f4f2 !important;
-  border-color: #e3e0db !important;
+  background: var(--c-subtle) !important;
+  border-color: var(--c-line-strong) !important;
 }
 .btn-secondary:active,
 .icon-btn:active {
-  background: #efedea !important;
+  background: var(--surface-container-highest) !important;
 }
 .btn-ghost:hover {
-  background: #f5f4f2 !important;
+  background: var(--c-subtle) !important;
 }
 .icon-btn:hover {
-  background: #f5f4f2 !important;
-  border-color: #e3e0db !important;
+  background: var(--c-subtle) !important;
+  border-color: var(--c-line-strong) !important;
 }
 .icon-btn.icon-danger:hover {
   background: #faeeeb !important;
   border-color: #eccfc9 !important;
-  color: #b5392e !important;
+  color: var(--c-danger) !important;
 }
 .ui-field:focus-visible,
 .ui-field:focus-within {
-  border-color: #1c1917 !important;
+  border-color: var(--c-ink900) !important;
   box-shadow: 0 0 0 3px rgba(28, 25, 23, 0.1);
 }
 
@@ -167,9 +167,46 @@ a:focus-visible,
 select:focus-visible,
 [role="button"]:focus-visible,
 .sortable:focus-visible {
-  outline: 2px solid #1c1917;
+  outline: 2px solid var(--c-ink900);
   outline-offset: 2px;
   border-radius: 6px;
+}
+
+/* ---- M3 state-layer model ----
+   A translucent overlay of an "on" colour, at a fixed opacity per interaction
+   state, so hover/focus/press/drag feedback is uniform across any surface.
+   Tint defaults to ink; `.state-on-light` flips it for dark/coloured surfaces. */
+.state-layer {
+  position: relative;
+}
+.state-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--state-on, var(--c-ink900));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.state-layer:hover::after {
+  opacity: var(--state-hover);
+}
+.state-layer:focus-visible::after {
+  opacity: var(--state-focus);
+}
+.state-layer:active::after {
+  opacity: var(--state-press);
+}
+.state-layer[data-dragging="true"]::after {
+  opacity: var(--state-drag);
+}
+.state-on-light {
+  --state-on: #ffffff;
+}
+/* keep real content above the overlay */
+.state-layer > * {
+  position: relative;
 }
 
 @media (prefers-reduced-motion: reduce) {
