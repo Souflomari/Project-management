@@ -907,16 +907,17 @@ export function StatusPill({
 
 export function ProgressBar({
   pct,
-  color = C.brand,
-  track = C.subtle,
+  color = "var(--data-fill)",
+  track = "var(--data-track)",
   height = 7,
   label,
 }: {
   pct: number;
-  /** Fill colour. Defaults to the brand green — the app's ONE accent, and the
-   *  single governed meaning of a progress meter ("how far along / how healthy").
-   *  Override only with a SEMANTIC colour (e.g. C.danger when behind schedule);
-   *  never a decorative neutral. */
+  /** Fill colour. Defaults to the SOFT data-viz green (--data-fill) on a soft
+   *  track (C2): progress bars are repeated data, so they use the tinted-down
+   *  green, not full-strength accent. Full --accent green is reserved for the one
+   *  high-signal element per view (e.g. the dashboard gauge / a headline metric).
+   *  Override only with a SEMANTIC colour (e.g. C.danger when behind schedule). */
   color?: string;
   track?: string;
   height?: number;

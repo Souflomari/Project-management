@@ -1,0 +1,93 @@
+/* =====================================================================
+   setec · Direction technique — Design Tokens
+   Foundation for the colour-system fix (Critic findings C1 + C2 + C9),
+   plus spacing / radius / type / motion scales.
+
+   SEMANTIC COLOUR MODEL (one model — every view obeys it):
+     green  -> positive / health / progress / on-track / within-capacity
+               ...and transient HOVER. (NOT the persistent "selected" state.)
+     amber  -> caution: at-risk, approaching capacity
+     red    -> critical: late, over capacity
+     gray   -> neutral / done / inactive
+     ink    -> primary ACTION + persistent SELECTED / ACTIVE state
+               (an emphasis device, not a status — this is where the active
+                nav + active filter move, OFF green -> C1)
+     terracotta -> REMOVED. Team-load over-capacity now uses amber/red (C9).
+
+   !! BRAND GREEN: --green-700 below is matched to the current UI (#15803D — the
+      confirmed setec brand green). It is borderline for body text (~4.6:1), so
+      it is used for FILLS / large elements / status tints; text on tints uses
+      --green-800. Verified against a checker.
+   ===================================================================== */
+
+:root {
+  /* ---- Neutrals (tinted; never pure #000 / #FFF on large areas) ----- */
+  --canvas:            #FBFBFA;  /* page background (off-white)             */
+  --surface:           #FFFFFF;  /* cards lift off the canvas               */
+  --surface-sunken:    #F5F5F4;  /* table header rows, sunken wells         */
+  --border:            #E7E7E4;  /* hairline                                */
+  --border-strong:     #D6D6D2;
+
+  --text:              #1A1A1A;  /* primary        ~16.9:1 ✓                */
+  --text-secondary:    #4B4B4E;  /* secondary      ~8.6:1  ✓                */
+  --text-muted:        #6B6B6E;  /* MIN for text   ~5.1:1  ✓  (C6 floor)    */
+  --text-disabled:     #A1A1A4;  /* non-text / disabled ONLY — never copy   */
+
+  /* ---- Green = good / health / progress / hover -------------------- */
+  --green-700:         #15803D;  /* accent + text  ~4.6:1 ✓ (borderline — verify) */
+  --green-800:         #166534;  /* text on green tints (safe on --green-bg) */
+  --green-soft:        #5FB87F;  /* LARGE data-viz fills (bars) — C2        */
+  --green-track:       #E8F5EE;  /* empty track behind progress bars        */
+  --green-bg:          #EAF5EE;  /* "À jour" pill background                */
+  --green-hover:       #F3FAF5;  /* transient HOVER wash (very light)       */
+
+  /* ---- Amber = caution / at-risk / near-capacity ------------------- */
+  --amber-700:         #B45309;  /* text / icon    ~4.9:1 ✓                 */
+  --amber-800:         #92400E;  /* text on --amber-bg                      */
+  --amber-bg:          #FDF3E7;  /* "À risque" pill bg                      */
+
+  /* ---- Red = critical / late / over-capacity ----------------------- */
+  --red-700:           #B91C1C;  /* text / icon    ~5.9:1 ✓                 */
+  --red-800:           #991B1B;  /* text on --red-bg                        */
+  --red-bg:            #FCECEC;  /* "En retard" pill bg                     */
+
+  /* ---- Ink = primary action + SELECTED / ACTIVE (C1) --------------- */
+  --ink:               #1A1A1A;  /* primary button, active pill, active nav */
+  --ink-hover:         #2E2E30;
+  --on-ink:            #FFFFFF;
+
+  /* ---- Semantic aliases — USE THESE in components ------------------ */
+  --success:           var(--green-700);
+  --success-bg:        var(--green-bg);
+  --warning:           var(--amber-700);
+  --warning-bg:        var(--amber-bg);
+  --danger:            var(--red-700);
+  --danger-bg:         var(--red-bg);
+  --selected:          var(--ink);          /* persistent active / selected */
+  --accent:            var(--green-700);     /* the ONE high-signal accent   */
+  --data-fill:         var(--green-soft);    /* large chart / bar fills      */
+  --data-track:        var(--green-track);
+  --hover-wash:        var(--green-hover);   /* transient hover background    */
+
+  /* ---- Spacing (4 / 8 grid) ---------------------------------------- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-8: 48px; --space-10: 64px;
+
+  /* ---- Radius (cards ≤ 16px; pill only for tags / buttons) --------- */
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-pill: 9999px;
+
+  /* ---- Type scale (1.25 ratio, 16px base) -------------------------- */
+  --text-xs: 12px;  --text-sm: 14px;  --text-base: 16px; --text-lg: 20px;
+  --text-xl: 24px;  --text-2xl: 30px; --text-3xl: 38px;  --text-4xl: 48px;
+  --lh-tight: 1.12; --lh-snug: 1.3;   --lh-body: 1.5;
+  --font-sans:    system-ui, -apple-system, sans-serif;  /* your current text face */
+  --font-display: var(--font-sans);  /* optional character face for big headings/numerals (C7) */
+
+  /* ---- Motion (functional only; reduced-motion honoured below) ----- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms; --dur: 200ms; --dur-slow: 300ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur: 0ms; --dur-slow: 0ms; }
+}

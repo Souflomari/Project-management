@@ -123,7 +123,7 @@ export function MobileNav() {
                 transition: `color ${DUR.base} ${EASE.standard}`,
               }}
             >
-              <span style={{ display: "flex", color: active ? C.brand : C.ink500, transition: `color ${DUR.base} ${EASE.standard}` }}>
+              <span style={{ display: "flex", color: active ? "var(--selected)" : C.ink500, transition: `color ${DUR.base} ${EASE.standard}` }}>
                 <Icon size={21} />
               </span>
               <span style={{ ...TX.nano, fontWeight: "inherit", whiteSpace: "nowrap" }}>{item.label}</span>

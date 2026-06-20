@@ -478,7 +478,8 @@ function Kpi({ title, value, sub, subColor, dot, delta, onClick, className }: { 
       {...(onClick ? rowProps(onClick) : {})}
       style={{ border: `1px solid ${C.line}`, borderRadius: R.lg, background: C.surface, padding: "16px 16px", height: "100%", display: "flex", flexDirection: "column", ...(onClick ? { cursor: "pointer" } : {}) }}
     >
-      <div style={{ ...TX.overline, color: C.ink700 }}>{title}</div>
+      {/* C5: KPI label promoted — text-sm / 500 / secondary (not a muted eyebrow). */}
+      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)" }}>{title}</div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
         {/* Secondary KPIs sit a step below the hero gauge readout so the portfolio
             health stays the single focal point (was larger, competing with it). */}

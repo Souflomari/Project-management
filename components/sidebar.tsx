@@ -53,7 +53,8 @@ function ActiveBar({ active }: { active: boolean }) {
         width: 3,
         height: 18,
         borderRadius: R.pill,
-        background: C.brand,
+        // C1: persistent SELECTED is ink, not green (green = hover/positive/data).
+        background: "var(--selected)",
         transition: `transform ${DUR.base} ${EASE.out}`,
       }}
     />
@@ -89,7 +90,7 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
           style={{ ...navLinkStyle(groupActive), paddingRight: 34 }}
         >
           <ActiveBar active={groupActive} />
-          <span style={{ color: groupActive ? C.brand : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
+          <span style={{ color: groupActive ? "var(--selected)" : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
             <Icon />
           </span>
           <span className="rail-hide">Projets</span>
@@ -164,7 +165,7 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
                         height: 5,
                         borderRadius: "50%",
                         flexShrink: 0,
-                        background: active ? C.brand : C.ink350,
+                        background: active ? "var(--selected)" : C.ink350,
                         transition: `background ${DUR.base} ${EASE.standard}`,
                       }}
                     />
@@ -366,7 +367,7 @@ export function Sidebar() {
               style={navLinkStyle(active)}
             >
               <ActiveBar active={active} />
-              <span style={{ color: active ? C.brand : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
+              <span style={{ color: active ? "var(--selected)" : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
                 <Icon />
               </span>
               <span className="rail-hide">{item.label}</span>

@@ -286,17 +286,19 @@ export function chargeColor(pct: number): string {
   }
 }
 
-/** Heatmap cell colour by load % — Von Restorff: keep within-capacity cells
- *  QUIET (a low-chroma neutral→soft-green intensity, so a healthy team reads as
- *  calm, not a green field) and let ONLY the genuine over-capacity weeks carry a
- *  muted clay alert that actually pops. The cell's % figure carries the precise
- *  load; colour is reinforcement for the exception, not decoration on every cell. */
+/** Heatmap cell colour by load % — C9: terracotta REMOVED. Load now speaks the
+ *  SAME colour language as project-status — green (within capacity) → amber
+ *  (≈100–120 %, mild over) → red (> ≈120 %, severe over). Within-capacity stays a
+ *  quiet soft-green intensity ramp; over-capacity escalates green→amber→red so a
+ *  strained week reads with the same semantics as an at-risk / late project. The
+ *  cell's % figure carries the precise load (dark ink, legible on every tint). */
 export function heatColor(pct: number): string {
   if (pct <= 0) return "#F4F3F1"; // empty — neutral well
-  if (pct < 50) return "#ECEDEA"; // light load — near-neutral
-  if (pct < 85) return "#DDE5DC"; // moderate — faint green-grey
-  if (pct <= 100) return "#C4D4C5"; // at capacity — the clearest (still soft) green
-  return "#CC7E68"; // over capacity → ONE muted clay (matches chargeColor over/crit)
+  if (pct < 50) return "#E8F1EA"; // light load — faint green
+  if (pct < 85) return "#CFE3D4"; // moderate — soft green
+  if (pct <= 100) return "#A9CDB2"; // at capacity — clearest soft green (within capacity → success)
+  if (pct <= 120) return "#EAB871"; // mild over (≈100–120 %) → amber (warning)
+  return "#D98A78"; // severe over (> ≈120 %) → red (danger)
 }
 
 // ── CSS-variable bridge ──────────────────────────────────────────────────────

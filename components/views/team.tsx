@@ -354,15 +354,15 @@ function MemberCard({
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
           {lens === "charge" ? (
             <>
-              <span style={{ ...num(28), color: headColor }}>{shown}&#8239;%{over ? " +" : ""}</span>
-              <span style={{ ...TX.caption, color: C.ink500 }}>
-                {load.periodDays} / {load.capacity} j
-                {over ? (
-                  <span style={{ color: C.danger, fontWeight: 500 }}> · +{load.periodDays - load.capacity}&#8239;j de surcapacité</span>
-                ) : freeDays > 0 ? (
-                  <span style={{ color: C.ink500 }}> · {freeDays}&#8239;j libres</span>
-                ) : ""}
-              </span>
+              {/* C5: the concrete ratio (jours engagés / capacité) is the focal
+                  number; the capped "%" is demoted to a state-coloured caption. */}
+              <span style={{ ...num(20), color: C.ink900 }}>{load.periodDays} / {load.capacity}&#8239;j</span>
+              <span style={{ ...TX.caption, color: headColor, fontWeight: 500 }}>{shown}&#8239;%{over ? " +" : ""}</span>
+              {over ? (
+                <span style={{ ...TX.caption, color: C.danger, fontWeight: 500 }}>· +{load.periodDays - load.capacity}&#8239;j de surcapacité</span>
+              ) : freeDays > 0 ? (
+                <span style={{ ...TX.caption, color: C.ink500 }}>· {freeDays}&#8239;j libres</span>
+              ) : null}
             </>
           ) : (
             <>
@@ -485,7 +485,7 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
   return (
     <div role="group" aria-label={`Graphique de charge de ${memberName}`}>
       <div aria-hidden style={{ ...TX.nano, color: C.ink400, marginBottom: SP[3] }}>
-        Charge {mode === "semaine" ? "par jour" : "par semaine"} <span style={{ color: C.ink300 }}>· repère = 100&#8239;%</span>
+        Charge {mode === "semaine" ? "par jour" : "par semaine"} <span style={{ color: "var(--text-muted)" }}>· repère = 100&#8239;%</span>
       </div>
       <div role="img" aria-label={summary} style={{ display: "flex", gap: mode === "semaine" ? 5 : 3, alignItems: "flex-end" }}>
         {buckets.map((b, i) => {

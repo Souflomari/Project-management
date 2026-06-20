@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 
 import "./globals.css";
+import "./tokens.css";
 import { tokenCssVars } from "@/lib/tokens";
 
 // Geist — Vercel's product typeface: a clean, modern, neutral grotesk built for

@@ -25,8 +25,8 @@ const DAY = 86_400_000;
 // + active/healthy. Everything else is warm neutral (tracks, structure). Assignee
 // identity is carried by the left-cell avatar, so bars stay mono: a light neutral
 // track with a green progress fill. No per-person rainbow, no near-black fill.
-const BAR_TRACK = C.subtle; // unfilled remainder / resting track (light neutral)
-const PROGRESS = C.brand; // green progress fill (the one accent = active/positive)
+const BAR_TRACK = "var(--data-track)"; // unfilled remainder / resting track (soft data track, C2)
+const PROGRESS = "var(--data-fill)"; // soft data-viz green fill (C2 — repeated bars use the tinted-down green, not full accent)
 const DONE_FILL = C.ink300; // "done" recedes to a receded neutral (+ check + hatch)
 
 // Critical-path treatment: criticality is STRUCTURAL, carried by ONE restrained
@@ -797,7 +797,9 @@ function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: Gantt
     >
       <div style={{ position: "absolute", inset: 0, width: `${g.fill}%`, background: PROGRESS, borderRadius: `${R.xs}px 0 0 ${R.xs}px` }} />
       {/* % label: white on the green fill when filled enough to sit on it, ink otherwise. */}
-      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, color: g.fill > 82 ? C.surface : C.ink700 }}>
+      {/* C2: fill is now the SOFT data-green (light) — keep the % label dark ink
+          for legibility on both the fill and the track (white would fail AA). */}
+      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, color: C.ink700 }}>
         {g.progress} %
       </span>
       {drag ? <DatePill text={drag.mode === "move" ? `${fmtShort(pStart)} → ${fmtShort(pEnd)}` : fmtShort(pEnd)} /> : null}
