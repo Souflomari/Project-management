@@ -167,7 +167,7 @@ export function Header() {
           >
             <SearchIcon />
             <span style={{ fontSize: 14, flex: 1, textAlign: "left" }}>Rechercher…</span>
-            <kbd style={{ ...TX.nano, color: C.ink500, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit", minWidth: "3ch", textAlign: "center", visibility: kbd ? "visible" : "hidden" }}>{kbd ?? " "}</kbd>
+            <kbd style={{ ...TX.nano, color: C.ink700, background: C.subtle, border: `1px solid ${C.line}`, borderRadius: R.xs, padding: "1px 5px", fontFamily: "inherit", minWidth: "3ch", textAlign: "center", visibility: kbd ? "visible" : "hidden" }}>{kbd ?? " "}</kbd>
           </button>
         )}
         <Button onClick={openAdd} icon={<PlusIcon size={15} />} aria-label="Nouveau projet">

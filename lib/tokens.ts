@@ -40,7 +40,7 @@ export const C = {
   brandHover: "#166534",
   brand50: "#EDF4EE",
   brandText: "#136B35", // text on brand50 (AA)
-  brandDot: "#1E8E48", // small-element green — tonal sibling of brand, not neon
+  brandDot: "#15803D", // small-element / logo green — aligned to brand (5.0:1); the prior #1E8E48 read 4.18:1 on the 20px logo glyph (under AA)
   inversePrimary: "#6FCF8E", // green legible on the dark (inverse) toast surface
   ink350: "#A8A29E", // named warm grey between ink400/ink300 (gantt secondary, rings)
   danger: "#B5392E", // single danger hue
