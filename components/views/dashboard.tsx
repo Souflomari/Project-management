@@ -224,6 +224,7 @@ export function Dashboard() {
           sub={lateCount > 0 ? "à traiter en priorité" : "rien en retard"}
           subColor={lateCount > 0 ? STATUS_META["en retard"].color : undefined}
           dot={lateCount > 0 ? STATUS_META["en retard"].color : undefined}
+          spark={history.map((h) => h.late)}
           onClick={lateCount > 0 ? goLate : undefined}
         />
         <Kpi
@@ -470,23 +471,34 @@ function Delta({ v, unit, goodUp = true }: { v: number; unit?: string; goodUp?: 
  *  set, not four competing boxes (Tufte data-ink; Gestalt proximity). Resting
  *  state is bare; the hover state paints a quiet well + lift only when actionable,
  *  so the affordance stays visible without a permanent box. */
-function Kpi({ title, value, sub, subColor, dot, delta, onClick, className }: { title: string; value: string | number; sub: string; subColor?: string; dot?: string; delta?: number; onClick?: () => void; className?: string }) {
+function Kpi({ title, value, sub, subColor, dot, delta, spark, onClick, className }: { title: string; value: string | number; sub: string; subColor?: string; dot?: string; delta?: number; spark?: number[]; onClick?: () => void; className?: string }) {
   const cls = [className, onClick ? "lift-hover row-focus" : ""].filter(Boolean).join(" ") || undefined;
   return (
     <div
       className={cls}
       {...(onClick ? rowProps(onClick) : {})}
-      style={{ border: `1px solid ${C.line}`, borderRadius: R.lg, background: C.surface, padding: "16px 16px", height: "100%", display: "flex", flexDirection: "column", ...(onClick ? { cursor: "pointer" } : {}) }}
+      // C5: content-height tile (no forced height:100% — the grid no longer stretches
+      // these to the hero's height), so the label / number / context line stack
+      // tightly like the Équipe cards instead of a tall box with an empty middle.
+      style={{ border: `1px solid ${C.line}`, borderRadius: R.lg, background: C.surface, padding: "15px 16px", display: "flex", flexDirection: "column", gap: 6, ...(onClick ? { cursor: "pointer" } : {}) }}
     >
       {/* C5: KPI label promoted — text-sm / 500 / secondary (not a muted eyebrow). */}
       <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)" }}>{title}</div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         {/* Secondary KPIs sit a step below the hero gauge readout so the portfolio
-            health stays the single focal point (was larger, competing with it). */}
+            health stays the single focal point. */}
         <span style={{ ...num(28), color: C.ink900 }}>{value}</span>
         {delta !== undefined ? <Delta v={delta} /> : null}
       </div>
-      <div style={{ ...TX.nano, color: subColor ?? C.ink400, marginTop: "auto", paddingTop: 7, display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {/* Context line (like the Équipe cards): a trend sparkline where weekly
+          history exists, else the descriptive sub — connected to the number, not
+          pinned to the bottom of an empty box. */}
+      {spark && spark.length > 1 ? (
+        <div style={{ marginTop: 2, marginBottom: 2 }}>
+          <Sparkline values={spark} height={22} color={C.ink400} ariaLabel={`${title} — tendance sur ${spark.length} semaines`} />
+        </div>
+      ) : null}
+      <div style={{ ...TX.nano, color: subColor ?? C.ink400, display: "inline-flex", alignItems: "center", gap: 6 }}>
         {dot ? <span style={{ width: 6, height: 6, borderRadius: "50%", background: dot, flexShrink: 0 }} /> : null}
         {sub}
       </div>

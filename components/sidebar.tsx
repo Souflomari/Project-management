@@ -17,7 +17,7 @@ import {
   workspaceLensForPath,
 } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, DUR, EASE, FONT_DISPLAY, R, SP, SPRING, TX } from "@/lib/tokens";
+import { C, DUR, EASE, FONT_DISPLAY, R, SP, SPRING, SURFACE, TX } from "@/lib/tokens";
 
 function navLinkStyle(active: boolean): React.CSSProperties {
   return {
@@ -32,10 +32,9 @@ function navLinkStyle(active: boolean): React.CSSProperties {
     padding: "0 10px",
     borderRadius: R.sm,
     color: active ? C.ink900 : C.ink500,
-    // Calm active state: one quiet container tint. The green identity is carried
-    // by the single ActiveBar + the icon, so the row itself stays neutral and the
-    // active item reads as selected without a coloured pill competing for accent.
-    background: active ? C.subtle : "transparent",
+    // C1: SELECTED is an INK device (not green). Dark left-bar + dark icon + a
+    // clearly-sunken surface so the active row reads as chosen without any accent.
+    background: active ? SURFACE.containerHigh : "transparent",
     transition: `background ${DUR.base} ${EASE.standard}, color ${DUR.base} ${EASE.standard}`,
   };
 }
@@ -54,7 +53,7 @@ function ActiveBar({ active }: { active: boolean }) {
         height: 18,
         borderRadius: R.pill,
         // C1: persistent SELECTED is ink, not green (green = hover/positive/data).
-        background: "var(--selected)",
+        background: C.ink900,
         transition: `transform ${DUR.base} ${EASE.out}`,
       }}
     />
@@ -90,7 +89,7 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
           style={{ ...navLinkStyle(groupActive), paddingRight: 34 }}
         >
           <ActiveBar active={groupActive} />
-          <span style={{ color: groupActive ? "var(--selected)" : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
+          <span style={{ color: groupActive ? C.ink900 : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
             <Icon />
           </span>
           <span className="rail-hide">Projets</span>
@@ -154,7 +153,7 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
                       // Same calm model as primary rows: quiet neutral container,
                       // the active dot (a non-colour position cue too) goes green.
                       color: active ? C.ink900 : C.ink500,
-                      background: active ? C.subtle : "transparent",
+                      background: active ? SURFACE.containerHigh : "transparent",
                       transition: `background ${DUR.base} ${EASE.standard}, color ${DUR.base} ${EASE.standard}`,
                     }}
                   >
@@ -165,7 +164,7 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
                         height: 5,
                         borderRadius: "50%",
                         flexShrink: 0,
-                        background: active ? "var(--selected)" : C.ink350,
+                        background: active ? C.ink900 : C.ink350,
                         transition: `background ${DUR.base} ${EASE.standard}`,
                       }}
                     />
@@ -367,7 +366,7 @@ export function Sidebar() {
               style={navLinkStyle(active)}
             >
               <ActiveBar active={active} />
-              <span style={{ color: active ? "var(--selected)" : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
+              <span style={{ color: active ? C.ink900 : C.ink500, display: "flex", transition: `color ${DUR.base} ${EASE.standard}` }}>
                 <Icon />
               </span>
               <span className="rail-hide">{item.label}</span>

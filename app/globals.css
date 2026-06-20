@@ -446,12 +446,17 @@ select:focus-visible,
 .bento {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-auto-rows: minmax(128px, auto);
+  grid-auto-rows: minmax(108px, auto);
   gap: 16px;
+  /* C5: KPI tiles are content-height and top-aligned — they no longer stretch to
+     match the tall "Santé du portefeuille" hero (which keeps its own height). */
+  align-items: start;
 }
 .bento > * {
   min-width: 0;
 }
+/* the hero stays the tall anchor even though tiles no longer stretch to it */
+.b-hero { align-self: stretch; }
 .b-hero { grid-column: 1 / 3; grid-row: 1 / 3; } /* 2x2 anchor */
 .b-late { grid-column: 3 / 4; grid-row: 1 / 2; }
 .b-rendus7 { grid-column: 4 / 5; grid-row: 1 / 2; }

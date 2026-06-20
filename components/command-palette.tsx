@@ -405,7 +405,7 @@ export function CommandPalette() {
                   >
                     {/* Same selection atom as the sidebar: quiet container + one green
                         bar, neutral ink label. One accent cue, consistent everywhere. */}
-                    <span aria-hidden style={{ position: "absolute", left: 3, top: "50%", transform: `translateY(-50%) scaleY(${sel ? 1 : 0})`, width: 3, height: 16, borderRadius: R.pill, background: "var(--selected)", transition: `transform ${DUR.fast} ${EASE.out}` }} />
+                    <span aria-hidden style={{ position: "absolute", left: 3, top: "50%", transform: `translateY(-50%) scaleY(${sel ? 1 : 0})`, width: 3, height: 16, borderRadius: R.pill, background: C.ink900, transition: `transform ${DUR.fast} ${EASE.out}` }} />
                     <span style={{ width: 20, display: "flex", justifyContent: "center", flexShrink: 0 }}>{it.leading}</span>
                     <span style={{ minWidth: 0, flex: 1 }}>
                       <span style={{ ...TX.bodyStrong, color: C.ink900, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: `color ${DUR.fast} ${EASE.standard}` }}>{it.label}</span>
