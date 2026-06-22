@@ -9,6 +9,7 @@ import type {
   Status,
   TeamMember,
 } from "../types";
+import { REFERENCE_DATE } from "../format";
 import { buildSampleProjects, buildSampleTeam } from "./sample-data";
 import type {
   NewProjectInput,
@@ -149,6 +150,7 @@ export const sampleRepository: ProjectRepository = {
       initials: "ME",
       color: "#4F5A63", // muted neutral, in line with AVATAR_PALETTE (no saturated persona hue)
       text: trimmed,
+      at: REFERENCE_DATE, // posted "now" on the app clock → renders "à l’instant", then ages
       when: "à l'instant",
     };
     return replace({ ...p, comments: [...p.comments, comment] });

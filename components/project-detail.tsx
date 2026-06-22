@@ -13,7 +13,7 @@ import { CloseIcon, PlusIcon, TrashIcon } from "./icons";
 import { Avatar, Button, Checkbox, IconButton, Input, ProgressBar, Select, Textarea } from "./ui";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { buildBudget, type DerivedProject, type DerivedSubtask } from "@/lib/derive";
-import { daysFromToday, fmtEur, fmtFull, fmtShort, formatDays, pct, REFERENCE_DATE, REFERENCE_TS, toDate, workingDaysBetween } from "@/lib/format";
+import { daysFromToday, fmtEur, fmtFull, fmtShort, formatDays, pct, REFERENCE_DATE, REFERENCE_TS, relativeWhen, toDate, workingDaysBetween } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, FONT_DISPLAY, num, R, SURFACE, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
@@ -628,7 +628,10 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
   );
 }
 
-function CommentItem({ cm, teamFirstNames }: { cm: { author: string; initials: string; color: string; text: string; when: string }; teamFirstNames: Set<string> }) {
+function CommentItem({ cm, teamFirstNames }: { cm: { author: string; initials: string; color: string; text: string; when: string; at?: string }; teamFirstNames: Set<string> }) {
+  // Prefer the live relative label computed from `at`; fall back to the stored
+  // string for legacy comments.
+  const whenLabel = cm.at ? relativeWhen(cm.at) : cm.when;
   // Render @mentions of real team members as accented tokens.
   const parts: React.ReactNode[] = [];
   let last = 0;
@@ -654,7 +657,7 @@ function CommentItem({ cm, teamFirstNames }: { cm: { author: string; initials: s
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ ...TX.caption }}>
           <span style={{ fontWeight: 600, color: C.ink900 }}>{cm.author}</span>{" "}
-          <span style={{ color: C.ink500 }} title={cm.when}>· {cm.when}</span>
+          <span style={{ color: C.ink500 }} title={cm.at ?? cm.when}>· {whenLabel}</span>
         </div>
         <div style={{ ...TX.body, marginTop: 2, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{parts}</div>
       </div>

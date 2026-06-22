@@ -59,6 +59,19 @@ export function daysFromToday(iso: string): number {
   return Math.round((toDate(iso).getTime() - REFERENCE_TS) / 86_400_000);
 }
 
+/** Relative posting label computed from the app clock (REFERENCE_DATE), so a
+ *  comment's timestamp reflects how long ago it was posted instead of a frozen
+ *  "à l'instant" string. Future/now → "à l'instant". */
+export function relativeWhen(iso: string): string {
+  const days = Math.round((REFERENCE_TS - toDate(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "à l’instant";
+  if (days === 1) return "hier";
+  if (days < 7) return `il y a ${days}${NNBSP}j`;
+  if (days < 31) return `il y a ${Math.round(days / 7)}${NNBSP}sem.`;
+  if (days < 365) return `il y a ${Math.round(days / 30)}${NNBSP}mois`;
+  return `il y a ${Math.round(days / 365)}${NNBSP}an${days >= 730 ? "s" : ""}`;
+}
+
 export function fmtShort(iso: string): string {
   const d = toDate(iso);
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;

@@ -52,7 +52,12 @@ export interface Comment {
   initials: string;
   color: string;
   text: string;
+  /** Human label fallback (legacy). Prefer `at` — the UI computes the relative
+   *  label from it so timestamps aren't frozen strings. */
   when: string;
+  /** ISO date the comment was posted (the app clock). Drives the live relative
+   *  label ("à l'instant" / "il y a 3 j"). Optional for back-compat. */
+  at?: string;
 }
 
 export interface Project {

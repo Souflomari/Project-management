@@ -2,7 +2,7 @@
 // set of editable tasks (sous-tâches); progress and the "prochain rendu" are
 // derived from them. Swapping to Supabase replaces the repository, not this file.
 
-import { REFERENCE_DATE, shiftISO, taskEnd, taskStartForEnd, workingDaysBetween } from "../format";
+import { REFERENCE_DATE, relativeWhen, shiftISO, taskEnd, taskStartForEnd, workingDaysBetween } from "../format";
 import { AVATAR_PALETTE } from "../tokens";
 import type { Project, Status, Subtask, TeamMember } from "../types";
 
@@ -58,10 +58,10 @@ const ROWS: Row[] = [
   ["Data center Sud — Lot CVC", "OVHcloud", "Bâtiment / Énergie", 3, 5, 84, "à jour", 460, "2025-01-01", "2026-09-05", "Visa exécution", "2026-06-21"],
 ];
 
-const SEED_COMMENTS: Record<number, { ri: number; text: string; when: string }[]> = {
-  1: [{ ri: 0, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", when: "il y a 2 j" }],
-  6: [{ ri: 1, text: "Accès à l'ouvrage soumis à autorisation — relance du MOA en cours.", when: "hier" }],
-  21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", when: "il y a 4 j" }],
+const SEED_COMMENTS: Record<number, { ri: number; text: string; at: string }[]> = {
+  1: [{ ri: 0, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", at: shiftISO(REFERENCE_DATE, -2) }],
+  6: [{ ri: 1, text: "Accès à l'ouvrage soumis à autorisation — relance du MOA en cours.", at: shiftISO(REFERENCE_DATE, -1) }],
+  21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", at: shiftISO(REFERENCE_DATE, -4) }],
 };
 
 // Effort model. Each project's five tasks share a total planned effort sized so
@@ -232,7 +232,8 @@ export function buildSampleProjects(): Project[] {
         initials: TEAM[c.ri].initials,
         color: TEAM[c.ri].color,
         text: c.text,
-        when: c.when,
+        at: c.at,
+        when: relativeWhen(c.at),
       })),
     };
   });

@@ -97,7 +97,7 @@ function rowToProject(row: ProjectRow): Project {
     comments: [...row.comments]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((c) => ({
-        author: c.author, initials: c.initials, color: c.color, text: c.text, when: c.when_label,
+        author: c.author, initials: c.initials, color: c.color, text: c.text, when: c.when_label, at: c.created_at,
       })),
   };
 }
