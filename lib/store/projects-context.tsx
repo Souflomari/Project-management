@@ -203,6 +203,19 @@ export function ProjectsProvider({
     setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   }, []);
 
+  // Persistence (sample mode): the SSR `initial*` props are the fresh seed, but the
+  // sample repository hydrates its own state from localStorage on the client. Re-read
+  // it once on mount so a returning user sees their persisted edits instead of the
+  // seed. (Supabase mode persists server-side, so this is skipped.)
+  useEffect(() => {
+    if (serverBacked) return;
+    let alive = true;
+    Promise.all([sampleRepository.listProjects(), sampleRepository.listTeam()]).then(([ps, ts]) => {
+      if (alive) { setProjects(ps); setTeam(ts); }
+    }).catch(() => { /* keep the SSR seed on failure */ });
+    return () => { alive = false; };
+  }, [serverBacked]);
+
   // ---- project / task / team mutations (server actions vs sample repo) ----
   // Specific, recoverable error: names the action and offers a retry.
   const failToast = useCallback(

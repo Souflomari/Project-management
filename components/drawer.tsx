@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef } from "react";
 
 import { CloseIcon } from "./icons";
-import { ProjectIdentity, ProjectPeekSummary, StatusPicker } from "./project-detail";
+import { ProjectComments, ProjectIdentity, ProjectPeekSummary, ProjectTasks, StatusPicker } from "./project-detail";
 import { IconButton, useFocusTrap } from "./ui";
 import { deriveProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
@@ -49,11 +49,9 @@ function Peek({
   onClose: () => void;
   onOpenFull: () => void;
 }) {
-  // The drawer is a FAST TRIAGE PEEK — identity, status, the three decision
-  // numbers (avancement / margin / next rendu), quick actions, recent comments.
-  // The full two-column workspace lives at /projets/[id].
-  const recentComments = p.comments.slice(-3);
-
+  // The drawer is an ACTIONABLE PEEK — identity, status, the decision numbers,
+  // then the live task list (add/toggle/edit/delete) and the activity thread with
+  // a working composer. The full two-column workspace still lives at /projets/[id].
   return (
     <>
       <motion.div
@@ -122,37 +120,29 @@ function Peek({
           {/* the two decision numbers + next deliverable */}
           <ProjectPeekSummary p={p} />
 
-          {/* recent activity (last 3) — separated by whitespace + a hairline
-              rule, not wrapped in a competing card. Full thread on the page. */}
+          {/* live task list — toggle / inline-edit / delete + the "Nouvelle tâche"
+              add form, self-contained and store-connected. Separated by a hairline
+              rule and a section label, not wrapped in a competing card. */}
+          <div style={{ marginTop: 24, paddingTop: 20, borderTop: `1px solid ${C.line}` }}>
+            <div style={{ ...SECTION, marginBottom: 12 }}>Tâches</div>
+            <ProjectTasks p={p} />
+          </div>
+
+          {/* live activity thread WITH the comment composer (@mentions, Maj+Entrée).
+              Replaces the former read-only "Activité récente" snapshot. */}
           <div style={{ marginTop: 24, paddingTop: 20, borderTop: `1px solid ${C.line}` }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={SECTION}>Activité récente</div>
+              <div style={SECTION}>Activité</div>
               <Link
                 href={`/projets/${p.id}?onglet=activite`}
                 onClick={(e) => { e.preventDefault(); onOpenFull(); }}
                 className="soft-hover"
                 style={{ ...TX.micro, color: C.ink500, padding: "2px 6px", borderRadius: R.xs }}
               >
-                Tout voir
+                Ouvrir la page ↗
               </Link>
             </div>
-            {recentComments.length === 0 ? (
-              <div style={{ ...TX.caption, color: C.ink500 }}>Aucune activité pour l’instant.</div>
-            ) : (
-              recentComments.map((cm, i) => (
-                <div key={i} style={{ display: "flex", gap: 9, marginBottom: i === recentComments.length - 1 ? 0 : 12 }}>
-                  {/* neutral marker — author identity is the name, not a decorative hue */}
-                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.ink300, marginTop: 7, flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ ...TX.caption }}>
-                      <span style={{ fontWeight: 600, color: C.ink900 }}>{cm.author}</span>{" "}
-                      <span style={{ color: C.ink500 }}>· {cm.when}</span>
-                    </div>
-                    <div style={{ ...TX.body, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{cm.text}</div>
-                  </div>
-                </div>
-              ))
-            )}
+            <ProjectComments p={p} />
           </div>
         </div>
       </motion.aside>

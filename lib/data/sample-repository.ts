@@ -24,6 +24,51 @@ const DEFAULT_COST_PER_DAY = 700;
 let projects: Project[] = buildSampleProjects();
 let team: TeamMember[] = buildSampleTeam();
 
+// ── Browser persistence ──────────────────────────────────────────────────────
+// In sample mode there is no backend, so edits are kept in localStorage and the
+// store re-hydrates from here on mount (see projects-context). The SERVER copy of
+// this module has no `window`, so server reads still return the fresh seed for the
+// first SSR paint; the client then overrides with the persisted state. Bump the
+// key's version suffix if the Project/TeamMember shape changes.
+const STORAGE_KEY = "setec.sample.v1";
+
+function persist(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects, team }));
+  } catch {
+    /* quota / privacy mode — degrade to in-memory only */
+  }
+}
+
+function hydrate(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw) as { projects?: unknown; team?: unknown };
+    if (Array.isArray(data.projects) && data.projects.length && Array.isArray(data.team) && data.team.length) {
+      projects = data.projects as Project[];
+      team = data.team as TeamMember[];
+    }
+  } catch {
+    /* corrupt payload — fall back to the seed */
+  }
+}
+
+// Load any persisted session as soon as the module is evaluated in the browser.
+hydrate();
+
+/** Reset the demo to its seed and clear the persisted browser copy. The settings
+ *  page calls this then reloads, so a user can get back to a clean portfolio. */
+export function clearSampleData(): void {
+  projects = buildSampleProjects();
+  team = buildSampleTeam();
+  if (typeof window !== "undefined") {
+    try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+  }
+}
+
 const clone = <T>(v: T): T => structuredClone(v);
 
 function mustFind(id: number): Project {
@@ -34,6 +79,7 @@ function mustFind(id: number): Project {
 
 function replace(updated: Project): Project {
   projects = projects.map((p) => (p.id === updated.id ? updated : p));
+  persist();
   return clone(updated);
 }
 
@@ -72,6 +118,7 @@ export const sampleRepository: ProjectRepository = {
       comments: [],
     };
     projects = [np, ...projects];
+    persist();
     return clone(np);
   },
 
@@ -137,16 +184,19 @@ export const sampleRepository: ProjectRepository = {
   async addTeamMember(input: NewTeamMemberInput) {
     const id = Math.max(-1, ...team.map((m) => m.id)) + 1;
     team = [...team, { id, ...input, costPerDay: Math.max(0, Math.round(input.costPerDay ?? DEFAULT_COST_PER_DAY)) }];
+    persist();
     return team.map(clone);
   },
 
   async updateTeamMember(id, patch: TeamMemberPatch) {
     team = team.map((m) => (m.id === id ? { ...m, ...patch } : m));
+    persist();
     return team.map(clone);
   },
 
   async deleteTeamMember(id) {
     team = team.filter((m) => m.id !== id);
+    persist();
     return team.map(clone);
   },
 };

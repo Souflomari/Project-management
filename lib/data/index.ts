@@ -6,4 +6,4 @@
 // The Supabase swap is driven by env vars in lib/supabase/config.ts.
 
 export type { ProjectRepository, NewProjectInput } from "./repository";
-export { sampleRepository } from "./sample-repository";
+export { sampleRepository, clearSampleData } from "./sample-repository";
