@@ -534,6 +534,18 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
     return team.filter((tm) => tm.name.toLowerCase().includes(q)).slice(0, 5);
   }, [commentDraft, team]);
 
+  // A real activity timeline derived from the project's OWN data (no event store
+  // needed): every delivered task becomes a "rendu livré" milestone, plus the
+  // project opening — so Activité is never an empty placeholder, even before
+  // anyone comments.
+  const history = useMemo(() => {
+    const items: { kind: "rendu" | "open"; text: string; date: string; who?: TeamMember }[] = [];
+    for (const s of p.subtasksD) if (s.done) items.push({ kind: "rendu", text: s.name, date: s.end, who: s.assignee });
+    items.sort((a, b) => b.date.localeCompare(a.date));
+    items.push({ kind: "open", text: "Projet ouvert", date: p.start });
+    return items;
+  }, [p]);
+
   function submit() {
     if (!commentDraft.trim()) return;
     addComment(p.id);
@@ -549,9 +561,6 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
 
   return (
     <>
-      {p.comments.length === 0 ? (
-        <div style={{ ...TX.caption, color: C.ink500, marginBottom: 12 }}>Aucune activité pour l’instant.</div>
-      ) : null}
       {p.comments.map((cm, i) => (
         <CommentItem key={i} cm={cm} teamFirstNames={teamFirstNames} />
       ))}
@@ -594,6 +603,26 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
           <Button variant="secondary" onClick={submit} disabled={!commentDraft.trim()}>Publier</Button>
         </div>
+      </div>
+
+      {/* Derived activity timeline — delivered rendus (real task dates) + the
+          project opening. Always present, so the feed reads as a real history
+          rather than an empty placeholder. */}
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.line}` }}>
+        <div style={{ ...TX.overline, color: C.ink600, marginBottom: 10 }}>Historique du projet</div>
+        {history.map((a, i) => (
+          <div key={i} style={{ display: "flex", gap: 9, alignItems: "baseline", marginBottom: i === history.length - 1 ? 0 : 11 }}>
+            <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, transform: "translateY(5px)", background: a.kind === "rendu" ? C.brand : C.ink300 }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ ...TX.caption, color: C.ink900 }}>
+                {a.kind === "rendu" ? <>Rendu livré · <span style={{ fontWeight: 600 }}>{a.text}</span></> : a.text}
+              </div>
+              <div style={{ ...TX.nano, color: C.ink500, marginTop: 1 }}>
+                {a.who ? `${a.who.name} · ` : ""}{fmtFull(a.date)}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </>
   );
