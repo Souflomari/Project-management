@@ -251,10 +251,6 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
             <Link href={ACCOUNT_ROUTES.parametres} role="menuitem" className="nav-hover" style={itemStyle} onClick={() => setOpen(false)}>
               Paramètres
             </Link>
-            {/* TODO(theme): wire to a real theme toggle once a theme store exists. */}
-            <button type="button" role="menuitem" className="nav-hover" style={itemStyle} onClick={() => setOpen(false)} title="Bientôt disponible">
-              Thème
-            </button>
             <div style={{ height: 1, background: C.line, margin: "4px 6px" }} />
             {serverBacked ? (
               <form action={signOutAction}>

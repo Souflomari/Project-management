@@ -162,7 +162,8 @@ export default function ParametresPage() {
       <Section title="Thème">
         <Card padding={`${SP[4]}px ${SP[6]}px`}>
           <p style={{ ...TX.caption, color: C.ink500, margin: 0 }}>
-            Le thème clair est le seul disponible pour le moment.
+            L’interface est conçue autour d’un thème clair unique, pour une lecture
+            calme et un contraste maîtrisé.
           </p>
         </Card>
       </Section>
