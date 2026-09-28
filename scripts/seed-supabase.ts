@@ -5,7 +5,10 @@
 //   2. set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env
 //   3. npm run seed
 //
-// Uses the service-role key to bypass RLS. Idempotent (clears first).
+// Uses the service-role key to bypass RLS. Idempotent (clears projects first,
+// upserts the team). It never creates auth users: invite people from the
+// dashboard, then grant them access with a row in `app_users` (see the hint
+// printed at the end).
 
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
@@ -49,6 +52,9 @@ async function main() {
       )
     ).error,
   );
+  // The ids above were explicit: move the identity sequence past them so members
+  // created from the app get fresh ids.
+  check("sync team_members id sequence", (await sb.rpc("sync_team_members_id_seq")).error);
 
   const projects = buildSampleProjects();
   let count = 0;
@@ -116,6 +122,8 @@ async function main() {
               color: c.color,
               text: c.text,
               when_label: c.when,
+              // Keep the sample's posting date so relative labels read as designed.
+              ...(c.at ? { created_at: c.at } : {}),
             })),
           )
         ).error,
@@ -125,6 +133,16 @@ async function main() {
   }
 
   console.log(`✓ Seeded ${team.length} team members and ${count} projects.`);
+  console.log(`
+Next: grant access. Signing in is not enough — each person needs a row in
+app_users. Invite them (Authentication → Users → Invite), then in the SQL editor
+link them to a team member (ids: ${team.map((m) => `${m.id} = ${m.name}`).join(", ")}):
+
+  insert into app_users (user_id, member_id, role)
+  select id, ${team[0]?.id ?? 0}, 'admin' from auth.users where email = 'you@example.com';
+
+Use role 'member' for everyone but the first admin; admins can then manage
+app_users rows themselves.`);
 }
 
 main().catch((e) => {

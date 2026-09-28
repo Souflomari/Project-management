@@ -235,9 +235,9 @@ function FilterPopover({ facets, team }: { facets: FacetControls; team: { id: nu
 
 export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNode; showViews?: boolean; facets?: FacetControls }) {
   const {
-    filters, setFilter, filter,
+    filters, setFilter, filter, searched,
     team, respFilter, setRespFilter, phaseFilter, setPhaseFilter, resetFilters,
-    savedViews, saveView, applyView, deleteView,
+    savedViews, saveView, applyView, deleteView, renameView,
   } = useProjects();
 
   const [saveOpen, setSaveOpen] = useState(false);
@@ -248,9 +248,17 @@ export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNod
   const submitSave = () => { const n = viewName.trim(); if (n) saveView(n); setSaveOpen(false); setViewName(""); };
   const submitRename = () => {
     const n = renameName.trim();
-    if (renameTarget && n) { deleteView(renameTarget.id); applyView(renameTarget); saveView(n); }
+    if (renameTarget && n) renameView(renameTarget.id, n); // keeps the view's own filters
     setRenameTarget(null);
   };
+
+  // Legacy single-select facets: honest counts against the other active facets
+  // (status + search always; phase for the responsable list and vice versa).
+  const byStatus = filter === "all" ? searched : searched.filter((p) => p.status === filter);
+  const forResp = phaseFilter == null ? byStatus : byStatus.filter((p) => p.phaseIndex === phaseFilter);
+  const forPhase = respFilter == null ? byStatus : byStatus.filter((p) => p.responsableId === respFilter);
+  const respCount = (id: number) => forResp.filter((p) => p.responsableId === id).length;
+  const phaseCount = (i: number) => forPhase.filter((p) => p.phaseIndex === i).length;
 
   const hasFacets = facets ? facets.hasAny : filter !== "all" || respFilter != null || phaseFilter != null;
   const reset = facets ? facets.resetAll : resetFilters;
@@ -293,9 +301,9 @@ export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNod
           <FacetPopover label="Responsable" active={respFilter != null}>
             {(close) => (
               <>
-                <FacetOption selected={respFilter == null} label="Tous" count={0} onToggle={() => { setRespFilter(null); close(); }} />
+                <FacetOption selected={respFilter == null} label="Tous" count={forResp.length} onToggle={() => { setRespFilter(null); close(); }} />
                 {team.map((m) => (
-                  <FacetOption key={m.id} selected={respFilter === m.id} label={m.name} count={0} dot={m.color} onToggle={() => { setRespFilter(m.id); close(); }} />
+                  <FacetOption key={m.id} selected={respFilter === m.id} label={m.name} count={respCount(m.id)} dot={m.color} onToggle={() => { setRespFilter(m.id); close(); }} />
                 ))}
               </>
             )}
@@ -303,9 +311,9 @@ export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNod
           <FacetPopover label="Phase" active={phaseFilter != null}>
             {(close) => (
               <>
-                <FacetOption selected={phaseFilter == null} label="Toutes" count={0} onToggle={() => { setPhaseFilter(null); close(); }} />
+                <FacetOption selected={phaseFilter == null} label="Toutes" count={forPhase.length} onToggle={() => { setPhaseFilter(null); close(); }} />
                 {PHASES.map((ph, i) => (
-                  <FacetOption key={ph} selected={phaseFilter === i} label={ph} count={0} onToggle={() => { setPhaseFilter(i); close(); }} />
+                  <FacetOption key={ph} selected={phaseFilter === i} label={ph} count={phaseCount(i)} onToggle={() => { setPhaseFilter(i); close(); }} />
                 ))}
               </>
             )}
@@ -403,8 +411,10 @@ export function FilterBar({ trailing, showViews, facets }: { trailing?: ReactNod
 }
 
 const clearBtn: React.CSSProperties = {
-  display: "block", width: "100%", marginTop: 4, padding: "7px 8px", borderTop: `1px solid ${C.line}`,
-  background: "transparent", border: "none", borderTopColor: C.line, color: C.ink500, font: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left",
+  display: "block", width: "100%", marginTop: 4, padding: "7px 8px",
+  // Longhands only: a `border` shorthand after `borderTop` would erase the divider.
+  borderStyle: "solid", borderWidth: "1px 0 0", borderColor: C.line,
+  background: "transparent", color: C.ink500, font: "inherit", fontSize: 12, fontWeight: 600, cursor: "pointer", textAlign: "left",
 };
 
 const iconChip: React.CSSProperties = {

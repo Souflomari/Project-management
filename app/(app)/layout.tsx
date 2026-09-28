@@ -30,7 +30,7 @@ async function AppData({ children }: { children: React.ReactNode }) {
   const [projects, team] = await Promise.all([repo.listProjects(), repo.listTeam()]);
 
   return (
-    <ProjectsProvider initialProjects={projects} initialTeam={team} serverBacked={isSupabaseConfigured()}>
+    <ProjectsProvider initialProjects={projects} initialTeam={team} serverBacked={isSupabaseConfigured()} viewer={viewer}>
       <AppShell>{children}</AppShell>
     </ProjectsProvider>
   );
