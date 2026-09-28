@@ -98,3 +98,11 @@ export interface NewTeamMemberInput {
   /** Loaded daily rate — euros per working day. Defaults applied by the repo. */
   costPerDay?: number;
 }
+
+/** The signed-in person, as the app sees them. `null` in sample (demo) mode. */
+export interface Viewer {
+  email: string | null;
+  /** Linked team member (drives name/initials/colour), if any. */
+  memberId: number | null;
+  role: "member" | "admin";
+}

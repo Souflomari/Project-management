@@ -19,10 +19,17 @@ import type {
   TeamMember,
 } from "@/lib/types";
 
-/** Resolve the repository, enforcing auth when Supabase is connected. */
+/** Resolve the repository for a write. Server actions are public HTTP endpoints,
+ *  so each one re-checks access here (the proxy is not a security boundary):
+ *    • sample mode → refused: demo edits are applied in the visitor's browser and
+ *      the server's seed data must never be mutable by anonymous callers;
+ *    • Supabase    → the caller must be signed in AND granted access (app_users).
+ *  RLS enforces the same rule again in the database. */
 async function authedRepository() {
-  const { repository, user } = await getServerContext();
-  if (isSupabaseConfigured() && !user) throw new Error("Not authenticated");
+  if (!isSupabaseConfigured()) throw new Error("Server writes are disabled in demo mode");
+  const { repository, user, viewer } = await getServerContext();
+  if (!user) throw new Error("Not authenticated");
+  if (!viewer) throw new Error("Not authorized");
   return repository;
 }
 

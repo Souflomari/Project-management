@@ -9,6 +9,7 @@ import type {
   Status,
   Subtask,
   TeamMember,
+  Viewer,
 } from "../types";
 import type {
   NewProjectInput,
@@ -113,7 +114,7 @@ function subtaskPatchToRow(patch: SubtaskPatch): Record<string, unknown> {
   return row;
 }
 
-export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository {
+export function createSupabaseRepository(sb: SupabaseClient, viewer: Viewer | null = null): ProjectRepository {
   async function fetchProject(id: number): Promise<Project> {
     const row = unwrap(
       await sb.from("projects").select(PROJECT_SELECT).eq("id", id).single(),
@@ -194,8 +195,18 @@ export function createSupabaseRepository(sb: SupabaseClient): ProjectRepository 
     async addComment(id, text) {
       const trimmed = text.trim();
       if (!trimmed) return fetchProject(id);
+      // Author = the signed-in user's linked team member (author_id defaults to
+      // auth.uid() in the DB and the insert policy enforces it).
+      const { data: me } = viewer?.memberId != null
+        ? await sb.from("team_members").select("name, initials, color").eq("id", viewer.memberId).maybeSingle()
+        : { data: null };
+      const fallback = viewer?.email?.split("@")[0] ?? "Utilisateur";
       const { error } = await sb.from("comments").insert({
-        project_id: id, author: "Mehrnaz", initials: "ME", color: "#4F5A63", text: trimmed, when_label: "à l'instant",
+        project_id: id,
+        author: me?.name ?? fallback,
+        initials: me?.initials ?? fallback.slice(0, 2).toUpperCase(),
+        color: me?.color ?? "#4F5A63",
+        text: trimmed,
       });
       if (error) throw new Error(error.message);
       return fetchProject(id);

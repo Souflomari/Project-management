@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 
+import { signOutAction } from "@/app/actions";
 import { Button, Input } from "@/components/ui";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
@@ -18,19 +19,28 @@ function frError(raw: string): string {
     return `Cette adresse e-mail n${"’"}est pas valide.`;
   if (m.includes("email") && (m.includes("not") || m.includes("disabled")))
     return `La connexion par e-mail n${"’"}est pas activée pour ce compte.`;
-  if (m.includes("signups") && m.includes("disabled"))
+  if ((m.includes("signups") && m.includes("disabled")) || m.includes("not allowed") || m.includes("user not found"))
     return `Les inscriptions sont désactivées. Contactez votre administrateur.`;
   if (m.includes("network") || m.includes("fetch") || m.includes("failed to"))
     return `Connexion au serveur impossible. Vérifiez votre réseau et réessayez.`;
   return `Une erreur est survenue. Réessayez dans un instant.`;
 }
 
-export default function LoginPage() {
+/** Errors handed back via `?error=` by the auth callback / the app layout. */
+const URL_ERRORS: Record<string, string> = {
+  auth: `Ce lien de connexion est invalide ou a expiré. Ouvrez-le dans le navigateur où vous l${"’"}avez demandé, ou demandez-en un nouveau.`,
+  forbidden: `Votre compte n${"’"}a pas encore accès à l${"’"}application. Contactez votre administrateur.`,
+};
+
+export default function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const configured = isSupabaseConfigured();
+  const { error: urlError } = use(searchParams);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    urlError ? (URL_ERRORS[urlError] ?? URL_ERRORS.auth) : null,
+  );
 
   async function sendLink() {
     setLoading(true);
@@ -38,7 +48,8 @@ export default function LoginPage() {
     const supabase = createBrowserSupabaseClient();
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      // Invite-only: never create an account for an unknown address.
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback`, shouldCreateUser: false },
     });
     setLoading(false);
     if (error) setError(frError(error.message));
@@ -174,6 +185,18 @@ export default function LoginPage() {
               {error ? (
                 <p role="alert" style={{ ...TX.micro, color: C.danger, margin: `${SP[4]}px 0 0` }}>{error}</p>
               ) : null}
+            </div>
+          ) : urlError === "forbidden" ? (
+            <div>
+              <h1 style={{ ...TX.h2, margin: `0 0 ${SP[3]}px` }}>Accès non autorisé</h1>
+              <p role="alert" style={{ ...TX.caption, color: C.ink500, margin: `0 0 ${SP[6]}px` }}>
+                {URL_ERRORS.forbidden}
+              </p>
+              <form action={signOutAction}>
+                <Button type="submit" variant="secondary" fullWidth>
+                  Se déconnecter
+                </Button>
+              </form>
             </div>
           ) : (
             <form onSubmit={handleSubmit}>
