@@ -1,37 +1,62 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 
 import { CalendrierIcon, CheckIcon, FlagIcon } from "../icons";
 import { Card, EmptyState, Gauge, rowProps, Sparkline, StatusPill } from "../ui";
 import {
-  buildBudget,
   buildHistory,
   buildKanban,
-  buildTeamLoad,
   computeKpis,
+  portfolioBudget,
+  portfolioHealth,
+  recentRendus,
   statusDistribution,
   upcomingRendus,
-  vigilanceAlerts,
+  workloadSummary,
   type DerivedProject,
+  type HealthBand,
 } from "@/lib/derive";
 import { fmtEur, formatDays, pct, REFERENCE_DATE, WEEK_LABEL, weekRange, shiftISO } from "@/lib/format";
 import { useCountUp } from "@/lib/use-count-up";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, num, PHASE_COLORS, R, SPRING, SURFACE, STATUS_META, TX } from "@/lib/tokens";
+import type { Status } from "@/lib/types";
 
 const STALE_DAYS = 90;
 const VIGILANCE_VISIBLE = 4;
+const RECENT_DAYS = 7;
+const RECENT_VISIBLE = 6;
+
+// Health bands come from derive (`portfolioHealth`) — the ONE definition; the
+// dashboard only maps each band to its colour and words, so they can't disagree.
+const HEALTH_VIEW: Record<HealthBand, { color: string; label: string }> = {
+  sain: { color: C.brand, label: "Sous contrôle" },
+  fragile: { color: "#B45309", label: "À surveiller" },
+  critique: { color: C.danger, label: "Sous tension" },
+};
 
 export function Dashboard() {
-  const { allDerived, team, openProject, setFilter, setCalMode, setPhaseFilter } = useProjects();
+  const { allDerived, team, openProject, setFilter, setPhaseFilter } = useProjects();
   const router = useRouter();
 
-  const goProjects = (f: "all" | "en retard" | "à risque" | "à jour" | "terminé") => { setFilter(f); router.push("/projets"); };
-  const goWeek = () => { setCalMode("semaine"); router.push("/calendrier"); };
-  const goPhase = (i: number) => { setPhaseFilter(i); router.push("/projets"); };
+  // Apply a store filter, THEN navigate. The store mirrors its filters into the
+  // URL with history.replaceState, which Next's router turns into a "restore"
+  // action — and a restore dispatched while router.push("/projets") is in flight
+  // discards that navigation (the chips used to leave you on "/?statut=…").
+  // flushSync commits the filter (and runs the URL-sync effect) before the push
+  // starts; the push then carries the freshly mirrored query string, so the
+  // Projets URL is shareable/refresh-proof.
+  const applyAndGo = (apply: () => void, path: string) => {
+    flushSync(apply);
+    router.push(`${path}${window.location.search}`);
+  };
+  const goProjects = (f: "all" | Status) => applyAndGo(() => setFilter(f), "/projets");
+  const goLate = () => goProjects("en retard");
+  const goPhase = (i: number) => applyAndGo(() => setPhaseFilter(i), "/projets");
   const goTeam = () => router.push("/equipe");
 
   const phaseCols = buildKanban(allDerived);
@@ -41,73 +66,46 @@ export function Dashboard() {
   const distTotal = Math.max(1, allDerived.length);
   const empty = allDerived.length === 0;
 
+  // History shares the KPIs' definitions (its last point IS the KPI), so the
+  // "Avancement moyen" delta and the sparklines compare like with like.
   const history = buildHistory(allDerived);
   const lastH = history[history.length - 1];
   const prevH = history[history.length - 2] ?? lastH;
   const avgDelta = lastH.avg - prevH.avg;
 
-  // Portfolio health: composite the director can read at a glance — but the
-  // denominator EXCLUDES terminé so an archive of finished work can't mask
-  // burning active projects (a 90%-done portfolio of mostly-archived files used
-  // to read "Sous contrôle" while every live project was late).
-  // à jour counts fully, à risque half, en retard zero.
-  const countOf = (s: string) => dist.find((d) => d.status === s)?.count ?? 0;
-  const onTrack = countOf("à jour");
-  const atRisk = countOf("à risque");
-  const lateCount = countOf("en retard");
-  const done = countOf("terminé");
-  const activeDenom = onTrack + atRisk + lateCount; // terminé excluded
-  // Empty / all-archived portfolio: no live work to grade → don't fire a red
-  // 0/100 alarm; show a neutral 100 "rien en tension" reading instead.
-  const hasLiveWork = activeDenom > 0;
-  const health = hasLiveWork ? Math.round((100 * (onTrack + atRisk * 0.5)) / activeDenom) : 100;
+  // Portfolio health — terminé excluded from the denominator (derive). An empty
+  // or all-archived portfolio has nothing to grade: neutral, not a red alarm.
+  const health = portfolioHealth(allDerived);
+  const hasLiveWork = !health.empty;
+  const onTrack = health.onTrack;
+  const atRisk = health.atRisk;
+  const lateCount = kpis.late;
+  const activeDenom = health.activeTotal;
+  const healthAnim = useCountUp(health.score);
+  const healthColor = hasLiveWork ? HEALTH_VIEW[health.band].color : C.ink400;
+  const healthLabel = hasLiveWork
+    ? HEALTH_VIEW[health.band].label
+    : (empty ? "Portefeuille vide" : "Rien en tension");
 
-  // Banded gauge: red < 55, amber 55–74, green ≥ 75 — at the SAME thresholds the
-  // label uses, so colour and words can never disagree.
-  const healthAnim = useCountUp(health);
-  const band = !hasLiveWork ? "neutral" : health >= 75 ? "green" : health >= 55 ? "amber" : "red";
-  const healthColor = band === "neutral" ? C.ink400 : band === "green" ? C.brand : band === "amber" ? "#B45309" : C.danger;
-  const healthLabel = !hasLiveWork
-    ? (empty ? "Portefeuille vide" : "Rien en tension")
-    : health >= 75 ? "Sous contrôle" : health >= 55 ? "À surveiller" : "Sous tension";
+  // --- Money & decisions (portfolio EVM roll-up, same figures as the drawer) ---
+  const money = useMemo(() => portfolioBudget(allDerived, team), [allDerived, team]);
+  const marginTotal = money.marginEur;
+  const marginPct = money.marginPct;
+  const overCount = money.overBudgetCount;
 
-  // --- Money & decisions (EVM via buildBudget — was computed but unused) -------
-  // TODO(derive): replace with the portfolio-margin / overBudget-count selectors
-  // the orchestrator is adding to lib/derive.ts (buildBudget is per-project).
-  const budgets = useMemo(() => allDerived.map((p) => ({ p, b: buildBudget(p, team) })), [allDerived, team]);
-  const feesTotal = budgets.reduce((s, x) => s + x.b.feesEur, 0);
-  const marginTotal = budgets.reduce((s, x) => s + x.b.marginEur, 0);
-  const marginPct = feesTotal ? Math.round((marginTotal / feesTotal) * 100) : 0;
-  const overBudget = budgets.filter((x) => x.b.overBudget);
-  const overCount = overBudget.length;
-
-  // --- Team charge / workload signal -----------------------------------------
-  // Uses the corrected, non-double-counting allocation charge (chargeAllocPct)
-  // so the dashboard agrees with the Équipe view instead of showing inflated peaks.
-  const teamLoad = useMemo(() => {
-    const range = { start: weekRange(REFERENCE_DATE).start, end: shiftISO(weekRange(REFERENCE_DATE).start, 27) };
-    return buildTeamLoad(allDerived, team, range, "week");
+  // --- Team charge over the next 4 weeks (demand ÷ capacity, can exceed 100 %) ---
+  const workload = useMemo(() => {
+    const start = weekRange(REFERENCE_DATE).start;
+    return workloadSummary(allDerived, team, { start, end: shiftISO(start, 27) }, 1);
   }, [allDerived, team]);
-  const avgCharge = teamLoad.length ? Math.round(teamLoad.reduce((s, m) => s + m.chargeAllocPct, 0) / teamLoad.length) : 0;
-  const overloaded = teamLoad.filter((m) => m.chargeAllocPct > 100).length;
-  const peak = teamLoad.reduce((acc, m) => (m.chargeAllocPct > acc.chargeAllocPct ? m : acc), teamLoad[0] ?? null);
+  const avgCharge = workload.avgChargePct;
+  const overloaded = workload.overCapacityCount;
+  const peak = workload.members[0] ?? null;
 
-  // --- Rendus livrés (7 derniers jours) — activity, not the upcoming list ------
-  // TODO(derive): replace with the rendus-livrés selector.
-  const deliveredRecent = useMemo(() => {
-    const since = shiftISO(REFERENCE_DATE, -7);
-    const out: { id: number; name: string; taskName: string; end: string }[] = [];
-    for (const p of allDerived) {
-      for (const s of p.subtasksD) {
-        if (s.done && s.end > since && s.end <= REFERENCE_DATE) {
-          out.push({ id: p.id, name: p.name, taskName: s.name, end: s.end });
-        }
-      }
-    }
-    return out.sort((a, b) => b.end.localeCompare(a.end)).slice(0, 6);
-  }, [allDerived]);
+  // --- Rendus livrés (today + the 6 previous days) — activity, not the upcoming list ---
+  const deliveredRecent = useMemo(() => recentRendus(allDerived, RECENT_DAYS).slice(0, RECENT_VISIBLE), [allDerived]);
 
-  // Animated figures (~750ms ramp on load).
+  // Figures render final on first paint (useCountUp is a pass-through).
   const lateAnim = useCountUp(kpis.late);
   const avgAnim = useCountUp(kpis.avg);
   const onTrackAnim = useCountUp(onTrack);
@@ -127,11 +125,6 @@ export function Dashboard() {
   const [showAllAlerts, setShowAllAlerts] = useState(false);
   const visibleAlerts = showAllAlerts ? alerts : alerts.slice(0, VIGILANCE_VISIBLE);
   const overflow = alerts.length - VIGILANCE_VISIBLE;
-
-  function goLate() {
-    setFilter("en retard");
-    router.push("/projets");
-  }
 
   return (
     <>
@@ -265,9 +258,9 @@ export function Dashboard() {
             avgCharge={chargeAnim}
             band={loadBand(avgCharge)}
             overloaded={overloaded}
-            members={teamLoad.length}
+            members={team.length}
             peakName={peak?.member.name ?? "—"}
-            peakPct={peak?.chargeAllocPct ?? 0}
+            peakPct={peak?.chargePct ?? 0}
             onClick={goTeam}
           />
 
@@ -278,8 +271,8 @@ export function Dashboard() {
             ) : null}
             {deliveredRecent.map((d, i) => (
               <motion.div
-                key={`${d.id}-${d.taskName}-${i}`}
-                {...rowProps(() => openProject(d.id))}
+                key={`${d.projectId}-${d.taskName}-${d.date}-${i}`}
+                {...rowProps(() => openProject(d.projectId))}
                 className="row-hover row-focus"
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -289,7 +282,7 @@ export function Dashboard() {
                 <span style={{ display: "flex", color: C.brand, flexShrink: 0 }}><CheckIcon size={15} /></span>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ ...TX.bodyStrong, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.taskName}</div>
-                  <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</div>
+                  <div style={{ ...TX.caption, color: C.ink500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.projectName}</div>
                 </div>
               </motion.div>
             ))}

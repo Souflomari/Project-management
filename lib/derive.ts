@@ -1,22 +1,32 @@
 // View-model derivation: turns domain data into ready-to-render values.
 // Progress, the next deliverable, planning bars, calendar events and team
 // workload are all derived from each project's tasks.
+//
+// Conventions shared by every derivation below:
+//   • dates are ISO calendar dates; a task's `end` is INCLUSIVE (its last working
+//     day). Anything drawn on a timeline uses `end + 1 day` as the exclusive edge.
+//   • effort is `effortDays(plannedDays)` — whole working days, min 1.
+//   • a task with an unparseable start is "unscheduled": it still counts towards
+//     effort/progress/budget but is left out of anything placed on a calendar.
+//   • calendar arithmetic is done in whole days (see format.ts), never in ms.
 
 import {
+  daysBetween,
   daysFromToday,
   dueLabel,
+  effortDays,
+  epochDay,
   fmtBudget,
   fmtFull,
   fmtShort,
-  isWeekday,
+  fromEpochDay,
   MONS,
-  MONS_LONG,
   overlapWorkingDays,
   REFERENCE_DATE,
-  REFERENCE_TS,
+  shiftISO,
   taskEnd,
   toDate,
-  toISO,
+  toISODate,
   weekdaysInRange,
   weeksInRange,
   workingDaysBetween,
@@ -26,7 +36,14 @@ import { PHASES, PHASES_FULL, STATUSES, type Project, type Status, type Subtask,
 import { dueColor, PHASE_COLORS, ringColor, STATUS_META } from "./tokens";
 
 export interface DerivedSubtask extends Subtask {
+  /** Normalised ISO start ("" when the stored value isn't a valid date). */
+  start: string;
+  /** Normalised effort — `effortDays(plannedDays)`: whole days, min 1. */
+  plannedDays: number;
+  /** Inclusive ISO end date ("" when unscheduled). */
   end: string;
+  /** False when the task has no valid start date (kept off calendars/timelines). */
+  scheduled: boolean;
   assignee: TeamMember;
   color: string;
   /** Total float in working days (0 = on the critical path). */
@@ -36,6 +53,9 @@ export interface DerivedSubtask extends Subtask {
 }
 
 export interface DerivedProject extends Project {
+  /** Normalised ISO start / deadline ("" when the stored value is invalid). */
+  start: string;
+  deadline: string;
   phaseLabel: string;
   phaseFull: string;
   statusLabel: string;
@@ -50,7 +70,7 @@ export interface DerivedProject extends Project {
   totalDays: number;
   doneDays: number;
   subtasksD: DerivedSubtask[];
-  /** Earliest incomplete task, or null. */
+  /** Earliest-ending incomplete *scheduled* task, or null. */
   nextTask: DerivedSubtask | null;
   renduLabel: string;
   renduFmt: string;
@@ -68,16 +88,24 @@ const FALLBACK_MEMBER: TeamMember = {
   id: -1, name: "—", initials: "—", color: "#A8A29E", role: "", costPerDay: 0,
 };
 
+/** Share of `part` in `total` as a rounded percentage — the ONE formula used by
+ *  project progress and its history, so the two can never round differently. */
+function percentOf(part: number, total: number): number {
+  return total ? Math.round((part * 100) / total) : 0;
+}
+
 // ------------------------------------------------------------------ CPM
 //
 // Critical-path method over the Finish-to-Start `dependsOn` graph. Durations are
 // the tasks' planned working days; the pass is purely topological (it ignores the
 // calendar `start`, so float is the pure schedule slack the network allows).
 //
-// Cycle-guarded: the seed is a clean chain, but user edits can introduce cycles.
-// We compute a topological order with Kahn's algorithm and only run the passes on
-// the acyclic subset; any task caught in / fed by a cycle is treated as having no
-// usable float (float 0, not on the critical path) rather than looping forever.
+// Defensive: user edits (or bad rows) can introduce cycles, self-dependencies,
+// dangling ids, duplicate ids or a missing `dependsOn`. Dangling/self edges are
+// dropped; a topological order is computed with Kahn's algorithm and the passes
+// only run on the acyclic subset — any task caught in / fed by a cycle is treated
+// as having no usable float (float 0, not on the critical path). Linear time; no
+// recursion and no argument spreading, so it can't blow the stack either.
 
 export interface CpmResult {
   /** subtaskId → total float in working days. */
@@ -89,59 +117,62 @@ export interface CpmResult {
 export function computeCpm(subtasks: Subtask[]): CpmResult {
   const float = new Map<number, number>();
   const critical = new Map<number, boolean>();
-  const ids = subtasks.map((s) => s.id);
+  const byId = new Map<number, Subtask>();
+  for (const s of subtasks) if (!byId.has(s.id)) byId.set(s.id, s);
+  const ids = Array.from(byId.keys());
   for (const id of ids) { float.set(id, 0); critical.set(id, false); }
-  if (subtasks.length === 0) return { float, critical };
+  if (ids.length === 0) return { float, critical };
 
-  const byId = new Map(subtasks.map((s) => [s.id, s]));
-  const dur = (id: number) => Math.max(1, Math.floor(byId.get(id)?.plannedDays ?? 1));
-  // Keep only dependency edges that point at real sibling tasks.
-  const preds = new Map<number, number[]>(
-    subtasks.map((s) => [s.id, s.dependsOn.filter((d) => byId.has(d) && d !== s.id)]),
-  );
+  const dur = (id: number) => effortDays(byId.get(id)!.plannedDays);
+  // Keep only (deduplicated) dependency edges that point at real sibling tasks.
+  const preds = new Map<number, number[]>();
+  for (const id of ids) {
+    const deps = byId.get(id)!.dependsOn;
+    const list = Array.isArray(deps) ? deps : [];
+    preds.set(id, Array.from(new Set(list.filter((d) => d !== id && byId.has(d)))));
+  }
   const succs = new Map<number, number[]>(ids.map((id) => [id, []]));
   for (const id of ids) for (const p of preds.get(id)!) succs.get(p)!.push(id);
 
-  // Kahn topological sort — nodes left out of `order` are part of a cycle.
+  // Kahn topological sort — nodes left out of `order` are in / behind a cycle.
   const indeg = new Map<number, number>(ids.map((id) => [id, preds.get(id)!.length]));
-  const queue = ids.filter((id) => indeg.get(id) === 0);
-  const order: number[] = [];
-  while (queue.length) {
-    const id = queue.shift()!;
-    order.push(id);
-    for (const s of succs.get(id)!) {
-      indeg.set(s, indeg.get(s)! - 1);
-      if (indeg.get(s) === 0) queue.push(s);
+  const order: number[] = ids.filter((id) => indeg.get(id) === 0);
+  for (let head = 0; head < order.length; head++) {
+    for (const s of succs.get(order[head])!) {
+      const left = indeg.get(s)! - 1;
+      indeg.set(s, left);
+      if (left === 0) order.push(s);
     }
   }
-  const acyclic = new Set(order);
   if (order.length === 0) return { float, critical }; // fully cyclic — bail safely
 
-  // Forward pass: earliest start / finish (offsets in working days).
+  // Forward pass: earliest start / finish (offsets in working days). Every
+  // predecessor of an ordered node is itself ordered (it reached in-degree 0).
   const es = new Map<number, number>();
   const ef = new Map<number, number>();
+  let projectFinish = 0;
   for (const id of order) {
-    const start = Math.max(0, ...preds.get(id)!.filter((p) => acyclic.has(p)).map((p) => ef.get(p) ?? 0));
+    let start = 0;
+    for (const p of preds.get(id)!) start = Math.max(start, ef.get(p) ?? 0);
     es.set(id, start);
     ef.set(id, start + dur(id));
+    projectFinish = Math.max(projectFinish, start + dur(id));
   }
-  const projectFinish = Math.max(0, ...order.map((id) => ef.get(id)!));
 
-  // Backward pass: latest finish / start.
-  const lf = new Map<number, number>();
+  // Backward pass: latest finish / start over acyclic successors only.
   const ls = new Map<number, number>();
   for (let i = order.length - 1; i >= 0; i--) {
     const id = order[i];
-    const downstream = succs.get(id)!.filter((s) => acyclic.has(s));
-    const latestFinish = downstream.length
-      ? Math.min(...downstream.map((s) => ls.get(s) ?? projectFinish))
-      : projectFinish;
-    lf.set(id, latestFinish);
+    let latestFinish = projectFinish;
+    for (const s of succs.get(id)!) {
+      const sl = ls.get(s);
+      if (sl !== undefined) latestFinish = Math.min(latestFinish, sl);
+    }
     ls.set(id, latestFinish - dur(id));
   }
 
   for (const id of order) {
-    const fl = Math.max(0, (ls.get(id) ?? 0) - (es.get(id) ?? 0));
+    const fl = Math.max(0, ls.get(id)! - es.get(id)!);
     float.set(id, fl);
     critical.set(id, fl === 0);
   }
@@ -156,9 +187,15 @@ export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
   const cpm = computeCpm(p.subtasks);
   const subtasksD: DerivedSubtask[] = p.subtasks.map((s) => {
     const assignee = findMember(s.assigneeId);
+    const start = toISODate(s.start) ?? "";
+    const plannedDays = effortDays(s.plannedDays);
     return {
       ...s,
-      end: taskEnd(s.start, s.plannedDays),
+      start,
+      plannedDays,
+      dependsOn: Array.isArray(s.dependsOn) ? s.dependsOn : [],
+      end: start ? taskEnd(start, plannedDays) : "",
+      scheduled: start !== "",
       assignee,
       color: s.done ? "#A8A29E" : assignee.color,
       float: cpm.float.get(s.id) ?? 0,
@@ -168,12 +205,13 @@ export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
 
   const totalDays = subtasksD.reduce((sum, s) => sum + s.plannedDays, 0);
   const doneDays = subtasksD.filter((s) => s.done).reduce((sum, s) => sum + s.plannedDays, 0);
-  const progress = totalDays ? Math.round((doneDays / totalDays) * 100) : 0;
+  const progress = percentOf(doneDays, totalDays);
 
-  const incomplete = subtasksD
-    .filter((s) => !s.done)
-    .sort((a, b) => a.end.localeCompare(b.end));
-  const nextTask = incomplete[0] ?? null;
+  const incomplete = subtasksD.filter((s) => !s.done);
+  const nextTask =
+    incomplete
+      .filter((s) => s.scheduled)
+      .sort((a, b) => a.end.localeCompare(b.end) || a.start.localeCompare(b.start))[0] ?? null;
 
   const responsable = findMember(p.responsableId);
   const memberIds = Array.from(new Set([p.responsableId, ...p.subtasks.map((s) => s.assigneeId)]));
@@ -181,9 +219,12 @@ export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
 
   const renduDays = nextTask ? daysFromToday(nextTask.end) : null;
   const rdate = nextTask ? toDate(nextTask.end) : null;
+  const deadline = toISODate(p.deadline) ?? "";
 
   return {
     ...p,
+    start: toISODate(p.start) ?? "",
+    deadline,
     phaseLabel: PHASES[p.phaseIndex],
     phaseFull: PHASES_FULL[p.phaseIndex],
     statusLabel: meta.label,
@@ -198,19 +239,25 @@ export function deriveProject(p: Project, team: TeamMember[]): DerivedProject {
     doneDays,
     subtasksD,
     nextTask,
-    renduLabel: nextTask ? nextTask.name : p.subtasks.length ? "Tous les rendus livrés" : "Aucune tâche planifiée",
+    renduLabel: nextTask
+      ? nextTask.name
+      : incomplete.length
+        ? "Tâches à planifier"
+        : p.subtasks.length ? "Tous les rendus livrés" : "Aucune tâche planifiée",
     renduFmt: nextTask ? fmtShort(nextTask.end) : "—",
     renduFull: nextTask ? fmtFull(nextTask.end) : "—",
     renduDay: rdate ? rdate.getDate() : null,
     renduMon: rdate ? MONS[rdate.getMonth()] : "",
     renduDays,
-    renduDaysLabel: nextTask ? dueLabel(renduDays as number) : p.subtasks.length ? "Livré" : "—",
+    renduDaysLabel: nextTask
+      ? dueLabel(renduDays as number)
+      : incomplete.length ? "Non planifié" : p.subtasks.length ? "Livré" : "—",
     renduDueColor: nextTask ? dueColor(renduDays as number, false) : "#A8A29E",
-    deadlineFull: fmtFull(p.deadline),
+    deadlineFull: fmtFull(deadline),
     // Compact "Dans X j" everywhere (was the prose dueLabelFull "Dans X jours"),
     // so the countdown format is identical across Liste / Kanban / détail — an
     // audit flagged the j/jours split as a consistency tell.
-    deadlineDaysLabel: dueLabel(daysFromToday(p.deadline)),
+    deadlineDaysLabel: dueLabel(daysFromToday(deadline)),
   };
 }
 
@@ -227,107 +274,145 @@ export function upcomingRendus(all: DerivedProject[], limit = 7): DerivedProject
     .slice(0, limit);
 }
 
-export function vigilanceAlerts(all: DerivedProject[], limit = 6): DerivedProject[] {
-  return all
-    .filter((p) => p.status === "en retard" || p.status === "à risque")
-    .sort((a, b) => (a.status === "en retard" ? 0 : 1) - (b.status === "en retard" ? 0 : 1))
-    .slice(0, limit);
-}
-
 export interface Kpis {
+  /** Open (non-terminé) projects. */
   active: number;
+  /** Projects with an undelivered task due within the next 7 days (today incl.). */
   rendus: number;
+  /** Projects in status "en retard". */
   late: number;
+  /** Mean task-completion progress (by planned days) over all projects. */
   avg: number;
   budgetFmt: string;
   total: number;
+}
+
+// ---- KPI definitions "as of" a date — ONE basis for the KPIs and their history ----
+//
+// Tasks carry no completion timestamp, so history is reconstructed from the
+// schedule: a done task is taken as delivered on its end date, or today if it
+// was finished ahead of schedule. At D = today every definition below reduces
+// exactly to the live KPI, so the last history point always equals the KPI and
+// week-over-week deltas compare like with like.
+
+/** Date a task was delivered (done tasks only; null when still open). */
+function deliveredAt(s: DerivedSubtask): string | null {
+  if (!s.done) return null;
+  return s.end && s.end < REFERENCE_DATE ? s.end : REFERENCE_DATE;
+}
+
+function doneBy(s: DerivedSubtask, d: string): boolean {
+  const at = deliveredAt(s);
+  return at !== null && at <= d;
+}
+
+/** Task-completion progress as of `d` (equals `p.progress` at today). */
+function progressAsOf(p: DerivedProject, d: string): number {
+  let done = 0;
+  for (const s of p.subtasksD) if (doneBy(s, d)) done += s.plannedDays;
+  return percentOf(done, p.totalDays);
+}
+
+/** Open as of `d`: not archived yet. A "terminé" project is taken as closed
+ *  from its last delivery (it counts as open before that). */
+function openAsOf(p: DerivedProject, d: string): boolean {
+  if (p.status !== "terminé") return true;
+  let closed = "";
+  for (const s of p.subtasksD) {
+    const at = deliveredAt(s);
+    if (at && at > closed) closed = at;
+  }
+  return closed !== "" && d < closed;
+}
+
+/** "En retard" as of `d`: the project is declared late today AND the schedule
+ *  already showed it slipping at `d` (an open task past its end, or the deadline
+ *  passed). A late status with no schedule evidence counts from today only. */
+function lateAsOf(p: DerivedProject, d: string): boolean {
+  if (p.status !== "en retard") return false;
+  let since = REFERENCE_DATE;
+  for (const s of p.subtasksD) {
+    if (!s.done && s.scheduled && s.end < REFERENCE_DATE) {
+      const from = shiftISO(s.end, 1);
+      if (from < since) since = from;
+    }
+  }
+  if (p.deadline && p.deadline < REFERENCE_DATE) {
+    const from = shiftISO(p.deadline, 1);
+    if (from < since) since = from;
+  }
+  return since <= d;
+}
+
+/** A deliverable due within 7 days of `d` (d … d+6) and not delivered by `d`. */
+function renduDueAsOf(p: DerivedProject, d: string): boolean {
+  const horizon = shiftISO(d, 6);
+  return p.subtasksD.some((s) => s.scheduled && s.end >= d && s.end <= horizon && !doneBy(s, d));
+}
+
+interface Snapshot {
+  avg: number;
+  rendus: number;
+  late: number;
+  active: number;
+}
+
+function snapshotAsOf(all: DerivedProject[], d: string): Snapshot {
+  let sum = 0;
+  let rendus = 0;
+  let late = 0;
+  let active = 0;
+  for (const p of all) {
+    sum += progressAsOf(p, d);
+    if (renduDueAsOf(p, d)) rendus++;
+    if (lateAsOf(p, d)) late++;
+    if (openAsOf(p, d)) active++;
+  }
+  return { avg: all.length ? Math.round(sum / all.length) : 0, rendus, late, active };
 }
 
 // ---- portfolio history (schedule-derived, deterministic — for trends/deltas) ----
 
 export interface HistoryPoint {
   date: string;
-  avg: number; // mean schedule-progress across the portfolio
-  rendus: number; // projects with a deliverable due within 7 days
-  /** Projects whose final deadline had elapsed by this date but were unfinished
-   *  (schedule-derived late count) — lets KPIs show a late-count delta. */
+  /** Mean task-completion progress (same definition as `Kpis.avg`). */
+  avg: number;
+  /** Projects with a deliverable due within 7 days (same as `Kpis.rendus`). */
+  rendus: number;
+  /** Late projects as of this date (same definition as `Kpis.late`). */
   late: number;
-  /** Projects already started but not yet finished as of this date (active count). */
+  /** Open projects as of this date (same definition as `Kpis.active`). */
   active: number;
 }
 
-const DAY = 86_400_000;
-
-/** A project's progress "as of" date D, derived purely from its task schedule:
- *  task-days whose planned window has elapsed by D ÷ total task-days. */
-function progressAsOf(p: DerivedProject, dISO: string, dTs: number): number {
-  let total = 0;
-  let done = 0;
-  for (const s of p.subtasksD) {
-    total += s.plannedDays;
-    if (toDate(s.start).getTime() > dTs) continue;
-    const upto = s.end <= dISO ? s.end : dISO;
-    done += Math.min(s.plannedDays, workingDaysBetween(s.start, upto));
-  }
-  if (total === 0) return p.progress;
-  return Math.min(100, Math.round((100 * done) / total));
-}
-
 /** Weekly portfolio metrics over the trailing `points` weeks, ending today.
- *  Derived from the schedule so the curve is real and reproducible. */
+ *  The last point equals `computeKpis` exactly. */
 export function buildHistory(all: DerivedProject[], points = 8, stepDays = 7): HistoryPoint[] {
   const out: HistoryPoint[] = [];
   for (let i = points - 1; i >= 0; i--) {
-    const dTs = REFERENCE_TS - i * stepDays * DAY;
-    const dISO = toISO(new Date(dTs));
-    const d7ISO = toISO(new Date(dTs + 7 * DAY));
-    let sum = 0;
-    let rendus = 0;
-    let late = 0;
-    let active = 0;
-    for (const p of all) {
-      const prog = progressAsOf(p, dISO, dTs);
-      sum += prog;
-      if (p.subtasksD.some((s) => s.end > dISO && s.end <= d7ISO)) rendus++;
-      // "as of" status, schedule-derived: started but not 100% done = active;
-      // deadline elapsed yet incomplete = late.
-      const started = p.start <= dISO;
-      const finished = prog >= 100;
-      if (started && !finished) active++;
-      if (p.deadline < dISO && !finished) late++;
-    }
-    out.push({
-      date: dISO,
-      avg: all.length ? Math.round(sum / all.length) : 0,
-      rendus,
-      late,
-      active,
-    });
+    const date = shiftISO(REFERENCE_DATE, -i * stepDays);
+    out.push({ date, ...snapshotAsOf(all, date) });
   }
   return out;
 }
 
 export function computeKpis(all: DerivedProject[]): Kpis {
-  const active = all.filter((p) => p.status !== "terminé").length;
-  const rendus = all.filter(
-    (p) => p.renduDays !== null && p.renduDays >= 0 && p.renduDays <= 6,
-  ).length;
-  const late = all.filter((p) => p.status === "en retard").length;
-  const avg = all.length ? Math.round(all.reduce((s, p) => s + p.progress, 0) / all.length) : 0;
+  const now = snapshotAsOf(all, REFERENCE_DATE);
   const budgetFmt = fmtBudget(all.reduce((s, p) => s + p.budget, 0));
-  return { active, rendus, late, avg, budgetFmt, total: all.length };
+  return { active: now.active, rendus: now.rendus, late: now.late, avg: now.avg, budgetFmt, total: all.length };
 }
 
 // ---- portfolio health (banded; excludes `terminé` from the denominator) ----
 
-export type HealthBand = "critique" | "fragile" | "sain" | "excellent";
+/** sain ≥ 75 · fragile 55–74 · critique < 55. */
+export type HealthBand = "critique" | "fragile" | "sain";
 
 export interface PortfolioHealth {
   /** 0..100 health score over ACTIVE (non-terminé) projects only. */
   score: number;
   /** Banded interpretation of the score. */
   band: HealthBand;
-  /** Active (non-terminé) projects — the denominator. */
+  /** Active (non-terminé) projects — the denominator (= `Kpis.active`). */
   activeTotal: number;
   /** Counts of active projects per status. */
   onTrack: number;
@@ -339,7 +424,9 @@ export interface PortfolioHealth {
 
 /** Banded portfolio health. Archived (`terminé`) projects are EXCLUDED from the
  *  denominator so a pile of finished work can't mask burning active projects.
- *  Score weights: à jour = 1, à risque = 0.5, en retard = 0. */
+ *  Score weights: à jour = 1, à risque = 0.5, en retard = 0. The bands are
+ *  deliberately demanding — a portfolio where most live projects are merely "à
+ *  risque" must not read as healthy. */
 export function portfolioHealth(all: DerivedProject[]): PortfolioHealth {
   const activeProjects = all.filter((p) => p.status !== "terminé");
   const activeTotal = activeProjects.length;
@@ -349,8 +436,7 @@ export function portfolioHealth(all: DerivedProject[]): PortfolioHealth {
   const score = activeTotal
     ? Math.round((100 * (onTrack + atRisk * 0.5)) / activeTotal)
     : 100;
-  const band: HealthBand =
-    score >= 85 ? "excellent" : score >= 60 ? "sain" : score >= 35 ? "fragile" : "critique";
+  const band: HealthBand = score >= 75 ? "sain" : score >= 55 ? "fragile" : "critique";
   return {
     score,
     band,
@@ -364,10 +450,6 @@ export function portfolioHealth(all: DerivedProject[]): PortfolioHealth {
 
 // ------------------------------------------------------------------- gantt
 
-const DAY_MS = 86_400_000;
-const MONTH_START = (ts: number) => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); };
-const NEXT_MONTH_START = (ts: number) => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime(); };
-
 export interface GanttMonth {
   label: string;
   left: number;
@@ -377,12 +459,15 @@ export interface GanttMonth {
 export interface GanttBar {
   id: number;
   name: string;
+  /** % of the timeline from the window start to the task's first day. */
   left: number;
+  /** % of the timeline covered by [start, end] — end INCLUSIVE, so a Mon–Fri
+   *  task spans 5 days and a 1-day task exactly one day. */
   width: number;
   color: string;
   done: boolean;
   assigneeInitials: string;
-  /** Whether the bar falls inside the visible timeline window. */
+  /** Whether the bar falls inside the visible timeline window (false when unscheduled). */
   visible: boolean;
   /** Predecessor task ids (Finish-to-Start), for dependency arrows. */
   dependsOn: number[];
@@ -394,7 +479,7 @@ export interface GanttBar {
   float: number;
   /** On the critical (zero-float) path — rendered distinctly. */
   onCriticalPath: boolean;
-  /** Width (% of timeline) of the float ghost trailing the bar, 0 when none. */
+  /** Width (% of timeline) of the float ghost starting at `left + width`, 0 when none. */
   floatWidth: number;
 }
 
@@ -413,6 +498,7 @@ export interface GanttRow {
   phaseLabel: string;
   progress: number;
   taskCount: number;
+  /** Project bar over [start, deadline] (deadline inclusive); 0/0 when either is invalid. */
   left: number;
   width: number;
   color: string;
@@ -425,8 +511,10 @@ export interface GanttRow {
 export interface GanttData {
   months: GanttMonth[];
   rows: GanttRow[];
+  /** % position of the START of today's day column. */
   todayLeft: number;
-  /** Calendar-day span of the (data-driven) window — lets the view map px↔days. */
+  /** Whole calendar days in the window — `left`/`width` are fractions of it, so
+   *  1 day = 100 / spanDays %. */
   spanDays: number;
   /** ISO date of the window start (first of a month) — for week-grid alignment. */
   windowStart: string;
@@ -434,37 +522,57 @@ export interface GanttData {
 
 export function buildGantt(filtered: DerivedProject[]): GanttData {
   // Window spans the actual portfolio (+ today), snapped to whole months, with a
-  // little padding so bars don't kiss the edges — instead of a fixed 2026 frame
-  // that clamped every earlier project to January.
-  let minTs = REFERENCE_TS;
-  let maxTs = REFERENCE_TS;
+  // little padding so bars don't kiss the edges. Invalid dates are skipped so a
+  // single bad row can never poison the window.
+  const today = epochDay(REFERENCE_DATE);
+  let minDay = today;
+  let maxDay = today;
+  const include = (iso: string) => {
+    const d = epochDay(iso);
+    if (Number.isNaN(d)) return;
+    if (d < minDay) minDay = d;
+    if (d > maxDay) maxDay = d;
+  };
   for (const p of filtered) {
-    minTs = Math.min(minTs, toDate(p.start).getTime());
-    maxTs = Math.max(maxTs, toDate(p.deadline).getTime());
+    include(p.start);
+    include(p.deadline);
     for (const s of p.subtasksD) {
-      minTs = Math.min(minTs, toDate(s.start).getTime());
-      maxTs = Math.max(maxTs, toDate(s.end).getTime());
+      if (!s.scheduled) continue;
+      include(s.start);
+      include(s.end);
     }
   }
-  const winStart = MONTH_START(minTs);
-  const winEnd = NEXT_MONTH_START(maxTs);
-  const span = Math.max(DAY_MS, winEnd - winStart);
-  const pctOf = (ts: number) => ((ts - winStart) / span) * 100;
+  // Month arithmetic in UTC day numbers (Date.UTC normalises month overflow).
+  const monthStart = (y: number, m: number) => Date.UTC(y, m, 1) / 86_400_000;
+  const [y0, m0] = fromEpochDay(minDay).split("-").map(Number);
+  const [y1, m1] = fromEpochDay(maxDay).split("-").map(Number);
+  const winStart = monthStart(y0, m0 - 1);
+  const winEnd = monthStart(y1, m1); // first day of the month after the last date (exclusive)
+  const span = Math.max(1, winEnd - winStart);
+  const pctOf = (day: number) => ((day - winStart) / span) * 100;
+
+  /** Geometry of the inclusive day range [startIso, endIso]: the bar runs from
+   *  the start of its first day to the END of its last day (exclusive edge =
+   *  end + 1), so a Mon–Fri task covers 5 days and a 1-day task one full day. */
   const geom = (startIso: string, endIso: string) => {
-    const s = Math.max(toDate(startIso).getTime(), winStart);
-    const e = Math.min(toDate(endIso).getTime(), winEnd);
-    if (e < winStart || s > winEnd) return { left: 0, width: 0, visible: false };
-    return { left: pctOf(s), width: Math.max(0.6, ((e - s) / span) * 100), visible: true };
+    const a = epochDay(startIso);
+    const b = epochDay(endIso);
+    if (Number.isNaN(a) || Number.isNaN(b)) return { left: 0, width: 0, visible: false };
+    const s = Math.max(a, winStart);
+    const e = Math.min(Math.max(b, a) + 1, winEnd);
+    if (e <= s) return { left: 0, width: 0, visible: false };
+    return { left: pctOf(s), width: ((e - s) / span) * 100, visible: true };
   };
 
   const months: GanttMonth[] = [];
-  for (let cur = winStart; cur < winEnd; cur = NEXT_MONTH_START(cur)) {
-    const me = NEXT_MONTH_START(cur);
-    const mo = new Date(cur).getMonth();
+  for (let i = 0; monthStart(y0, m0 - 1 + i) < winEnd; i++) {
+    const cur = monthStart(y0, m0 - 1 + i);
+    const next = monthStart(y0, m0 + i);
+    const [yr, mo] = fromEpochDay(cur).split("-").map(Number);
     months.push({
-      label: MONS[mo] + (mo === 0 ? ` '${String(new Date(cur).getFullYear()).slice(2)}` : ""),
+      label: MONS[mo - 1] + (mo === 1 ? ` '${String(yr).slice(2)}` : ""),
       left: pctOf(cur),
-      width: ((me - cur) / span) * 100,
+      width: ((next - cur) / span) * 100,
     });
   }
 
@@ -492,11 +600,11 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
       start: p.start,
       deadline: p.deadline,
       subtasks: p.subtasksD.map((s) => {
-        const sg = geom(s.start, s.end);
-        // Float ghost: extend the bar by `float` working days past its end so the
-        // view can render the slack as a faint trailing extension.
-        const floatEnd = s.float > 0 ? taskEnd(s.end, s.float + 1) : s.end;
-        const fg = s.float > 0 ? geom(s.end, floatEnd) : { width: 0 };
+        const sg = s.scheduled ? geom(s.start, s.end) : { left: 0, width: 0, visible: false };
+        // Float ghost: the `float` working days that follow the bar, drawn from
+        // the bar's exclusive edge (end + 1) to the last day of slack, inclusive.
+        const floatEnd = s.float > 0 && s.scheduled ? taskEnd(s.end, s.float + 1) : "";
+        const fg = floatEnd ? geom(shiftISO(s.end, 1), floatEnd) : { width: 0 };
         return {
           id: s.id,
           name: s.name,
@@ -518,14 +626,14 @@ export function buildGantt(filtered: DerivedProject[]): GanttData {
     };
   });
 
-  return { months, rows, todayLeft: pctOf(REFERENCE_TS), spanDays: Math.round(span / DAY_MS), windowStart: toISO(new Date(winStart)) };
+  return { months, rows, todayLeft: pctOf(today), spanDays: span, windowStart: fromEpochDay(winStart) };
 }
 
 // --------------------------------------------------------------- budget / EVM
 //
 // Earned-value control derived from the same effort-in-days model:
-//   • plannedCost  = Σ task.plannedDays × assignee.costPerDay   (budget at completion)
-//   • earnedValue  = Σ done task.plannedDays × rate             (BCWP / valeur acquise)
+//   • plannedCost  = Σ effortDays(task) × assignee.costPerDay   (budget at completion)
+//   • earnedValue  = Σ done effortDays × rate                   (BCWP / valeur acquise)
 //   • the project's `budget` (honoraires) is in k€ — multiply by 1000 to compare.
 // No calendar/Date.now() — purely schedule-driven, consistent with the rest of derive.
 
@@ -553,7 +661,7 @@ export function buildBudget(p: Project, team: TeamMember[]): ProjectBudget {
   let plannedCostEur = 0;
   let earnedValueEur = 0;
   for (const s of p.subtasks) {
-    const cost = Math.max(1, Math.floor(s.plannedDays)) * rateOf(s.assigneeId);
+    const cost = effortDays(s.plannedDays) * rateOf(s.assigneeId);
     plannedCostEur += cost;
     if (s.done) earnedValueEur += cost;
   }
@@ -623,8 +731,8 @@ export function portfolioBudget(all: Project[], team: TeamMember[]): PortfolioBu
 }
 
 /** Projects recently delivered (a deliverable completed) within the trailing
- *  `windowDays` (default 7) of the reference date — recent-activity feed.
- *  Schedule-derived: a done task whose end date falls in [today−window, today]. */
+ *  `windowDays` days, today included — default 7 = today and the 6 days before.
+ *  Schedule-derived: a done task whose end date falls in that window. */
 export interface RecentRendu {
   projectId: number;
   projectName: string;
@@ -637,19 +745,18 @@ export interface RecentRendu {
 }
 
 export function recentRendus(all: DerivedProject[], windowDays = 7): RecentRendu[] {
-  const fromTs = REFERENCE_TS - windowDays * DAY;
+  const from = shiftISO(REFERENCE_DATE, -(Math.max(1, windowDays) - 1));
   const out: RecentRendu[] = [];
   for (const p of all) {
     for (const s of p.subtasksD) {
-      if (!s.done) continue;
-      const ts = toDate(s.end).getTime();
-      if (ts > REFERENCE_TS || ts < fromTs) continue;
+      if (!s.done || !s.scheduled) continue;
+      if (s.end > REFERENCE_DATE || s.end < from) continue;
       out.push({
         projectId: p.id,
         projectName: p.name,
         taskName: s.name,
         date: s.end,
-        daysAgo: Math.round((REFERENCE_TS - ts) / DAY),
+        daysAgo: daysBetween(s.end, REFERENCE_DATE),
         assigneeInitials: s.assignee.initials,
         assigneeColor: s.assignee.color,
       });
@@ -659,7 +766,7 @@ export function recentRendus(all: DerivedProject[], windowDays = 7): RecentRendu
 }
 
 /** Top over-capacity members over a range — workload summary tile.
- *  Uses the corrected allocation (`chargeAllocPct`), not the double-counting sum. */
+ *  Uses the demand-based charge (`chargeAllocPct`), which can exceed 100 %. */
 export interface WorkloadSummaryMember {
   member: TeamMember;
   chargePct: number;
@@ -668,9 +775,10 @@ export interface WorkloadSummaryMember {
 }
 
 export interface WorkloadSummary {
+  /** Members ranked by charge (highest first), truncated to `limit`. */
   members: WorkloadSummaryMember[];
   overCapacityCount: number;
-  /** Mean charge across all members (corrected allocation), percentage. */
+  /** Mean charge across ALL members, percentage. */
   avgChargePct: number;
 }
 
@@ -717,10 +825,12 @@ export interface TaskEvent {
   done: boolean;
 }
 
+/** One event per SCHEDULED task (unscheduled tasks have no date to sit on). */
 export function buildTaskEvents(projects: DerivedProject[]): TaskEvent[] {
   const events: TaskEvent[] = [];
   for (const p of projects) {
     for (const s of p.subtasksD) {
+      if (!s.scheduled) continue;
       events.push({
         projectId: p.id,
         subtaskId: s.id,
@@ -739,44 +849,6 @@ export function buildTaskEvents(projects: DerivedProject[]): TaskEvent[] {
     }
   }
   return events;
-}
-
-export interface CalCell {
-  day: number | null;
-  iso: string | null;
-  isToday: boolean;
-  events: TaskEvent[];
-}
-
-const [REF_Y, REF_M, REF_D] = REFERENCE_DATE.split("-").map(Number);
-
-export function buildMonthGrid(year: number, month: number, events: TaskEvent[]): CalCell[] {
-  const first = new Date(year, month, 1);
-  const startW = (first.getDay() + 6) % 7;
-  const dim = new Date(year, month + 1, 0).getDate();
-  const byDate = groupByDate(events);
-  const cells: CalCell[] = [];
-  for (let i = 0; i < startW; i++) cells.push({ day: null, iso: null, isToday: false, events: [] });
-  for (let d = 1; d <= dim; d++) {
-    const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    cells.push({
-      day: d,
-      iso,
-      isToday: year === REF_Y && month === REF_M - 1 && d === REF_D,
-      events: byDate.get(iso) ?? [],
-    });
-  }
-  return cells;
-}
-
-function groupByDate(events: TaskEvent[]): Map<string, TaskEvent[]> {
-  const map = new Map<string, TaskEvent[]>();
-  for (const e of events) {
-    const arr = map.get(e.date) ?? [];
-    arr.push(e);
-    map.set(e.date, arr);
-  }
-  return map;
 }
 
 export function eventsInRange(events: TaskEvent[], range: DateRange): TaskEvent[] {
@@ -833,8 +905,8 @@ export function buildTaskSpans(projects: DerivedProject[], range: DateRange): Ta
   const out: TaskSpan[] = [];
   for (const p of projects) {
     for (const s of p.subtasksD) {
-      // Skip tasks whose work window doesn't intersect the visible range.
-      if (s.end < range.start || s.start > range.end) continue;
+      // Skip unscheduled tasks and those whose window misses the visible range.
+      if (!s.scheduled || s.end < range.start || s.start > range.end) continue;
       const visStart = s.start < range.start ? range.start : s.start;
       const visEnd = s.end > range.end ? range.end : s.end;
       const segments: TaskSpanSegment[] = weeksInRange({ start: visStart, end: visEnd }).map(
@@ -885,11 +957,23 @@ export function buildKanban(filtered: DerivedProject[]): KanbanColumn[] {
 }
 
 // -------------------------------------------------------------------- team
+//
+// Workload is DEMAND over CAPACITY:
+//   • demand   — each task needs `effortDays` spread evenly over its working days
+//                (rate = effort ÷ working days of [start, end]; 1 day/day for a
+//                task whose end is derived from its effort). A member's demand in
+//                a window is the sum over their tasks of rate × working days of
+//                the task inside the window. Work already delivered (a done task)
+//                stops loading the calendar after today.
+//   • capacity — working days in the window × FTE (weeklyCapacityDays ÷ 5).
+//   • charge % — demand ÷ capacity. Three parallel full-time tasks in one week
+//                read 300 %: over-allocation is visible, not capped away.
 
 export interface TeamTask {
   projectId: number;
   projectName: string;
   taskName: string;
+  /** Effort (working days, rounded) this task demands inside the period. */
   daysInPeriod: number;
   start: string;
   end: string;
@@ -900,7 +984,7 @@ export interface TeamTask {
 export interface HeatProjectSplit {
   projectId: number;
   projectName: string;
-  /** Allocated working days this project consumes in the bucket (corrected). */
+  /** Demand (working days) this project places on the member in the bucket. */
   days: number;
 }
 
@@ -909,19 +993,17 @@ export interface HeatBucket {
   start: string;
   end: string;
   label: string;
-  /** Raw summed overlap days (legacy — double-counts parallel tasks). */
+  /** Demand in the bucket, in working days (rounded to a whole day). */
   days: number;
   /** Working-day capacity available in the bucket (calendar working days). */
   capacity: number;
-  /** Legacy charge: raw `days` ÷ capacity (can exceed 100 by double-count). */
+  /** Charge %: demand ÷ FTE capacity — same value as `allocPct`; can exceed 100. */
   pct: number;
-  // ---- corrected allocation (additive) ----
   /** Capacity scaled by the member's FTE (weeklyCapacityDays ÷ 5). */
   capacityFte: number;
-  /** Corrected allocated days: per calendar day, work is capped at the member's
-   *  daily availability, so parallel tasks no longer double-count. */
+  /** Demand in the bucket, working days (2 decimals). */
   allocDays: number;
-  /** Corrected charge: allocDays ÷ capacityFte, percentage. */
+  /** Charge: allocDays ÷ capacityFte, percentage (can exceed 100). */
   allocPct: number;
   /** Per-project split of `allocDays` for a stacked bar. */
   projectSplit: HeatProjectSplit[];
@@ -929,23 +1011,25 @@ export interface HeatBucket {
 
 export interface TeamLoad {
   member: TeamMember;
+  /** Demand over the period, working days (rounded to a whole day). */
   periodDays: number;
+  /** Working days in the period (calendar capacity, before FTE). */
   capacity: number;
+  /** Charge % over the period — same value as `chargeAllocPct`; can exceed 100. */
   chargePct: number;
   projectsActive: number;
   tasks: TeamTask[];
   /** Per-week (month view) or per-day (week view) breakdown for the heatmap. */
   buckets: HeatBucket[];
-  // ---- corrected model + cost (additive) ----
   /** The member's configured weekly capacity in working days (default 5). */
   weeklyCapacityDays: number;
   /** Period capacity scaled by FTE (capacity × weeklyCapacityDays ÷ 5). */
   capacityFte: number;
-  /** Corrected allocated days over the period (parallel tasks no longer summed). */
+  /** Demand over the period, working days (2 decimals). */
   allocDays: number;
-  /** Corrected charge: allocDays ÷ capacityFte, percentage (no 290% artifact). */
+  /** Charge: allocDays ÷ capacityFte, percentage (> 100 = over capacity). */
   chargeAllocPct: number;
-  /** Cost of the allocated work over the period: allocDays × member.costPerDay, €. */
+  /** Cost of the demanded work over the period: allocDays × member.costPerDay, €. */
   costEur: number;
   /** Per-project split of `allocDays` across the whole period (stacked totals). */
   projectSplit: HeatProjectSplit[];
@@ -957,46 +1041,41 @@ export type CapacityConfig = Record<number, number>;
 
 const DEFAULT_WEEKLY_CAPACITY = 5;
 
-/** Corrected allocation for one member within a date window: for each calendar
- *  working day, the member can apply at most `dailyAvail` days of effort split
- *  across whatever tasks are active that day — so two parallel tasks share the
- *  day instead of each counting a full day. Returns total allocated days plus a
- *  per-project split. */
-function allocateInWindow(
-  active: { projectId: number; start: string; end: string }[],
+/** A member's task as a constant daily demand over [start, end]. */
+interface LoadItem {
+  projectId: number;
+  start: string;
+  end: string;
+  /** Effort per working day (effort ÷ working days of the full task). */
+  rate: number;
+}
+
+/** Demand placed by `items` on [winStart, winEnd], total and per project. O(items). */
+function demandInWindow(
+  items: LoadItem[],
   winStart: string,
   winEnd: string,
-  dailyAvail: number,
-): { allocDays: number; byProject: Map<number, number> } {
+): { demand: number; byProject: Map<number, number> } {
   const byProject = new Map<number, number>();
-  let allocDays = 0;
-  const cur = toDate(winStart);
-  const end = toDate(winEnd);
-  while (cur <= end) {
-    if (isWeekday(cur)) {
-      const iso = toISO(cur);
-      const onDay = active.filter((t) => t.start <= iso && iso <= t.end);
-      if (onDay.length) {
-        // Cap the day's total effort at the member's daily availability, shared
-        // equally across the tasks active that day.
-        const perTask = dailyAvail / onDay.length;
-        for (const t of onDay) {
-          byProject.set(t.projectId, (byProject.get(t.projectId) ?? 0) + perTask);
-          allocDays += perTask;
-        }
-      }
-    }
-    cur.setDate(cur.getDate() + 1);
+  let demand = 0;
+  for (const t of items) {
+    const wd = overlapWorkingDays(t.start, t.end, winStart, winEnd);
+    if (wd <= 0) continue;
+    const d = wd * t.rate;
+    demand += d;
+    byProject.set(t.projectId, (byProject.get(t.projectId) ?? 0) + d);
   }
-  return { allocDays, byProject };
+  return { demand, byProject };
 }
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 function splitFromMap(map: Map<number, number>, names: Map<number, string>): HeatProjectSplit[] {
   return Array.from(map.entries())
     .map(([projectId, days]) => ({
       projectId,
       projectName: names.get(projectId) ?? "—",
-      days: Math.round(days * 100) / 100,
+      days: round2(days),
     }))
     .sort((a, b) => b.days - a.days);
 }
@@ -1014,78 +1093,71 @@ export function buildTeamLoad(
 
   return team.map((member) => {
     const weeklyCapacityDays = capacityConfig[member.id] ?? DEFAULT_WEEKLY_CAPACITY;
-    const fte = weeklyCapacityDays / DEFAULT_WEEKLY_CAPACITY;
-    const dailyAvail = fte; // days of effort available per calendar working day
+    const fte = Math.max(0, weeklyCapacityDays) / DEFAULT_WEEKLY_CAPACITY;
     const tasks: TeamTask[] = [];
-    const bucketDays = bucketRanges.map(() => 0);
-    // Tasks active for this member (clamped to range), for the corrected model.
-    const memberTasks: { projectId: number; start: string; end: string }[] = [];
+    const items: LoadItem[] = [];
 
     for (const p of projects) {
       for (const s of p.subtasksD) {
-        if (s.assigneeId !== member.id) continue;
-        const daysInPeriod = overlapWorkingDays(s.start, s.end, range.start, range.end);
-        if (daysInPeriod > 0) {
-          tasks.push({
-            projectId: p.id,
-            projectName: p.name,
-            taskName: s.name,
-            daysInPeriod,
-            start: s.start,
-            end: s.end,
-            done: s.done,
-          });
-          memberTasks.push({
-            projectId: p.id,
-            start: s.start < range.start ? range.start : s.start,
-            end: s.end > range.end ? range.end : s.end,
-          });
-        }
-        bucketRanges.forEach((b, i) => {
-          bucketDays[i] += overlapWorkingDays(s.start, s.end, b.start, b.end);
+        if (s.assigneeId !== member.id || !s.scheduled) continue;
+        const span = workingDaysBetween(s.start, s.end);
+        if (span <= 0) continue;
+        // Delivered work frees the member's calendar from today on.
+        const loadEnd = s.done && s.end > REFERENCE_DATE ? REFERENCE_DATE : s.end;
+        const item = { projectId: p.id, start: s.start, end: loadEnd, rate: s.plannedDays / span };
+        const inPeriod = demandInWindow([item], range.start, range.end).demand;
+        if (inPeriod <= 0) continue;
+        items.push(item);
+        tasks.push({
+          projectId: p.id,
+          projectName: p.name,
+          taskName: s.name,
+          daysInPeriod: Math.round(inPeriod),
+          start: s.start,
+          end: s.end,
+          done: s.done,
         });
       }
     }
 
-    const periodDays = tasks.reduce((sum, t) => sum + t.daysInPeriod, 0);
-    const projectsActive = new Set(tasks.map((t) => t.projectId)).size;
-
-    const buckets: HeatBucket[] = bucketRanges.map((b, i) => {
+    const buckets: HeatBucket[] = bucketRanges.map((b) => {
       const cap = workingDaysBetween(b.start, b.end);
       const capFte = cap * fte;
-      const alloc = allocateInWindow(memberTasks, b.start, b.end, dailyAvail);
+      const { demand, byProject } = demandInWindow(items, b.start, b.end);
+      const allocPct = capFte ? Math.round((demand / capFte) * 100) : 0;
       return {
         start: b.start,
         end: b.end,
         label: String(toDate(b.start).getDate()),
-        days: bucketDays[i],
+        days: Math.round(demand),
         capacity: cap,
-        pct: cap ? Math.round((bucketDays[i] / cap) * 100) : 0,
+        pct: allocPct,
         capacityFte: capFte,
-        allocDays: Math.round(alloc.allocDays * 100) / 100,
-        allocPct: capFte ? Math.round((alloc.allocDays / capFte) * 100) : 0,
-        projectSplit: splitFromMap(alloc.byProject, projectNames),
+        allocDays: round2(demand),
+        allocPct,
+        projectSplit: splitFromMap(byProject, projectNames),
       };
     });
 
     const capacityFte = capacity * fte;
-    const periodAlloc = allocateInWindow(memberTasks, range.start, range.end, dailyAvail);
-    const allocDays = Math.round(periodAlloc.allocDays * 100) / 100;
+    const period = demandInWindow(items, range.start, range.end);
+    const allocDays = round2(period.demand);
+    const chargeAllocPct = capacityFte ? Math.round((period.demand / capacityFte) * 100) : 0;
 
     return {
       member,
-      periodDays,
+      periodDays: Math.round(period.demand),
       capacity,
-      chargePct: capacity ? Math.round((periodDays / capacity) * 100) : 0,
-      projectsActive,
+      chargePct: chargeAllocPct,
+      projectsActive: new Set(tasks.map((t) => t.projectId)).size,
       tasks: tasks.sort((a, b) => a.start.localeCompare(b.start)),
       buckets,
       weeklyCapacityDays,
       capacityFte,
       allocDays,
-      chargeAllocPct: capacityFte ? Math.round((allocDays / capacityFte) * 100) : 0,
-      costEur: Math.round(allocDays * member.costPerDay),
-      projectSplit: splitFromMap(periodAlloc.byProject, projectNames),
+      chargeAllocPct,
+      costEur: Math.round(period.demand * member.costPerDay),
+      projectSplit: splitFromMap(period.byProject, projectNames),
     };
   });
 }
