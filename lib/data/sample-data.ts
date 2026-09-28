@@ -97,6 +97,12 @@ const SEED_COMMENTS: Record<number, { ri: number; text: string; at: string }[]> 
 // is split across the five tasks by these fractions (a study ramps up then closes
 // out), giving per-task work-packages of a few weeks to ~3 months — realistic for
 // a small staffed team, and large enough that the cost is a meaningful share.
+// The authored fees (ROWS) were sized for a much larger team: with the demand-
+// based workload model, the six-person roster ran at ~200 % on average. Scaling
+// the fees scales the effort with them (effort ∝ fee), so the portfolio lands at
+// ~3.8 M€, the team at ~70–80 % with a couple of members over capacity, and the
+// earned-value ratios above stay unchanged.
+const FEE_SCALE = 0.4;
 const COMMIT_FRACTION = 0.5; // planned labour cost as a fraction of the fee
 const EFFORT_SPLIT = [0.18, 0.24, 0.2, 0.24, 0.14]; // by chronological task position
 
@@ -242,6 +248,7 @@ function buildSubtasks(row: Row): Subtask[] {
 function shiftedRows(): Row[] {
   return ROWS.map((r) => {
     const out: Row = [...r];
+    out[7] = Math.max(5, Math.round((r[7] * FEE_SCALE) / 5) * 5);
     out[8] = demoDate(r[8]);
     out[9] = demoDate(r[9]);
     out[11] = demoDate(r[11]);
