@@ -201,17 +201,39 @@ function AccountMenu({ serverBacked, identity }: { serverBacked: boolean; identi
 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const items = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) triggerRef.current?.focus();
+  };
 
   useEffect(() => {
     if (!open) return;
+    // Keyboard users land on the first item (the menu mounts this frame).
+    const raf = requestAnimationFrame(() => items()[0]?.focus());
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("mousedown", onDown); };
   }, [open]);
+
+  // Menu keyboard model: ↑/↓ wrap, Home/End, Escape returns to the trigger,
+  // Tab closes and moves on.
+  const onMenuKey = (e: React.KeyboardEvent) => {
+    const list = items();
+    const i = list.indexOf(document.activeElement as HTMLElement);
+    const go = (n: number) => { e.preventDefault(); list[(n + list.length) % list.length]?.focus(); };
+    if (e.key === "ArrowDown") go(i + 1);
+    else if (e.key === "ArrowUp") go(i - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(list.length - 1);
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(true); }
+    else if (e.key === "Tab") close(false);
+  };
 
   const itemStyle: React.CSSProperties = {
     display: "flex",
@@ -235,8 +257,10 @@ function AccountMenu({ serverBacked, identity }: { serverBacked: boolean; identi
       <AnimatePresence>
         {open ? (
           <motion.div
+            ref={menuRef}
             role="menu"
             aria-label="Compte"
+            onKeyDown={onMenuKey}
             initial={{ opacity: 0, y: 6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.98 }}
@@ -280,6 +304,7 @@ function AccountMenu({ serverBacked, identity }: { serverBacked: boolean; identi
       </AnimatePresence>
 
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
