@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
+import { openAddInPhase } from "../add-project-modal";
 import { FilterBar } from "../filter-bar";
 import { MinusIcon, PlusIcon, ArrowRightIcon, AlertTriangleIcon, ClockIcon } from "../icons";
 import { Avatar, IconButton, ProgressBar, Segmented, EmptyState } from "../ui";
@@ -10,6 +11,8 @@ import { buildKanban } from "@/lib/derive";
 import type { DerivedProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
 import { toast } from "@/lib/toast";
+import { usePointerDrag } from "@/lib/use-pointer-drag";
+import { useStoredString } from "@/lib/use-stored-state";
 import { C, FONT_NUM, PHASE_COLORS, R, SH, SP, SPRING, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type Status } from "@/lib/types";
 
@@ -70,25 +73,16 @@ const WIP_STYLE: Record<WipTier, { color: string; bg: string; meter: string }> =
 export function Kanban() {
   const { filtered, team, setPhase, setStatus, advancePhase, bulkAdvancePhase, openAdd, openProject } = useProjects();
 
-  // ── persisted group-by + collapse ──
-  const [groupBy, setGroupBy] = useState<GroupKey>("phase");
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const hydrated = useRef(false);
-
-  useEffect(() => {
-    try {
-      const g = localStorage.getItem(STORAGE_GROUP);
-      if (g === "phase" || g === "statut" || g === "responsable" || g === "discipline") setGroupBy(g);
-      const c = localStorage.getItem(STORAGE_COLLAPSED);
-      if (c) {
-        const arr = JSON.parse(c);
-        if (Array.isArray(arr)) setCollapsed(new Set(arr.map(String)));
-      }
-    } catch {}
-    hydrated.current = true;
-  }, []);
-  useEffect(() => { if (hydrated.current) try { localStorage.setItem(STORAGE_GROUP, groupBy); } catch {} }, [groupBy]);
-  useEffect(() => { if (hydrated.current) try { localStorage.setItem(STORAGE_COLLAPSED, JSON.stringify([...collapsed])); } catch {} }, [collapsed]);
+  // ── persisted group-by + collapse (hydration-safe, no setState-in-effect) ──
+  const [storedGroup, setStoredGroup] = useStoredString(STORAGE_GROUP);
+  const groupBy: GroupKey =
+    storedGroup === "statut" || storedGroup === "responsable" || storedGroup === "discipline" ? storedGroup : "phase";
+  const setGroupBy = (g: GroupKey) => setStoredGroup(g);
+  const [storedCollapsed, setStoredCollapsed] = useStoredString(STORAGE_COLLAPSED);
+  const collapsed = useMemo(() => {
+    try { const arr = storedCollapsed ? JSON.parse(storedCollapsed) : []; return new Set<string>(Array.isArray(arr) ? arr.map(String) : []); }
+    catch { return new Set<string>(); }
+  }, [storedCollapsed]);
 
   // ── columns from the chosen grouping ──
   const columns = useMemo<Column[]>(() => {
@@ -157,36 +151,13 @@ export function Kanban() {
 
   const movable = groupBy === "phase" || groupBy === "statut";
 
-  const [overKey, setOverKey] = useState<string | null>(null);
-  const [draggingId, setDraggingId] = useState<number | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // Cursor-locked drag ghost: a fixed clone that follows the pointer, so a card
-  // can travel across a board wider than the viewport (the original couldn't).
-  const [ghost, setGhost] = useState<{ card: DerivedProject; x: number; y: number; w: number } | null>(null);
-
-  // Pointer-event drag (works on touch AND mouse). A movement threshold lets a
-  // plain tap still open the project. While dragging we (a) follow the pointer
-  // with a ghost, (b) resolve the column under the pointer, (c) edge-autoscroll
-  // the horizontal board so distant columns become reachable mid-drag.
-  const drag = useRef<{
-    id: number; card: DerivedProject; startX: number; startY: number;
-    offX: number; offY: number; w: number; moved: boolean; overKey: string | null;
-  } | null>(null);
-  const autoScroll = useRef<number | null>(null);
-  const lastPointer = useRef({ x: 0, y: 0 });
-
-  const stopAutoScroll = () => {
-    if (autoScroll.current != null) { cancelAnimationFrame(autoScroll.current); autoScroll.current = null; }
+  const toggleCollapse = (k: string) => {
+    const next = new Set(collapsed);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    setStoredCollapsed(JSON.stringify([...next]));
   };
-  useEffect(() => stopAutoScroll, []);
-
-  const toggleCollapse = (k: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      next.has(k) ? next.delete(k) : next.add(k);
-      return next;
-    });
 
   /** Column key under a viewport point, or null. */
   function keyAtPoint(x: number, y: number): string | null {
@@ -215,92 +186,66 @@ export function Kanban() {
     }
   }
 
-  const tick = () => {
-    autoScroll.current = null;
-    const board = boardRef.current;
-    if (!board || !drag.current) return;
-    const rect = board.getBoundingClientRect();
-    const x = lastPointer.current.x;
-    const EDGE = 80;
-    let dx = 0;
-    if (x < rect.left + EDGE) dx = -Math.ceil((rect.left + EDGE - x) / 6);
-    else if (x > rect.right - EDGE) dx = Math.ceil((x - (rect.right - EDGE)) / 6);
-    if (dx !== 0) {
-      board.scrollLeft += dx;
-      const k = keyAtPoint(lastPointer.current.x, lastPointer.current.y);
-      drag.current.overKey = k;
-      setOverKey(k);
-    }
-    autoScroll.current = requestAnimationFrame(tick);
-  };
-
-  const cardHandlers = (card: DerivedProject) => ({
-    onPointerDown: (e: React.PointerEvent) => {
-      if (e.button != null && e.button !== 0) return;
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      drag.current = {
-        id: card.id, card,
-        startX: e.clientX, startY: e.clientY,
-        offX: e.clientX - rect.left, offY: e.clientY - rect.top, w: rect.width,
-        moved: false, overKey: null,
-      };
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    },
-    onPointerMove: (e: React.PointerEvent) => {
-      const d = drag.current;
-      if (!d || d.id !== card.id) return;
-      lastPointer.current = { x: e.clientX, y: e.clientY };
-      if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 5) return;
-      if (!d.moved) {
-        if (!movable) return; // read lens: no drag, tap still opens
-        d.moved = true;
-        setDraggingId(card.id);
-        setGhost({ card, x: e.clientX - d.offX, y: e.clientY - d.offY, w: d.w });
-        if (autoScroll.current == null) autoScroll.current = requestAnimationFrame(tick);
-      }
-      setGhost((g) => (g ? { ...g, x: e.clientX - d.offX, y: e.clientY - d.offY } : g));
-      const k = keyAtPoint(e.clientX, e.clientY);
-      d.overKey = k;
-      setOverKey(k);
-    },
-    onPointerUp: (e: React.PointerEvent) => {
-      const d = drag.current;
-      drag.current = null;
-      stopAutoScroll();
-      if (!d || d.id !== card.id) return;
-      if (d.moved) {
-        const k = keyAtPoint(e.clientX, e.clientY) ?? d.overKey;
-        const target = columns.find((c) => c.key === k);
-        if (target) applyMove(card, target);
-      } else {
-        openProject(card.id);
-      }
-      setDraggingId(null);
-      setOverKey(null);
-      setGhost(null);
-    },
-    onPointerCancel: () => {
-      drag.current = null;
-      stopAutoScroll();
-      setDraggingId(null);
-      setOverKey(null);
-      setGhost(null);
-    },
-    // Keyboard move (a11y): ← / → shift phase, Enter opens.
-    onKeyDown: (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProject(card.id); return; }
-      if (groupBy === "phase" && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        e.preventDefault();
-        const to = e.key === "ArrowRight"
-          ? Math.min(card.phaseIndex + 1, FINAL_PHASE_INDEX)
-          : Math.max(card.phaseIndex - 1, 0);
-        if (to !== card.phaseIndex) {
-          const col = columns.find((c) => c.movePhase === to);
-          if (col) applyMove(card, col);
-        }
-      }
+  // Pointer drag (mouse: small threshold; touch: long-press so the board and
+  // the page still scroll). Drops outside a column cancel. Shared with the
+  // calendar via usePointerDrag.
+  const { drag, bind, point } = usePointerDrag<DerivedProject>({
+    targetAt: keyAtPoint,
+    canDrag: () => movable,
+    onTap: (card) => openProject(card.id),
+    onDrop: (card, key) => {
+      const target = columns.find((c) => c.key === key);
+      if (target) applyMove(card, target);
     },
   });
+  const draggingId = drag?.item.id ?? null;
+  const overKey = drag?.over ?? null;
+
+  // Edge auto-scroll of the horizontal board while dragging, so distant columns
+  // are reachable on a board wider than the viewport.
+  const dragging = drag != null;
+  useEffect(() => {
+    if (!dragging) return;
+    let raf = 0;
+    const tick = () => {
+      const board = boardRef.current;
+      if (board) {
+        const rect = board.getBoundingClientRect();
+        const { x } = point.current;
+        const EDGE = 80;
+        let dx = 0;
+        if (x < rect.left + EDGE) dx = -Math.ceil((rect.left + EDGE - x) / 6);
+        else if (x > rect.right - EDGE) dx = Math.ceil((x - (rect.right - EDGE)) / 6);
+        if (dx !== 0) board.scrollLeft += dx;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [dragging, point]);
+
+  // Keyboard move re-parents the card (new column → remount), so focus is
+  // restored onto the moved card once it has rendered in its new column.
+  const refocusId = useRef<number | null>(null);
+  useEffect(() => {
+    const id = refocusId.current;
+    if (id == null) return;
+    const el = boardRef.current?.querySelector<HTMLElement>(`[data-card-id="${id}"]`);
+    if (el) { refocusId.current = null; el.focus(); }
+  });
+
+  const onCardKey = (card: DerivedProject) => (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProject(card.id); return; }
+    if (!movable || (e.key !== "ArrowRight" && e.key !== "ArrowLeft")) return;
+    // ← / → move to the adjacent movable column (phases in order, or statuses).
+    e.preventDefault();
+    const from = columns.findIndex((c) => c.cards.some((x) => x.id === card.id));
+    const to = columns[from + (e.key === "ArrowRight" ? 1 : -1)];
+    if (from < 0 || !to) return;
+    refocusId.current = card.id;
+    applyMove(card, to);
+  };
 
   const isEmpty = columns.every((c) => c.cards.length === 0);
 
@@ -308,15 +253,15 @@ export function Kanban() {
     <>
       <FilterBar
         trailing={
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
-            <span style={{ ...TX.caption, color: C.ink500 }}>Grouper&#8239;:</span>
-            <Segmented value={groupBy} options={GROUP_OPTIONS} onChange={setGroupBy} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto", minWidth: 0, maxWidth: "100%", flexWrap: "wrap" }}>
+            <span aria-hidden style={{ ...TX.caption, color: C.ink500 }}>Grouper&#8239;:</span>
+            <Segmented value={groupBy} options={GROUP_OPTIONS} onChange={setGroupBy} aria-label="Grouper les cartes par" />
           </div>
         }
       />
-      <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 14px" }} aria-live="polite">
+      <p id="kanban-move-hint" style={{ ...TX.caption, color: C.ink500, margin: "0 0 14px" }} aria-live="polite">
         {movable
-          ? "Glissez une carte pour la déplacer · flèches ←/→ au clavier · limite affichée par colonne"
+          ? "Glissez une carte pour la déplacer (appui long sur mobile) · flèches ←/→ au clavier · limite affichée par colonne"
           : "Vue lecture · groupée par " + (groupBy === "responsable" ? "responsable" : "discipline") + " (déplacement désactivé)"}
       </p>
 
@@ -414,7 +359,7 @@ export function Kanban() {
                       quiet (ghost) so the column header reads calm at rest */}
                   {groupBy === "phase" ? (
                     <div style={{ display: "flex", gap: SP[3] }}>
-                      <button onClick={openAdd} className="btn btn-secondary" title={`Nouveau projet en ${col.label}`} aria-label={`Nouveau projet en ${col.full}`} style={addBtnStyle(false)}>
+                      <button onClick={() => (col.movePhase != null ? openAddInPhase(openAdd, col.movePhase) : openAdd())} className="btn btn-secondary" title={`Nouveau projet en ${col.label}`} aria-label={`Nouveau projet en ${col.full}`} style={addBtnStyle(false)}>
                         <PlusIcon size={12} /> Nouveau
                       </button>
                       {col.movePhase != null && col.movePhase < FINAL_PHASE_INDEX && col.cards.length > 0 ? (
@@ -445,17 +390,26 @@ export function Kanban() {
                           animate={{ opacity: isDragged ? 0.35 : 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.96 }}
                           transition={SPRING.snappy}
-                          {...cardHandlers(c)}
+                          {...bind(c)}
+                          onKeyDown={onCardKey(c)}
+                          data-card-id={c.id}
                           role="button"
                           tabIndex={0}
-                          aria-label={`${c.name} — ${c.client} · ${c.statusLabel} · ${c.progress}%`}
+                          aria-label={`${c.name} — ${c.client} · ${c.statusLabel} · ${c.progress} %`}
+                          aria-roledescription={movable ? "carte déplaçable" : undefined}
+                          aria-describedby={movable ? "kanban-move-hint" : undefined}
                           className="lift-hover row-focus"
                           style={{
                             background: C.surface,
                             border: `1px solid ${isDragged ? C.lineStrong : C.line}`,
                             borderRadius: R.lg, padding: `${SP[4]}px ${SP[4]}px`,
                             cursor: movable ? (isDragged ? "grabbing" : "grab") : "pointer",
-                            touchAction: "none",
+                            // Touch scrolls the board/page; a long press starts
+                            // the drag (usePointerDrag). No `none` — that
+                            // made the whole board unscrollable on phones.
+                            touchAction: movable ? "manipulation" : "auto",
+                            WebkitTouchCallout: "none",
+                            userSelect: "none",
                             boxShadow: isDragged ? SH.sm : undefined,
                           }}
                         >
@@ -479,15 +433,16 @@ export function Kanban() {
       )}
 
       {/* cursor-locked drag ghost */}
-      {ghost ? (
+      {drag ? (
         <div
+          aria-hidden
           style={{
-            position: "fixed", left: ghost.x, top: ghost.y, width: ghost.w, zIndex: 90,
+            position: "fixed", left: drag.x - drag.offX, top: drag.y - drag.offY, width: drag.width, zIndex: 90,
             pointerEvents: "none", background: C.surface, border: `1px solid ${C.lineStrong}`,
             borderRadius: R.lg, padding: `${SP[4]}px ${SP[4]}px`, boxShadow: SH.lg, transform: "rotate(1.5deg) scale(1.03)",
           }}
         >
-          <CardBody c={ghost.card} />
+          <CardBody c={drag.item} />
         </div>
       ) : null}
     </>
@@ -523,7 +478,7 @@ function CardBody({ c }: { c: DerivedProject }) {
 
       {/* progress — green fill (the app's one accent), thin; the at-a-glance signal */}
       <div style={{ display: "flex", alignItems: "center", gap: SP[3], marginTop: SP[5] }} title={`Avancement ${c.progress}%`}>
-        <ProgressBar pct={c.progress} height={4} />
+        <ProgressBar pct={c.progress} height={4} label={`Avancement de ${c.name}`} />
         <span style={{ ...numTab, fontSize: 12, fontWeight: 600, color: C.ink500, width: 34, textAlign: "right" }}>{c.progress}&#8239;%</span>
       </div>
 
