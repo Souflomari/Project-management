@@ -106,7 +106,17 @@ export const NAV_ICONS: Record<ViewKey, (p: IconProps) => React.ReactNode> = {
   calendrier: CalendrierIcon,
   kanban: KanbanIcon,
   equipe: EquipeIcon,
+  parametres: SettingsIcon,
 };
+
+export function SettingsIcon({ size = 20 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+    </svg>
+  );
+}
 
 // ── action icons (stroke, currentColor)
 
@@ -137,13 +147,6 @@ export function ChevronRightIcon({ size = 16 }: IconProps) {
   return (
     <svg {...base(size)}>
       <polyline points="9 6 15 12 9 18" />
-    </svg>
-  );
-}
-export function ChevronUpIcon({ size = 16 }: IconProps) {
-  return (
-    <svg {...base(size)}>
-      <polyline points="6 15 12 9 18 15" />
     </svg>
   );
 }
@@ -195,14 +198,6 @@ export function MinusIcon({ size = 16 }: IconProps) {
 
 // ── new utility glyphs (replace the text-glyph substitutes ↗ → ← ▦ kebab) ──
 
-export function ArrowUpRightIcon({ size = 16 }: IconProps) {
-  return (
-    <svg {...base(size)}>
-      <line x1="7" y1="17" x2="17" y2="7" />
-      <polyline points="8 7 17 7 17 16" />
-    </svg>
-  );
-}
 export function ArrowRightIcon({ size = 16 }: IconProps) {
   return (
     <svg {...base(size)}>
@@ -211,36 +206,10 @@ export function ArrowRightIcon({ size = 16 }: IconProps) {
     </svg>
   );
 }
-export function ArrowLeftIcon({ size = 16 }: IconProps) {
-  return (
-    <svg {...base(size)}>
-      <line x1="20" y1="12" x2="4" y2="12" />
-      <polyline points="11 5 4 12 11 19" />
-    </svg>
-  );
-}
-export function MoreHorizontalIcon({ size = 16 }: IconProps) {
-  return (
-    <svg {...base(size)}>
-      <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 export function FilterIcon({ size = 16 }: IconProps) {
   return (
     <svg {...base(size)}>
       <path d="M3 5h18l-7 8v5l-4 2v-7Z" />
-    </svg>
-  );
-}
-export function InfoIcon({ size = 16 }: IconProps) {
-  return (
-    <svg {...base(size)}>
-      <circle cx="12" cy="12" r="9" />
-      <line x1="12" y1="11" x2="12" y2="16" />
-      <line x1="12" y1="8" x2="12" y2="8" />
     </svg>
   );
 }
@@ -261,23 +230,6 @@ export function ClockIcon({ size = 16 }: IconProps) {
     </svg>
   );
 }
-export function LinkIcon({ size = 16 }: IconProps) {
-  return (
-    <svg {...base(size)}>
-      <path d="M9.5 14.5 14.5 9.5" />
-      <path d="M8 11 6 13a3.5 3.5 0 0 0 5 5l2-2" />
-      <path d="M16 13l2-2a3.5 3.5 0 0 0-5-5l-2 2" />
-    </svg>
-  );
-}
-export function UserIcon({ size = 16 }: IconProps) {
-  return (
-    <svg {...base(size)}>
-      <circle cx="12" cy="8" r="3.4" />
-      <path d="M5 20c0-3.6 3-6 7-6s7 2.4 7 6" />
-    </svg>
-  );
-}
 export function CalendarIcon({ size = 16 }: IconProps) {
   return (
     <svg {...base(size)}>
@@ -289,8 +241,8 @@ export function CalendarIcon({ size = 16 }: IconProps) {
   );
 }
 
-/** Indeterminate / loading ring — a 270° arc with an open gap. Spin it via the
- *  `.spin` keyframe (used by the Button/Spinner primitive). */
+/** Indeterminate / loading ring — a 270° arc with an open gap. Spun by the
+ *  motion-driven <Spinner> primitive in ui.tsx (no CSS keyframe needed). */
 export function SpinnerIcon({ size = 16 }: IconProps) {
   return (
     <svg {...base(size)}>

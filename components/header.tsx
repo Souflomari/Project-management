@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { ChevronRightIcon, PlusIcon, SearchIcon } from "./icons";
-import { Button } from "./ui";
+import { Button, IconButton } from "./ui";
 import { openCommandPalette } from "./command-palette";
 import { isProjectDetailPath, isWorkspacePath, navItemForPath, WORKSPACE_VIEWS } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, DUR, EASE, R, SH, TX } from "@/lib/tokens";
+
+const noopSubscribe = () => () => {};
 
 /** Segmented links switching the lens of the Projets workspace. A neutral toggle:
  *  the selected lens is a quiet white pill on the inset track (size/elevation, not
@@ -70,10 +72,11 @@ export function Header() {
   // Resolve the platform-specific hint only after mount to avoid a visible swap
   // from the SSR/first-paint guess. `null` until then renders a stable-width
   // placeholder so the launcher layout doesn't shift.
-  const [kbd, setKbd] = useState<string | null>(null);
-  useEffect(() => {
-    setKbd(/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K");
-  }, []);
+  const kbd = useSyncExternalStore(
+    noopSubscribe,
+    () => (/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K"),
+    () => null,
+  );
 
   // Lift the sticky header (shadow + denser glass) once content scrolls under it.
   const [scrolled, setScrolled] = useState(false);
@@ -92,6 +95,7 @@ export function Header() {
 
   return (
     <header
+      className="app-header"
       style={{
         minHeight: 64,
         background: scrolled ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.72)",
@@ -131,7 +135,11 @@ export function Header() {
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        {/* Phones: the wide launcher is hidden — keep the palette one tap away. */}
+        <IconButton size={38} className="header-search-mobile" onClick={openCommandPalette} aria-label="Recherche rapide">
+          <SearchIcon size={17} />
+        </IconButton>
         {isListe ? (
           <div
             className="ui-field header-search lift-hover"

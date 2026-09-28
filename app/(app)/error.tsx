@@ -1,9 +1,17 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { Button } from "@/components/ui";
 import { C, R, ROLE, SH, SP, TX } from "@/lib/tokens";
 
-export default function AppError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // Surface the failure (with the server digest when there is one) instead of
+  // swallowing it — the only trace left once the boundary has rendered.
+  useEffect(() => {
+    console.error("[setec] Erreur de rendu", error.digest ? `(digest ${error.digest})` : "", error);
+  }, [error]);
+
   return (
     <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ width: 420, maxWidth: "100%", background: C.surface, border: `1px solid ${C.lineStrong}`, borderRadius: R.xl, boxShadow: SH.md, padding: 28, textAlign: "center" }}>

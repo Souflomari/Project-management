@@ -3,7 +3,7 @@ import { GeistSans } from "geist/font/sans";
 
 import "./globals.css";
 import "./tokens.css";
-import { tokenCssVars } from "@/lib/tokens";
+import { C, tokenCssVars } from "@/lib/tokens";
 
 // Geist — Vercel's product typeface: a clean, modern, neutral grotesk built for
 // dense UIs, with excellent tabular numerals. Used for both UI/body and the
@@ -22,12 +22,11 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Setec", statusBarStyle: "default" },
 };
 
-// Browser chrome tint: matches the warm canvas in light, near-black in dark.
+// Browser chrome tint = the app canvas. The app is light-only (no dark theme),
+// so a dark-scheme tint would frame a white page in near-black chrome.
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FAF9F7" },
-    { media: "(prefers-color-scheme: dark)", color: "#1C1917" },
-  ],
+  themeColor: C.canvas,
+  colorScheme: "light",
 };
 
 export default function RootLayout({
