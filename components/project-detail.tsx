@@ -7,8 +7,7 @@
 // reads the store directly so callers just drop them in. `p` is the derived
 // project (extends the raw Project).
 
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { flushSync } from "react-dom";
+import { useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { CloseIcon, PlusIcon, TrashIcon } from "./icons";
 import { Avatar, Button, Checkbox, IconButton, Input, ProgressBar, Select, Textarea } from "./ui";
@@ -16,7 +15,6 @@ import type { SubtaskPatch } from "@/lib/data/repository";
 import { buildBudget, type DerivedProject, type DerivedSubtask } from "@/lib/derive";
 import { daysFromToday, fmtEur, fmtFull, fmtShort, formatDays, pct, REFERENCE_DATE, relativeWhen } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
-import { subscribeToasts } from "@/lib/toast";
 import { C, FONT_DISPLAY, num, R, SURFACE, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
 
@@ -452,7 +450,7 @@ function useDraft(id: number): [string, (t: string) => void] {
 /** Activity feed: richer comment thread — multiline composer (Shift+Enter for a
  *  newline), @mentions of team members (↑/↓/Entrée/Échap), relative timestamps. */
 export function ProjectComments({ p }: { p: DerivedProject }) {
-  const { team, addComment, commentDraft, setCommentDraft } = useProjects();
+  const { team, addComment } = useProjects();
   const [draft, setDraftText] = useDraft(p.id);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionIdx, setMentionIdx] = useState(0);
@@ -460,23 +458,10 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
   const listId = useId();
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
-  // Publishing: the store's addComment(id) reads ITS shared draft, so we hand it
-  // our text synchronously (flushSync) and post. The composer clears at once
-  // (a second Enter finds nothing to send → no double post) and stays locked
-  // while the store still holds our text. On failure (error toast) the text is
-  // put back for a retry.
-  const [pending, setPending] = useState<string | null>(null);
-  const isPending = pending !== null && commentDraft === pending;
-  useEffect(() => {
-    if (pending === null) return;
-    const text = pending;
-    const unsub = subscribeToasts((t) => {
-      if (t.variant === "error") { setDraft(p.id, text); setCommentDraft(""); }
-      setPending(null);
-    });
-    const timer = window.setTimeout(() => setPending(null), 15_000);
-    return () => { unsub(); window.clearTimeout(timer); };
-  }, [pending, p.id, setCommentDraft]);
+  // Publishing: the composer clears at once (a second Enter finds nothing to
+  // send → no double post) and stays locked until the store answers. On failure
+  // (the store shows the error toast) the text is put back for a retry.
+  const [isPending, setPending] = useState(false);
 
   const teamFirstNames = useMemo(() => new Set(team.map((m) => m.name.split(" ")[0].toLowerCase())), [team]);
   const mentionMatches = useMemo(() => {
@@ -504,10 +489,11 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
     const text = draft.trim();
     if (!text || isPending) return;
     setMentionOpen(false);
-    flushSync(() => setCommentDraft(text));
-    setPending(text);
+    setPending(true);
     setDraftText("");
-    addComment(p.id);
+    addComment(p.id, text)
+      .then((posted) => { if (!posted) setDraft(p.id, text); })
+      .finally(() => setPending(false));
   }
 
   function applyMention(name: string) {

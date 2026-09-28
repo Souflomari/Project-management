@@ -4,10 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { Button, Field, Input, Modal, Select } from "./ui";
-import type { ProjectPatch } from "@/lib/data/repository";
 import { useProjects } from "@/lib/store/projects-context";
-import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { REFERENCE_DATE } from "@/lib/format";
 import { PHASES, PHASES_FULL } from "@/lib/types";
 import { C, R, TX } from "@/lib/tokens";
@@ -41,51 +38,40 @@ export function parseFrenchNumber(raw: string): number | null {
   return /^\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
 }
 
-type CreationJob = { knownIds: Set<number>; patch: ProjectPatch; phase: number };
-
 export function AddProjectModal() {
   const router = useRouter();
-  const { showAdd, projects, selectedId, updateProject, setPhase, closeDrawer, closeAdd } = useProjects();
+  const { showAdd, selectedId, closeDrawer, closeAdd } = useProjects();
 
-  // After submitAdd() resolves, the new project appears in `projects` (whether
-  // or not the store also selects it). Detect it by id, apply the extra fields,
-  // make sure the drawer is closed, then route to its page. This watcher lives
-  // HERE (always mounted): the store may close the form before the new project
-  // shows up, which would unmount a watcher placed inside the form.
-  const pending = useRef<CreationJob | null>(null);
-  const navTo = useRef<string | null>(null);
+  // After a successful create: close the form and any open drawer, then route
+  // to the new project's page. The push waits until the drawer is really
+  // closed (and is deferred one task): the store mirrors its selection to the
+  // URL with history.replaceState in its own effect, which would otherwise
+  // cancel the navigation.
+  const [navTo, setNavTo] = useState<string | null>(null);
   useEffect(() => {
-    const job = pending.current;
-    if (!job) return;
-    const created = projects.find((p) => !job.knownIds.has(p.id));
-    if (!created) return;
-    pending.current = null;
-    updateProject(created.id, job.patch);
-    if (job.phase > 0) setPhase(created.id, job.phase);
-    closeDrawer();
-    closeAdd();
-    navTo.current = `/projets/${created.id}`;
-  }, [projects, updateProject, setPhase, closeDrawer, closeAdd]);
-  // Navigate once the drawer is really closed. Deferred one task: the store
-  // mirrors its selection to the URL with history.replaceState in its own
-  // (parent, hence later) effect, which would otherwise cancel the push.
-  useEffect(() => {
-    const url = navTo.current;
-    if (!url || selectedId != null) return;
-    navTo.current = null;
-    window.setTimeout(() => router.push(url), 0);
-  }, [selectedId, projects, router]);
+    if (!navTo || selectedId != null) return;
+    const timer = window.setTimeout(() => { router.push(navTo); setNavTo(null); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [navTo, selectedId, router]);
 
   // Mounted only while open: every opening starts from fresh field state.
-  return showAdd ? <AddProjectForm stage={(job) => { pending.current = job; }} /> : null;
+  return showAdd ? (
+    <AddProjectForm
+      onCreated={(id) => {
+        closeDrawer();
+        closeAdd();
+        setNavTo(`/projets/${id}`);
+      }}
+    />
+  ) : null;
 }
 
-function AddProjectForm({ stage }: { stage: (job: CreationJob | null) => void }) {
+function AddProjectForm({ onCreated }: { onCreated: (id: number) => void }) {
   const {
     closeAdd,
     newName, newClient, newResp,
     setNewName, setNewClient, setNewResp,
-    submitAdd, team, projects,
+    createProject, team, viewerMember,
   } = useProjects();
 
   const [busy, setBusy] = useState(false);
@@ -101,27 +87,14 @@ function AddProjectForm({ stage }: { stage: (job: CreationJob | null) => void })
   });
   const [touched, setTouched] = useState(false);
 
-  // Pre-select the signed-in user as responsable when their email maps onto a
-  // team member (prenom.nom@… → "Prénom Nom"). Best-effort; keeps the store's
-  // default otherwise.
-  const respGuessed = useRef(false);
+  // Pre-select the signed-in user as responsable (Supabase mode, when their
+  // login is linked to a team member). Runs once per opening.
+  const respDefaulted = useRef(false);
   useEffect(() => {
-    if (respGuessed.current || !isSupabaseConfigured()) return;
-    let cancelled = false;
-    createBrowserSupabaseClient().auth.getUser().then(({ data }) => {
-      const email = data.user?.email;
-      if (cancelled || !email) return;
-      const local = email.split("@")[0].toLowerCase();
-      const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const me = team.find((m) => {
-        const parts = norm(m.name).split(/\s+/);
-        return parts.every((p) => local.includes(p)) || norm(m.name).replace(/\s+/g, ".") === norm(local);
-      });
-      respGuessed.current = true;
-      if (me) setNewResp(me.id);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [team, setNewResp]);
+    if (respDefaulted.current || !viewerMember) return;
+    respDefaulted.current = true;
+    setNewResp(viewerMember.id);
+  }, [viewerMember, setNewResp]);
 
   // Validation runs live (not just after a first submit): the error shows as
   // soon as the value is wrong and submit stays blocked until it is fixed.
@@ -142,30 +115,24 @@ function AddProjectForm({ stage }: { stage: (job: CreationJob | null) => void })
     if (!valid || busy) return;
     setBusy(true);
     setFormError(null);
-    // Stage the extra fields; the effect above persists them once the new
-    // project shows up in the store.
-    stage({
-      knownIds: new Set(projects.map((p) => p.id)),
-      patch: {
+    try {
+      const created = await createProject({
+        name: newName,
+        client: newClient,
+        responsableId: newResp,
         discipline,
         budget: Math.max(0, Math.round(budgetNum ?? 0)),
+        phaseIndex,
         start,
         ...(deadline ? { deadline } : {}),
-      },
-      phase: phaseIndex,
-    });
-    try {
-      const created = await submitAdd();
-      if (!created) {
-        stage(null);
-        setBusy(false);
-        setFormError("Le projet n’a pas pu être créé. Vérifiez les champs puis réessayez.");
-      }
+      });
+      if (created) return onCreated(created.id);
+      // The store already showed the reason in a toast.
+      setFormError("Le projet n’a pas pu être créé. Vérifiez les champs puis réessayez.");
     } catch {
-      stage(null);
-      setBusy(false);
       setFormError("La création a échoué (connexion ou serveur indisponible). Vos saisies sont conservées — réessayez.");
     }
+    setBusy(false);
   }
 
   const onEnter = (e: React.KeyboardEvent) => {

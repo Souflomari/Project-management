@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { use, useState } from "react";
 
 import { signOutAction } from "@/app/actions";
@@ -34,6 +35,7 @@ const URL_ERRORS: Record<string, string> = {
 
 export default function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const configured = isSupabaseConfigured();
+  const router = useRouter();
   const { error: urlError } = use(searchParams);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -115,6 +117,7 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ er
 
       {/* ── Right auth column ─────────────────────────────────────────────── */}
       <div
+        className="login-col"
         style={{
           flex: "0 1 520px",
           display: "flex",
@@ -124,6 +127,7 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ er
         }}
       >
         <div
+          className="login-card"
           style={{
             width: 380,
             maxWidth: "100%",
@@ -159,7 +163,7 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ er
                 environnement. L{"’"}application fonctionne avec des données
                 d{"’"}exemple.
               </p>
-              <Button onClick={() => { window.location.href = "/"; }} fullWidth>
+              <Button onClick={() => router.push("/")} fullWidth>
                 Accéder au tableau de bord
               </Button>
             </div>
@@ -234,6 +238,8 @@ export default function LoginPage({ searchParams }: { searchParams: Promise<{ er
         @media (max-width: 640px) {
           .login-hero { display: none !important; }
           .login-card-mark { display: flex !important; }
+          .login-col { flex: 1 1 auto !important; min-width: 0; padding: 16px !important; }
+          .login-card { padding: 24px 20px !important; box-sizing: border-box; }
         }
       `}</style>
     </div>

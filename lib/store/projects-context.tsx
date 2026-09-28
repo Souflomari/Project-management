@@ -167,7 +167,9 @@ interface ProjectsContextValue {
   advancePhase: (id: number) => void;
   setPhase: (id: number, phaseIndex: number) => void;
   setStatus: (id: number, status: Status) => void;
-  addComment: (id: number) => void;
+  /** Post a comment (`text`, or the shared `commentDraft` when omitted).
+   *  Resolves to true once saved, false after an error toast. */
+  addComment: (id: number, text?: string) => Promise<boolean>;
   /** Create a project from the add-modal fields (+ optional details). Closes the
    *  modal on success; does not open the drawer (the caller navigates). */
   submitAdd: (extra?: Partial<NewProjectInput>) => Promise<boolean>;
@@ -847,9 +849,13 @@ export function ProjectsProvider({
   );
 
   const addComment = useCallback(
-    (id: number) => {
-      if (!commentDraft.trim()) return;
-      mutations.addComment(id, commentDraft).then((posted) => { if (posted) setCommentDraft(""); });
+    (id: number, text?: string) => {
+      const body = text ?? commentDraft;
+      if (!body.trim()) return Promise.resolve(false);
+      return mutations.addComment(id, body).then((posted) => {
+        if (posted && text === undefined) setCommentDraft("");
+        return posted;
+      });
     },
     [mutations, commentDraft],
   );
