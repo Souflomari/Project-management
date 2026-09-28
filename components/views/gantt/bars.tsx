@@ -8,7 +8,7 @@ import { fmtShort, shiftISO, workingDaysBetween } from "@/lib/format";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { toast } from "@/lib/toast";
 import { C, FONT_NUM, R, SH, SPRING, TX } from "@/lib/tokens";
-import { BAR_TRACK, CP_RING, DONE_FILL, PROGRESS, PROJ_ROW_H, SUB_ROW_H } from "./constants";
+import { BAR_TRACK, CP_RING, DONE_FILL, PROGRESS, PROJ_ROW_H, SUB_ROW_H, Z_ARROWS } from "./constants";
 import { shiftWorkingDays, snapWeekday, workingDayDelta } from "./dates";
 
 /** SVG overlay drawing Finish-to-Start connectors between a project's tasks with
@@ -56,7 +56,7 @@ export function DependencyArrows({ subtasks, leftW, timelineW, hoverDep, onHover
   if (links.length === 0) return null;
 
   return (
-    <svg style={{ position: "absolute", left: leftW, top: 0, width: timelineW, height: subtasks.length * SUB_ROW_H, pointerEvents: "none", zIndex: 4, overflow: "visible" }}>
+    <svg style={{ position: "absolute", left: leftW, top: 0, width: timelineW, height: subtasks.length * SUB_ROW_H, pointerEvents: "none", zIndex: Z_ARROWS, overflow: "visible" }}>
       <defs>
         {/* Quiet neutral arrowhead; a single slightly-darker head on hover. No red
             marker — a backward link is shown by a dash, not by an alarm colour. */}
@@ -167,7 +167,9 @@ export function ProjectBar({ g, spanDays, onCommit, onCommitTask, onLive, cp }: 
   };
 
   const left = g.left + (drag?.mode === "move" ? drag.dxDays * pctPerDay : 0);
-  const width = Math.max(0.6, g.width + (drag?.mode === "resize" ? drag.dxDays * pctPerDay : 0));
+  // The floor is in PIXELS (CSS `minWidth` below), never a % of the window —
+  // on a multi-year window even 0.6 % is several days wide.
+  const width = Math.max(0, g.width + (drag?.mode === "resize" ? drag.dxDays * pctPerDay : 0));
   const pStart = shiftISO(g.start, drag?.mode === "move" ? drag.dxDays : 0);
   const pEnd = shiftISO(g.deadline, drag ? drag.dxDays : 0);
 
@@ -220,6 +222,10 @@ export function ProjectBar({ g, spanDays, onCommit, onCommitTask, onLive, cp }: 
 }
 
 // ── Subtask bar ──────────────────────────────────────────────────────────────
+
+/** Smallest rendered task bar, in px — a 1-day task at the widest zoom-out
+ *  stays visible and grabbable without overstating its duration. */
+const MIN_SUB_BAR_PX = 5;
 
 export function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onLive, dim }: { projectId: number; s: GanttBar; timelineW: number; spanDays: number; pxPerDay: number; onCommit: (projectId: number, subtaskId: number, patch: SubtaskPatch) => void; onLive: (m: string) => void; dim: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -279,7 +285,10 @@ export function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onComm
   };
 
   const left = s.left + (drag?.mode === "move" ? drag.dxDays * pctPerDay : 0);
-  const width = Math.max(0.8, s.width + (drag?.mode === "resize" ? drag.dxDays * pctPerDay : 0));
+  // Width = the inclusive working span exactly; only a tiny PIXEL floor
+  // (MIN_SUB_BAR_PX, applied as CSS `minWidth`) keeps a sub-day bar grabbable.
+  // A %-based floor scaled with the window (0.8 % ≈ 9 days on a 3-year plan).
+  const width = Math.max(0, s.width + (drag?.mode === "resize" ? drag.dxDays * pctPerDay : 0));
   const pStart = shiftISO(s.start, drag?.mode === "move" ? drag.dxDays : 0);
   const pDays = Math.max(1, workingDaysBetween(s.start, shiftISO(s.end, drag?.mode === "resize" ? drag.dxDays : 0)));
 
@@ -290,7 +299,7 @@ export function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onComm
   const critical = s.onCriticalPath && !s.done;
   const barFill = s.done ? DONE_FILL : PROGRESS;
   const critTitle = s.onCriticalPath ? " · chemin critique (marge nulle)" : s.float > 0 ? ` · marge ${s.float} j` : "";
-  const labelOutside = (left + width) * (timelineW / 100) + 8; // px from timeline start for the trailing name
+  const labelOutside = left * (timelineW / 100) + Math.max(MIN_SUB_BAR_PX, width * (timelineW / 100)) + 8; // px from timeline start for the trailing name
   const showLabel = pxPerDay >= 4 && !drag;
   const showFloatNum = s.float > 0 && s.floatWidth > 0 && !s.done && pxPerDay >= 5;
 
@@ -336,7 +345,7 @@ export function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onComm
         style={{
           position: "absolute", top: SUB_ROW_H / 2 - 8, height: 16, borderRadius: R.xs,
           ...(drag ? { left: `${left}%`, width: `${width}%` } : {}),
-          minWidth: 8, background: barFill, opacity: s.done ? 0.7 : 1,
+          minWidth: MIN_SUB_BAR_PX, background: barFill, opacity: s.done ? 0.7 : 1,
           // done = diagonal hatch overlay (non-opacity cue, so done recedes without
           // relying on opacity alone); critical = ONE ink hairline ring as a border
           // (NOT a box-shadow — that's reserved for the .gantt-bar:hover ring, which

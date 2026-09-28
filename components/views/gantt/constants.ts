@@ -10,6 +10,15 @@ export const HEADER_H = 48; // two-tier sticky header — airy two-row rhythm
 
 export const MIN_LEFT_W = 240;
 
+// Paint order inside the scroll container (one stacking context). The sticky
+// name column must sit ABOVE everything drawn on the timeline — bars (≤ 5 while
+// dragging) and the dependency-arrow layer (4), which otherwise slide under /
+// over it when a predecessor is scrolled off to the left — and the sticky
+// header above the column.
+export const Z_ARROWS = 4;
+export const Z_LEFT_COL = 6;
+export const Z_HEADER = 7;
+
 export const MAX_LEFT_W = 560;
 
 // Unified colour system: GREEN (C.brand) is the SINGLE accent — brand + progress

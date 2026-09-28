@@ -298,7 +298,11 @@ export function PlanningGantt() {
                           animate={{ height: "auto", opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={SPRING.gentle}
-                          style={{ position: "relative", overflow: "hidden" }}
+                          // `clip`, NOT `hidden`: `overflow:hidden` makes this box
+                          // a scroll container, which captures the sticky name
+                          // cells inside it — they then scroll away horizontally
+                          // and bars/arrows paint across the name column.
+                          style={{ position: "relative", overflow: "clip" }}
                         >
                           {g.subtasks.map((s) => (
                             <div

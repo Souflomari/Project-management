@@ -2,7 +2,7 @@
 
 import { toDate } from "@/lib/format";
 import { C, FONT_NUM, R, SURFACE, TX } from "@/lib/tokens";
-import { HEADER_H, type Zoom } from "./constants";
+import { HEADER_H, Z_HEADER, type Zoom } from "./constants";
 import { addDays, dayIndex } from "./dates";
 
 // ── Axis tick model ──────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ export function ChartBackground({ leftW, timelineW, axis, todayPx, topOffset }: 
 
 export function AxisHeader({ leftW, timelineW, axis, todayPx, onResize }: { leftW: number; timelineW: number; axis: Axis; todayPx: number; onResize: (e: React.PointerEvent) => void }) {
   return (
-    <div style={{ display: "flex", borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: C.subtle, zIndex: 6, height: HEADER_H }}>
+    <div style={{ display: "flex", borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: C.subtle, zIndex: Z_HEADER, height: HEADER_H }}>
       <div
         style={{
           width: leftW, flexShrink: 0, padding: "8px 14px", ...TX.eyebrow, color: C.ink500, position: "sticky", left: 0,

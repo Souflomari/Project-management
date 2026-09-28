@@ -42,6 +42,14 @@ export function Popover(props: PopoverProps) {
   );
 }
 
+/** The element focus returns to. The anchor may be a non-focusable wrapper
+ *  (table cells anchor on a <span> around the trigger button) — use the
+ *  focusable control inside it then. */
+function triggerOf(anchor: HTMLElement | null): HTMLElement | null {
+  if (!anchor || anchor.tabIndex >= 0) return anchor;
+  return focusableIn(anchor)[0] ?? anchor;
+}
+
 const GAP = 6;
 const MARGIN = 8;
 
@@ -51,14 +59,6 @@ function PopoverPanel({
 }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   const present = useIsPresent();
-
-  useOverlay(ref, {
-    active: present,
-    modal: false,
-    onEscape: onClose,
-    initialFocus: autoFocus ? "first" : "none",
-    returnFocus: () => anchorRef.current,
-  });
 
   const place = useCallback(() => {
     const a = anchorRef.current;
@@ -81,7 +81,19 @@ function PopoverPanel({
     el.style.transformOrigin = above ? "bottom left" : "top left";
   }, [anchorRef, align]);
 
+  // Placement MUST run before `useOverlay`'s initial focus: layout effects fire
+  // in declaration order, and the panel is `visibility:hidden` until placed —
+  // a hidden element silently refuses focus(), leaving focus on the trigger
+  // (no arrow keys, no Tab-out close).
   useLayoutEffect(() => { place(); }, [place]);
+
+  useOverlay(ref, {
+    active: present,
+    modal: false,
+    onEscape: onClose,
+    initialFocus: autoFocus ? "first" : "none",
+    returnFocus: () => triggerOf(anchorRef.current),
+  });
 
   useEffect(() => {
     const onPress = (e: PointerEvent) => {
@@ -103,10 +115,33 @@ function PopoverPanel({
     };
   }, [anchorRef, onClose, place]);
 
-  // Arrow-key roving between items; Tab leaving the panel closes it.
+  // Tab leaving the panel closes it and continues the page's tab order from the
+  // trigger (the panel is portalled to the end of <body>, so the browser's own
+  // next stop would be the address bar). A menu is a single tab stop: any Tab
+  // leaves it. Shift+Tab lands on the trigger itself.
+  const tabOut = (e: React.KeyboardEvent, node: HTMLElement) => {
+    const items = focusableIn(node);
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    const leaving = role === "menu" || !items.length || (e.shiftKey ? i <= 0 : i === items.length - 1);
+    if (!leaving) return;
+    const trigger = triggerOf(anchorRef.current);
+    if (!trigger) return;
+    e.preventDefault();
+    let dest: HTMLElement | null = trigger;
+    if (!e.shiftKey) {
+      const order = focusableIn(document.body).filter((el) => !node.contains(el));
+      const t = order.indexOf(trigger);
+      dest = t >= 0 ? order[t + 1] ?? trigger : trigger;
+    }
+    dest.focus();
+    onClose();
+  };
+
+  // Arrow-key roving between items (Home/End jump); Tab-out handled above.
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
     const node = ref.current;
+    if (node && e.key === "Tab" && !e.defaultPrevented) { tabOut(e, node); return; }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
     if (!node) return;
     const target = e.target as HTMLElement;
     if (target.tagName === "INPUT" && (target as HTMLInputElement).type !== "checkbox") return;

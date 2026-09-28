@@ -5,7 +5,7 @@ import { Avatar, StatusPill } from "../../ui";
 import { type GanttBar, type GanttRow } from "@/lib/derive";
 import { fmtShort } from "@/lib/format";
 import { C, FONT_NUM, R, SURFACE, TX } from "@/lib/tokens";
-import { ALL_COLS, BAR_TRACK, CP_RING, PROGRESS, type ColKey } from "./constants";
+import { ALL_COLS, BAR_TRACK, CP_RING, PROGRESS, Z_LEFT_COL, type ColKey } from "./constants";
 
 // Left-panel cells (project / task rows) and the legend.
 
@@ -49,7 +49,7 @@ export function ProjectLeftCell({ g, isOpen, leftW, cols, cpCount, onToggle }: {
       style={{
         width: leftW, flexShrink: 0, padding: "8px 12px 8px 14px", position: "sticky", left: 0,
         background: isOpen ? C.subtle : C.surface, borderRight: `1px solid ${C.line}`, minWidth: 0,
-        display: "flex", gap: 9, alignItems: "center", zIndex: 2,
+        display: "flex", gap: 9, alignItems: "center", zIndex: Z_LEFT_COL,
       }}
     >
       <button
@@ -89,7 +89,10 @@ export function SubtaskLeftCell({ s, leftW, cols }: { s: GanttBar; leftW: number
       style={{
         width: leftW, flexShrink: 0, padding: "0 12px 0 37px", position: "sticky", left: 0,
         background: SURFACE.container, borderRight: `1px solid ${C.line}`, minWidth: 0,
-        display: "flex", alignItems: "center", gap: 7, zIndex: 2,
+        display: "flex", alignItems: "center", gap: 7, zIndex: Z_LEFT_COL,
+        // Repaint the row's 1px top border ON the sticky layer, so a dependency
+        // arrow passing under the column can't show through that seam.
+        boxShadow: `0 -1px 0 ${C.subtle}`,
       }}
     >
       <Avatar initials={s.assigneeInitials} color={s.color} size={20} fontSize={12} title={s.assigneeInitials} />

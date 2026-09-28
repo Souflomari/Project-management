@@ -7,7 +7,7 @@
 // reads the store directly so callers just drop them in. `p` is the derived
 // project (extends the raw Project).
 
-import { useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { CloseIcon, PlusIcon, TrashIcon } from "./icons";
 import { Avatar, Button, Checkbox, IconButton, Input, ProgressBar, Select, Textarea } from "./ui";
@@ -172,7 +172,6 @@ export function ProjectProperties({ p }: { p: DerivedProject }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
         <PropRow label="Début">
           <DateField
-            key={`s-${p.start}`}
             ariaLabel="Date de début"
             value={p.start}
             max={p.deadline}
@@ -182,7 +181,6 @@ export function ProjectProperties({ p }: { p: DerivedProject }) {
         </PropRow>
         <PropRow label={`Échéance · ${p.deadlineDaysLabel}`}>
           <DateField
-            key={`d-${p.deadline}`}
             ariaLabel="Échéance finale"
             value={p.deadline}
             min={p.start}
@@ -729,7 +727,7 @@ function SubtaskRow({
             <Select size="sm" aria-label="Responsable" value={subtask.assigneeId} onChange={(e) => onUpdate(projectId, subtask.id, { assigneeId: Number(e.target.value) })}>
               {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
             </Select>
-            <DateField key={`st-${subtask.start}`} ariaLabel="Date de début" value={subtask.start} onCommit={(v) => onUpdate(projectId, subtask.id, { start: v })} style={{ width: 148 }} />
+            <DateField ariaLabel="Date de début" value={subtask.start} onCommit={(v) => onUpdate(projectId, subtask.id, { start: v })} style={{ width: 148 }} />
             <DaysField key={`pd-${subtask.plannedDays}`} value={subtask.plannedDays} onCommit={(n) => onUpdate(projectId, subtask.id, { plannedDays: n })} />
           </div>
           <div style={{ ...TX.micro, color: C.ink500, marginTop: 6 }}>fin {fmtFull(subtask.end)}</div>
@@ -808,9 +806,14 @@ function dateError(v: string): string | null {
   return null;
 }
 
-/** Date input that never saves an empty/invalid value: an invalid entry shows
- *  an inline error and, on blur, reverts to the last saved value. Pickers
- *  commit on change; a valid typed date commits as soon as it is complete. */
+/** Date input with a LOCAL draft: typing, ArrowUp/Down on a segment or a
+ *  picker selection only edit the draft — the component is never remounted, so
+ *  focus stays put and a half-typed date (e.g. "15" in the year) is never
+ *  saved. The draft commits on blur/Enter, and only when it is a complete, valid
+ *  yyyy-mm-dd that also satisfies `validate`; otherwise it reverts to the last
+ *  saved value with an inline error. Escape discards the draft. An external
+ *  change of `value` (undo, Gantt drag) shows through whenever no draft is
+ *  pending. */
 function DateField({ value, onCommit, validate, ariaLabel, min, max, style }: {
   value: string;
   onCommit: (v: string) => void;
@@ -823,6 +826,25 @@ function DateField({ value, onCommit, validate, ariaLabel, min, max, style }: {
   const [draft, setDraft] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const errId = useId();
+  const check = (v: string) => dateError(v) ?? validate?.(v) ?? null;
+
+  const commit = () => {
+    if (draft === null) return;
+    setDraft(null);
+    const msg = check(draft);
+    if (msg) { setErr(`${msg} Valeur précédente conservée.`); return; }
+    setErr(null);
+    if (draft !== value) onCommit(draft);
+  };
+
+  // A still-pending valid draft is saved if the field unmounts while focused
+  // (drawer closed from the keyboard, project switched) — no silent data loss.
+  const pending = useRef<() => void>(() => {});
+  useLayoutEffect(() => {
+    pending.current = () => { if (draft !== null && !check(draft) && draft !== value) onCommit(draft); };
+  });
+  useEffect(() => () => pending.current(), []);
+
   return (
     <div style={{ minWidth: 0 }}>
       <Input
@@ -837,13 +859,20 @@ function DateField({ value, onCommit, validate, ariaLabel, min, max, style }: {
         value={draft ?? value}
         onChange={(e) => {
           const v = e.target.value;
-          const msg = dateError(v) ?? validate?.(v) ?? null;
-          if (msg) { setDraft(v); setErr(msg); return; }
-          setDraft(null);
-          setErr(null);
-          if (v !== value) onCommit(v);
+          setDraft(v);
+          // Live feedback only; nothing is saved until blur/Enter.
+          setErr(v === value ? null : check(v));
         }}
-        onBlur={() => { if (draft !== null) { setDraft(null); setErr((m) => (m ? `${m} Valeur précédente conservée.` : m)); } }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          else if (e.key === "Escape" && (draft !== null || err)) {
+            // Handled here: the enclosing drawer/modal must not close as well.
+            e.preventDefault();
+            setDraft(null);
+            setErr(null);
+          }
+        }}
         style={style}
       />
       {err ? <div id={errId} role="alert" style={{ ...TX.nano, color: C.danger, marginTop: 4 }}>{err}</div> : null}
