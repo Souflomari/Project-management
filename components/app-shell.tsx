@@ -1,5 +1,6 @@
 "use client";
 
+import { MotionConfig } from "motion/react";
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
 
@@ -46,7 +47,7 @@ const VISIBLE: CSSProperties = {
   background: C.solid,
   borderRadius: R.sm,
   textDecoration: "none",
-  boxShadow: "var(--sh-overlay, 0 8px 28px rgba(28,25,23,.16))",
+  boxShadow: "var(--sh-overlay)",
   zIndex: Z.toast + 1,
 };
 
@@ -65,8 +66,13 @@ function SkipLink() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  // MotionConfig: motion's JS animations ignore the CSS reduced-motion query, so
+  // opt every <motion.*> into the user's OS preference here.
+  // `data-app-root` is what the overlay layer marks `inert` while a modal
+  // surface is open; overlays themselves render in portals on <body>.
   return (
-    <div style={{ display: "flex", minHeight: "100dvh", background: C.canvas, color: C.ink900, fontVariantNumeric: "tabular-nums" }}>
+    <MotionConfig reducedMotion="user">
+    <div data-app-root="" className="app-shell" style={{ display: "flex", minHeight: "100dvh", background: C.canvas, color: C.ink900, fontVariantNumeric: "tabular-nums" }}>
       {/* Skip link: first focusable element; visually hidden until focused. */}
       <SkipLink />
       <Sidebar />
@@ -81,5 +87,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       <CommandPalette />
       <Toaster />
     </div>
+    </MotionConfig>
   );
 }

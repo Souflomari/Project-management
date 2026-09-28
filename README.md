@@ -15,7 +15,7 @@ It tracks engineering projects across six views:
 | **Équipe** | `/equipe` | Editable team + workload (charge) per week/month |
 
 Each project has: name, client (maître d'ouvrage), study phase
-(ESQ → APS → APD → PRO → DCE → EXE → RÉC), fees (honoraires, in M€), a project
+(ESQ → APS → APD → PRO → DCE → EXE → RÉC), fees (honoraires, in k€), a project
 lead, a status (à jour / à risque / en retard / terminé), and a list of editable
 **tasks (sous-tâches)** — each with its own assignee, start date and planned
 days. **Progress** and the **next deliverable** are derived from those tasks.
@@ -40,10 +40,18 @@ allocation.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm run build    # production build
-npm start        # serve the production build
+npm run dev        # http://localhost:3000
+npm run build      # production build
+npm start          # serve the production build
+
+npm run lint       # ESLint (flat config, next/core-web-vitals + typescript)
+npm run typecheck  # tsc --noEmit
+npm test           # vitest: scheduling/EVM/workload maths, formats,
+                   # validation and the sample repository
 ```
+
+CI (`.github/workflows/ci.yml`) runs `npm audit --audit-level=high`, lint,
+typecheck, tests and the build on every pull request.
 
 ## Deploying to Vercel
 
@@ -52,69 +60,96 @@ Push the repo and import it in Vercel — it builds with zero configuration
 
 ## Data layer (built for the Supabase swap)
 
-The data layer is isolated behind a single interface so the move to a real
-database is a one-file change.
+The data layer is isolated behind a single interface, so the views never know
+which backend they are talking to.
 
 ```
 lib/
-  types.ts                  # domain model (Project, TeamMember, Phase, Status, …)
+  types.ts                   # domain model (Project, TeamMember, Viewer, …)
+  validation.ts              # zod schemas + French messages for every write
   data/
-    repository.ts           # ProjectRepository interface (reads + mutations)
-    sample-data.ts          # the seed content (25 projects, 8 people)
-    sample-repository.ts    # in-memory implementation
-    index.ts                # exports the active repository  ← swap point
-  data/
-    supabase-client.ts      # supabase-js client (+ isSupabaseConfigured)
+    repository.ts            # ProjectRepository interface (reads + mutations)
+    sample-data.ts           # the seed content (25 projects, 6 people)
+    sample-repository.ts     # in-memory implementation, persisted in localStorage
     supabase-repository.ts   # Supabase implementation of ProjectRepository
-  derive.ts                 # pure view-model derivation (KPIs, gantt, calendar…)
-  format.ts                 # date / budget formatting
-  store/projects-context.tsx# client store (state + actions)
-lib/supabase/              # auth-aware Supabase clients (config/server/browser)
-app/actions.ts             # server actions for writes (auth + RLS)
-proxy.ts                   # auth gate / session refresh (Next "proxy" middleware)
+    server.ts                # picks the repository per request (+ signed-in viewer)
+    index.ts                 # client-safe exports (sample repository)
+  supabase/                  # auth-aware Supabase clients (config/server/browser)
+  derive.ts                  # pure view-model derivation (KPIs, gantt, calendar…)
+  format.ts                  # date / budget formatting
+  store/projects-context.tsx # client store (state + optimistic actions)
+app/actions.ts               # server actions for writes (access check + validation)
+proxy.ts                     # auth gate / session refresh (Next "proxy" middleware)
+supabase/schema.sql          # tables, constraints, RLS, access helpers
+scripts/seed-supabase.ts     # loads the sample portfolio into Supabase
 ```
 
 The active backend is chosen at request time:
 
-- **Sample mode** (no env vars): reads come from the in-memory sample data and
-  writes happen client-side for instant, session-local edits. No login.
+- **Demo mode** (no Supabase env vars): the server renders the sample portfolio,
+  and every edit is applied **in the visitor's browser** — kept in
+  `localStorage` (versioned and validated on load), never sent anywhere. Each
+  visitor has their own copy; *Paramètres → Réinitialiser la démonstration*
+  restores the seed. Server writes are **disabled**: the server actions refuse
+  to run, so nobody can change the data other visitors see. No login.
 - **Supabase mode** (env vars set): the whole app is gated behind login;
   reads use a request-scoped, authenticated Supabase client and writes go
-  through **server actions** (`app/actions.ts`) subject to RLS.
+  through **server actions** (`app/actions.ts`), which check that the caller is
+  signed in *and* granted access, validate the input, then call the
+  repository. RLS enforces access again in the database.
 
-Nothing in the views imports a concrete repository, so the UI is identical
-either way.
+Every write is validated with the same rules in both modes
+(`lib/validation.ts`: required names, real `yyyy-mm-dd` dates, échéance ≥
+début, whole days 1–1000, dependencies within the project…); rejected input is
+reported as a French toast instead of being saved or silently clamped.
 
 ### Authentication
 
-Login uses **Supabase Auth — email magic link**. When Supabase env vars are
-present, `proxy.ts` redirects unauthenticated visitors to `/login`; the magic
-link returns to `/auth/callback`, which exchanges the code for a session cookie.
+Login uses **Supabase Auth — email magic link**, with sign-ups closed: only
+invited users can sign in, and only those with a row in `app_users` see any
+data. When Supabase env vars are present, `proxy.ts` redirects unauthenticated
+visitors to `/login`; the magic link returns to `/auth/callback`, which
+exchanges the code for a session cookie. The sidebar and *Paramètres* show the
+signed-in person's team member (name, initials, colour); comments are signed
+with it.
 
 ### Connecting Supabase
 
 1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql)
-   in its SQL editor (tables + authenticated-only RLS policies).
-2. In **Authentication → Providers**, enable **Email** (magic link). Under
-   **Authentication → URL Configuration**, add your site URL and
-   `…/auth/callback` to the redirect allow-list (e.g. `http://localhost:3000`
-   and your Vercel URL).
+   in its SQL editor (tables, constraints, RLS policies, access helpers). The
+   file is idempotent: re-run it after pulling a newer version.
+2. In **Authentication → Providers → Email**, enable Email (magic link) and
+   **disable "Allow new users to sign up"**. Under **Authentication → URL
+   Configuration**, add your site URL and `…/auth/callback` to the redirect
+   allow-list (e.g. `http://localhost:3000` and your Vercel URL).
 3. Copy `.env.example` to `.env` and fill in all four values
    (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`,
    `SUPABASE_SERVICE_ROLE_KEY`).
-4. Seed the database with the sample portfolio: `npm run seed`.
-5. Restart `npm run dev`, then sign in with your email. On Vercel, set the two
+4. Seed the database with the sample portfolio: `npm run seed` (optional — skip
+   it to start empty, but create at least one team member). It prints the team
+   ids you need for the next step.
+5. **Invite users** from **Authentication → Users → Invite user**.
+6. **Grant access.** Signing in is not enough: each person needs a row in
+   `app_users` linking their login to a team member. Create the first admin in
+   the SQL editor:
+
+   ```sql
+   insert into app_users (user_id, member_id, role)
+   select id, 0, 'admin' from auth.users where email = 'you@setec.fr';
+   ```
+
+   Add everyone else the same way with `role = 'member'` (admins can manage
+   `app_users` rows; only admins can delete projects).
+7. Restart `npm run dev`, then sign in with your email. On Vercel, set the two
    `NEXT_PUBLIC_*` vars in the project settings (the service-role key is only
-   needed locally for seeding).
+   needed locally for seeding — never expose it to the browser).
 
-> The RLS policies in `schema.sql` allow any **authenticated** user to read and
-> write. Tighten them (per-team / per-owner roles) when you introduce roles.
-
-> **Note:** dates are anchored to a fixed reference "today" (`REFERENCE_DATE` in
-> `lib/format.ts`) so the curated sample data reads exactly as designed. Remove
-> or change that once live data is connected.
+> **Note:** "today" comes from `REFERENCE_DATE` in `lib/format.ts` (the current
+> date, Europe/Paris, re-read on every request and handed to the browser);
+> relative labels, the sidebar week and default project dates are all anchored
+> to it. Set `NEXT_PUBLIC_DEMO_DATE=yyyy-mm-dd` to pin it for demos.
 
 ## Original design
 
-The source design is kept at the repo root
-(`Pilotage Setec (cards version) - standalone.html`) for reference.
+The source design is kept in
+[`docs/prototype/pilotage-cards-standalone.html`](docs/prototype/pilotage-cards-standalone.html) for reference.

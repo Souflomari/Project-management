@@ -6,7 +6,8 @@ export type ViewKey =
   | "planning"
   | "calendrier"
   | "kanban"
-  | "equipe";
+  | "equipe"
+  | "parametres";
 
 export interface NavItem {
   key: ViewKey;
@@ -23,6 +24,10 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "calendrier", href: "/calendrier", label: "Calendrier", sub: "" },
   { key: "kanban", href: "/kanban", label: "Kanban", sub: "" },
   { key: "equipe", href: "/equipe", label: "Équipe", sub: "" },
+  // Not a sidebar entry (reached from the account menu), but listed so the
+  // header title / command palette resolve it instead of falling back to the
+  // dashboard.
+  { key: "parametres", href: "/parametres", label: "Paramètres", sub: "" },
 ];
 
 // The four dataset views are lenses on ONE "Projets" workspace, not separate
@@ -72,7 +77,7 @@ export function isProjectDetailPath(pathname: string): boolean {
   return pathname.startsWith("/projets/") && pathname !== "/projets";
 }
 
-/** Routes for the account menu. `/parametres` is a minimal stub for now. */
+/** Routes for the account menu. */
 export const ACCOUNT_ROUTES = {
   profil: "/parametres",
   parametres: "/parametres",

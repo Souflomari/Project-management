@@ -2,7 +2,16 @@
 // set of editable tasks (sous-tâches); progress and the "prochain rendu" are
 // derived from them. Swapping to Supabase replaces the repository, not this file.
 
-import { REFERENCE_DATE, relativeWhen, shiftISO, taskEnd, taskStartForEnd, workingDaysBetween } from "../format";
+import {
+  daysBetween,
+  REFERENCE_DATE,
+  relativeWhen,
+  shiftISO,
+  taskEnd,
+  taskStartForEnd,
+  weekRange,
+  workingDaysBetween,
+} from "../format";
 import { AVATAR_PALETTE } from "../tokens";
 import type { Project, Status, Subtask, TeamMember } from "../types";
 
@@ -19,6 +28,26 @@ export const TEAM: TeamMember[] = [
   { id: 4, name: "Soufiane", initials: "SF", color: AVATAR_PALETTE[4], role: "Ingénieur d’affaires", costPerDay: 650 },
   { id: 5, name: "Fabio", initials: "FB", color: AVATAR_PALETTE[5], role: "Ingénieur d’affaires (externe)", costPerDay: 700 },
 ];
+
+// ---------------------------------------------------------- demo time-shift
+//
+// The portfolio below was authored around ANCHOR (Monday 15 June 2026). The app
+// clock is the real date, so every authored date is shifted by the whole-week
+// offset between ANCHOR and the Monday of the current week: weekdays stay
+// aligned (a Friday deliverable is still a Friday) and the demo reads, relative
+// to "today", just as it did at the anchor — deliverables due this week, a few
+// projects slipping, others archived.
+export const DEMO_ANCHOR = "2026-06-15";
+/** Whole-week offset (a multiple of 7 days) applied to every authored date.
+ *  Computed on each call: the app clock can move (see setReferenceDate). */
+export function demoShiftDays(): number {
+  return daysBetween(DEMO_ANCHOR, weekRange(REFERENCE_DATE).start);
+}
+
+/** An authored (anchor-relative) date moved into the current week's frame. */
+function demoDate(iso: string): string {
+  return shiftISO(iso, demoShiftDays());
+}
 
 // [name, client, discipline, leadIdx, phaseIndex, progress, status, budget(k€), start, deadline, renduLabel, renduDate]
 type Row = [
@@ -58,10 +87,12 @@ const ROWS: Row[] = [
   ["Data center Sud — Lot CVC", "OVHcloud", "Bâtiment / Énergie", 3, 5, 84, "à jour", 460, "2025-01-01", "2026-09-05", "Visa exécution", "2026-06-21"],
 ];
 
+// Authored dates (a few days before the anchor), shifted like everything else
+// when the projects are built.
 const SEED_COMMENTS: Record<number, { ri: number; text: string; at: string }[]> = {
-  1: [{ ri: 0, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", at: shiftISO(REFERENCE_DATE, -2) }],
-  6: [{ ri: 1, text: "Accès à l'ouvrage soumis à autorisation — relance du MOA en cours.", at: shiftISO(REFERENCE_DATE, -1) }],
-  21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", at: shiftISO(REFERENCE_DATE, -4) }],
+  1: [{ ri: 0, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", at: "2026-06-13" }],
+  6: [{ ri: 1, text: "Accès à l'ouvrage soumis à autorisation — relance du MOA en cours.", at: "2026-06-14" }],
+  21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", at: "2026-06-11" }],
 };
 
 // Effort model. Each project's five tasks share a total planned effort sized so
@@ -70,6 +101,12 @@ const SEED_COMMENTS: Record<number, { ri: number; text: string; at: string }[]> 
 // is split across the five tasks by these fractions (a study ramps up then closes
 // out), giving per-task work-packages of a few weeks to ~3 months — realistic for
 // a small staffed team, and large enough that the cost is a meaningful share.
+// The authored fees (ROWS) were sized for a much larger team: with the demand-
+// based workload model, the six-person roster ran at ~200 % on average. Scaling
+// the fees scales the effort with them (effort ∝ fee), so the portfolio lands at
+// ~3.8 M€, the team at ~70–80 % with a couple of members over capacity, and the
+// earned-value ratios above stay unchanged.
+const FEE_SCALE = 0.4;
 const COMMIT_FRACTION = 0.5; // planned labour cost as a fraction of the fee
 const EFFORT_SPLIT = [0.18, 0.24, 0.2, 0.24, 0.14]; // by chronological task position
 
@@ -182,7 +219,7 @@ function buildSubtasks(row: Row): Subtask[] {
   const target = (progress / 100) * total;
   let running = 0;
 
-  const subs = names.map((name, i) => {
+  const subs: Subtask[] = names.map((name, i) => {
     running += days[i];
     const done = status === "terminé" ? true : running <= target + 0.5;
     return {
@@ -191,7 +228,6 @@ function buildSubtasks(row: Row): Subtask[] {
       assigneeId: assignees[i],
       start: slots[i].start,
       plannedDays: days[i],
-      end: slots[i].end,
       done,
       // Linear Finish-to-Start chain: each task depends on the previous one.
       dependsOn: i === 0 ? [] : [i],
@@ -204,16 +240,28 @@ function buildSubtasks(row: Row): Subtask[] {
   // a project is simply work already delivered, so mark it done. (Genuinely late
   // projects keep their overdue open task; "terminé" is already all-done.)
   if (status !== "en retard" && status !== "terminé") {
-    for (const s of subs) {
-      if (!s.done && s.end < REFERENCE_DATE) s.done = true;
-    }
+    subs.forEach((s, i) => {
+      if (!s.done && slots[i].end < REFERENCE_DATE) s.done = true;
+    });
   }
 
-  return subs.map(({ end, ...s }) => s);
+  return subs;
+}
+
+/** The authored rows with every date moved into the current week's frame. */
+function shiftedRows(): Row[] {
+  return ROWS.map((r) => {
+    const out: Row = [...r];
+    out[7] = Math.max(5, Math.round((r[7] * FEE_SCALE) / 5) * 5);
+    out[8] = demoDate(r[8]);
+    out[9] = demoDate(r[9]);
+    out[11] = demoDate(r[11]);
+    return out;
+  });
 }
 
 export function buildSampleProjects(): Project[] {
-  return ROWS.map((r, idx) => {
+  return shiftedRows().map((r, idx) => {
     const id = idx + 1;
     return {
       id,
@@ -232,8 +280,8 @@ export function buildSampleProjects(): Project[] {
         initials: TEAM[c.ri].initials,
         color: TEAM[c.ri].color,
         text: c.text,
-        at: c.at,
-        when: relativeWhen(c.at),
+        at: demoDate(c.at),
+        when: relativeWhen(demoDate(c.at)),
       })),
     };
   });

@@ -7,7 +7,8 @@ import { CaretDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, S
 import { TeamMemberModal } from "../team-member-modal";
 import { Avatar, Button, Card, EmptyState, IconButton, Input, rowProps, Segmented, Select, Toolbar, Tooltip } from "../ui";
 import { buildTeamLoad, type HeatBucket, type TeamLoad } from "@/lib/derive";
-import { fmtEur, isToday, MONS_LONG, MONTHS_FULL, monthRange, REFERENCE_DATE, toDate, weekRange } from "@/lib/format";
+import { fmtEur, isToday, MONS_LONG, MONTHS_FULL, monthRange, REFERENCE_DATE, shiftISO, toDate, weekRange } from "@/lib/format";
+import { weekRangeLabel } from "@/lib/date-labels";
 import { useProjects, type TeamMode } from "@/lib/store/projects-context";
 import { C, chargeColor, DUR, EASE, loadTier, num, R, SP, SURFACE, TX } from "@/lib/tokens";
 import type { TeamMember } from "@/lib/types";
@@ -100,26 +101,24 @@ export function Team() {
   }, [allDerived]);
 
   const anchor = toDate(teamAnchor);
-  const range = teamMode === "semaine" ? weekRange(teamAnchor) : monthRange(anchor.getFullYear(), anchor.getMonth());
+  const range = useMemo(() => {
+    const a = toDate(teamAnchor);
+    return teamMode === "semaine" ? weekRange(teamAnchor) : monthRange(a.getFullYear(), a.getMonth());
+  }, [teamAnchor, teamMode]);
   const loads = useMemo(
     () => buildTeamLoad(allDerived, team, range, teamMode === "semaine" ? "day" : "week"),
-    [allDerived, team, range.start, range.end, teamMode],
+    [allDerived, team, range, teamMode],
   );
 
   // Previous period — for a period-over-period charge delta per member.
   const prevRange = useMemo(() => {
-    if (teamMode === "semaine") {
-      const d = toDate(weekRange(teamAnchor).start);
-      d.setDate(d.getDate() - 7);
-      return weekRange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
-    }
-    const m = anchor.getMonth() - 1;
-    const y = m < 0 ? anchor.getFullYear() - 1 : anchor.getFullYear();
-    return monthRange(y, (m + 12) % 12);
-  }, [teamAnchor, teamMode, anchor]);
+    if (teamMode === "semaine") return weekRange(shiftISO(weekRange(teamAnchor).start, -7));
+    const a = toDate(teamAnchor);
+    return monthRange(a.getMonth() === 0 ? a.getFullYear() - 1 : a.getFullYear(), (a.getMonth() + 11) % 12);
+  }, [teamAnchor, teamMode]);
   const prevLoads = useMemo(
     () => buildTeamLoad(allDerived, team, prevRange, teamMode === "semaine" ? "day" : "week"),
-    [allDerived, team, prevRange.start, prevRange.end, teamMode],
+    [allDerived, team, prevRange, teamMode],
   );
   const prevCharge = useMemo(() => {
     const m = new Map<number, number>();
@@ -136,7 +135,8 @@ export function Team() {
     let out = enriched.filter((e) => {
       if (q && !(e.load.member.name.toLowerCase().includes(q) || e.load.member.role.toLowerCase().includes(q))) return false;
       if (filter === "over") return e.chargePct > 100;
-      if (filter === "under") return e.chargePct > 0 && e.chargePct < 60;
+      // Under-used includes idle members (0 %) — they are the most under-used.
+      if (filter === "under") return e.chargePct < 60;
       if (filter === "free") return e.freeDays > 0;
       return true;
     });
@@ -166,7 +166,7 @@ export function Team() {
 
   const periodLabel =
     teamMode === "semaine"
-      ? `${toDate(weekRange(teamAnchor).start).getDate()} – ${toDate(weekRange(teamAnchor).end).getDate()} ${MONTHS_FULL[toDate(weekRange(teamAnchor).end).getMonth()]}`
+      ? weekRangeLabel(range.start, range.end, false)
       : `${MONS_LONG[anchor.getMonth()]} ${anchor.getFullYear()}`;
 
   const openAdd = () => { setEditing(null); setModalOpen(true); };
@@ -196,7 +196,7 @@ export function Team() {
           the first row never exceeds ~5 simultaneous choices (Hick/Miller). */}
       <Toolbar style={{ marginBottom: SP[4] }}>
         <IconButton onClick={teamPrev} aria-label="Période précédente"><ChevronLeftIcon /></IconButton>
-        <h2 style={{ ...num(20), minWidth: 150, textAlign: "center" }}>{periodLabel}</h2>
+        <h2 style={{ ...num(20), minWidth: 150, textAlign: "center", margin: 0 }}>{periodLabel}</h2>
         <IconButton onClick={teamNext} aria-label="Période suivante"><ChevronRightIcon /></IconButton>
         <Button variant="secondary" size="sm" onClick={teamToday}>Aujourd’hui</Button>
         <Segmented value={teamMode} options={MODE_OPTS} onChange={setTeamMode} />
@@ -463,13 +463,10 @@ function isoWeek(d: Date): number {
  *  colour the severity. Exposed as a labelled role=img figure with a per-bucket
  *  data-table fallback for assistive tech. */
 function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: TeamMode; memberName: string }) {
-  // Bars grow up from the baseline on mount (reduced-motion → instant full height).
+  // Bars grow up from the baseline on mount; under reduced motion the global
+  // CSS rule makes the height transition instant.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setMounted(true);
-      return;
-    }
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
   }, []);
@@ -497,7 +494,7 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
           // mild over (≈100–120 %) → amber, severe over (>≈120 %) → red. No hatch,
           // no terracotta; the bar HEIGHT still encodes the magnitude.
           const fillPx = base + over;
-          const cellFill = b.pct <= 0 ? "transparent" : b.pct <= 100 ? "var(--green-soft)" : b.pct <= 120 ? "var(--warning)" : "var(--danger)";
+          const cellFill = b.pct <= 0 ? "transparent" : b.pct <= 100 ? "var(--data-fill)" : b.pct <= 120 ? "var(--warning)" : "var(--danger)";
           const overDays = Math.max(0, b.days - b.capacity);
           const lab = bucketLabel(b, mode);
           const delay = `${Math.min(i * 25, 200)}ms`;
@@ -517,7 +514,7 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
                 <div style={{ position: "absolute", left: 0, right: 0, top: OVER, borderTop: `1px dashed ${C.line}` }} />
                 {/* C9: one flat tier-coloured load fill (no over-cap, no hatching). */}
                 <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: mounted ? fillPx : 0, background: cellFill, transition: grow, transitionDelay: delay }} />
-                {overDays > 0 ? <span aria-hidden style={{ position: "absolute", top: 0, left: 0, right: 0, textAlign: "center", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: C.ink900, opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
+                {overDays > 0 ? <span aria-hidden style={{ position: "absolute", top: 1, left: "50%", transform: "translateX(-50%)", textAlign: "center", fontSize: 12, fontWeight: 600, lineHeight: "14px", fontVariantNumeric: "tabular-nums", color: C.ink900, background: "rgba(255,255,255,.92)", borderRadius: R.xs, padding: "0 3px", whiteSpace: "nowrap", opacity: mounted ? 1 : 0, transition: `opacity ${DUR.slow} ${EASE.decel}`, transitionDelay: delay }}>+{overDays}&#8239;j</span> : null}
                 {/* today marker: a small ink dot (non-colour cue — position + the
                     bold weekday label below), so "today" is found without a heavy ring. */}
                 {inThisBucketToday ? <span aria-hidden style={{ position: "absolute", bottom: 3, left: "50%", transform: "translateX(-50%)", width: 3, height: 3, borderRadius: "50%", background: C.ink700 }} /> : null}
@@ -528,8 +525,10 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
           );
         })}
       </div>
-      {/* Screen-reader data-table fallback */}
-      <table style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>
+      {/* Screen-reader data-table fallback. Wrapped in a clipped BLOCK box
+          (.sr-only): a <table> ignores width:1px and used to widen the page. */}
+      <div className="sr-only">
+      <table>
         <caption>{summary}</caption>
         <thead><tr><th scope="col">{mode === "semaine" ? "Jour" : "Semaine"}</th><th scope="col">Jours</th><th scope="col">Capacité</th><th scope="col">Charge</th></tr></thead>
         <tbody>
@@ -541,6 +540,7 @@ function Heatmap({ buckets, mode, memberName }: { buckets: HeatBucket[]; mode: T
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

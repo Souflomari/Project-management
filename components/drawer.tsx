@@ -1,13 +1,16 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useId, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 
 import { CloseIcon } from "./icons";
+import { useOverlay } from "./overlay/overlay-stack";
 import { ProjectComments, ProjectIdentity, ProjectPeekSummary, ProjectTasks, StatusPicker } from "./project-detail";
-import { IconButton, useFocusTrap } from "./ui";
+import { IconButton } from "./ui";
+import { useIsClient } from "@/lib/use-media-query";
 import { deriveProject } from "@/lib/derive";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, R, SH, SPRING, TX, Z } from "@/lib/tokens";
@@ -17,9 +20,7 @@ const SECTION: React.CSSProperties = { ...TX.overline, color: C.ink700 };
 export function ProjectDrawer() {
   const { selected, team, closeDrawer } = useProjects();
   const router = useRouter();
-
-  const asideRef = useRef<HTMLElement>(null);
-  useFocusTrap(asideRef, closeDrawer);
+  const isClient = useIsClient();
 
   const derived = useMemo(() => (selected ? deriveProject(selected, team) : null), [selected, team]);
 
@@ -29,31 +30,42 @@ export function ProjectDrawer() {
     if (id != null) router.push(`/projets/${id}`);
   }, [selected, closeDrawer, router]);
 
-  return (
+  if (!isClient) return null;
+  // Portal on <body>, outside the inert-able app root. A constant key: switching
+  // project while open updates the peek in place (no remount → focus stays).
+  return createPortal(
     <AnimatePresence>
       {selected && derived ? (
-        <Peek key={derived.id} p={derived} asideRef={asideRef} onClose={closeDrawer} onOpenFull={openFull} />
+        <Peek key="peek" p={derived} onClose={closeDrawer} onOpenFull={openFull} />
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
 function Peek({
   p,
-  asideRef,
   onClose,
   onOpenFull,
 }: {
   p: ReturnType<typeof deriveProject>;
-  asideRef: React.RefObject<HTMLElement | null>;
   onClose: () => void;
   onOpenFull: () => void;
 }) {
+  // The overlay layer (focus trap, Escape for the top-most layer only, inert
+  // background, scroll lock, focus restore) lives HERE — this component only
+  // exists while the drawer is open, so the trap engages on open. During the
+  // exit animation the layer is already released.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const present = useIsPresent();
+  const titleId = useId();
+  useOverlay(rootRef, { active: present, onEscape: onClose, initialFocus: "container" });
+
   // The drawer is an ACTIONABLE PEEK — identity, status, the decision numbers,
   // then the live task list (add/toggle/edit/delete) and the activity thread with
   // a working composer. The full two-column workspace still lives at /projets/[id].
   return (
-    <>
+    <div ref={rootRef}>
       <motion.div
         onClick={onClose}
         aria-hidden
@@ -62,14 +74,14 @@ function Peek({
         exit={{ opacity: 0 }}
         transition={{ duration: 0.18 }}
         // cursor signals the backdrop is a click-to-close affordance (Escape also
-        // closes via the dialog focus-trap).
+        // closes via the overlay layer).
         style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: Z.drawer, cursor: "pointer" }}
       />
       <motion.aside
-        ref={asideRef as never}
+        data-overlay-focus=""
         role="dialog"
         aria-modal="true"
-        aria-labelledby="drawer-title"
+        aria-labelledby={titleId}
         tabIndex={-1}
         initial={{ x: "100%" }}
         animate={{ x: 0 }}
@@ -105,12 +117,12 @@ function Peek({
               >
                 Ouvrir la page ↗
               </Link>
-              <IconButton size={30} onClick={onClose} aria-label="Fermer le dossier">
+              <IconButton size={30} onClick={onClose} aria-label="Fermer le dossier" data-overlay-close="">
                 <CloseIcon size={15} />
               </IconButton>
             </div>
           </div>
-          <ProjectIdentity p={p} titleId="drawer-title" />
+          <ProjectIdentity p={p} titleId={titleId} />
           <div style={{ marginTop: 12 }}>
             <StatusPicker p={p} size="xs" />
           </div>
@@ -146,6 +158,6 @@ function Peek({
           </div>
         </div>
       </motion.aside>
-    </>
+    </div>
   );
 }

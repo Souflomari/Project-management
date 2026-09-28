@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import {
@@ -12,10 +13,11 @@ import {
   ClockIcon,
   SearchIcon,
 } from "./icons";
+import { hasOpenOverlay, useOverlay } from "./overlay/overlay-stack";
 import { Avatar } from "./ui";
 import { NAV_ITEMS, pushRecent, readRecents } from "@/lib/nav";
 import { useProjects } from "@/lib/store/projects-context";
-import { C, DUR, EASE, R, SH, STATUS_META, TX } from "@/lib/tokens";
+import { C, DUR, EASE, R, SH, STATUS_META, TX, Z } from "@/lib/tokens";
 import { STATUSES } from "@/lib/types";
 
 type Category = "Récents" | "Actions" | "Aller à" | "Projets" | "Personnes" | "Vues";
@@ -117,7 +119,6 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // Recents snapshot taken on open (localStorage-backed, decoupled from store).
   const [recentIds, setRecentIds] = useState<string[]>([]);
@@ -125,39 +126,43 @@ export function CommandPalette() {
   // from stealing `active` away from keyboard ↑↓ as rows scroll under it.
   const usingMouse = useRef(false);
 
-  // ---- global key handling: ⌘K, Esc, and light single-key shortcuts ----
+  // Reset the transient state as part of the open action (not in an effect).
+  const openPalette = useCallback(() => {
+    setQ("");
+    setActive(0);
+    setRecentIds(readRecents().map((r) => r.id));
+    setOpen(true);
+  }, []);
+
+  // ---- global key handling: ⌘K and light single-key shortcuts ----
+  // Escape is handled by the overlay layer (top-most overlay only).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setOpen((o) => !o); return; }
-      if (e.key === "Escape") { setOpen(false); return; }
-
+      if (e.defaultPrevented) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        // Toggle the palette, but never stack it over another dialog.
+        if (open) { e.preventDefault(); setOpen(false); }
+        else if (!hasOpenOverlay()) { e.preventDefault(); openPalette(); }
+        return;
+      }
       // Single-key shortcuts: never while typing, never with a modifier, never
-      // when the palette itself is open (it owns the keyboard then).
-      if (open || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
+      // while any overlay (palette, modal, drawer, menu) owns the keyboard.
+      if (open || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target) || hasOpenOverlay()) return;
       if (e.key === "n") { e.preventDefault(); openAdd(); }
       else if (e.key === "/") {
         e.preventDefault();
-        // Focus the Projets search if present; else fall back to opening the palette.
-        const search = document.querySelector<HTMLInputElement>('input[data-projets-search]');
+        // Focus the (visible) Projets search if present; else open the palette.
+        const search = Array.from(document.querySelectorAll<HTMLInputElement>("input[data-projets-search]")).find((el) => el.offsetParent !== null);
         if (search) search.focus();
-        else setOpen(true);
+        else openPalette();
       }
-      else if (e.key === "?") { e.preventDefault(); setOpen(true); }
+      else if (e.key === "?") { e.preventDefault(); openPalette(); }
     };
-    const onOpen = () => setOpen(true);
+    const onOpen = () => { if (!hasOpenOverlay()) openPalette(); };
     window.addEventListener("keydown", onKey);
     window.addEventListener("setec:command", onOpen);
     return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("setec:command", onOpen); };
-  }, [open, openAdd]);
-
-  useEffect(() => {
-    if (open) {
-      setQ("");
-      setActive(0);
-      setRecentIds(readRecents().map((r) => r.id));
-      setTimeout(() => inputRef.current?.focus(), 0);
-    }
-  }, [open]);
+  }, [open, openAdd, openPalette]);
 
   const cmds = useMemo<Cmd[]>(() => {
     const close = (fn: () => void, recentId?: string) => () => {
@@ -320,20 +325,24 @@ export function CommandPalette() {
     return scored.slice(0, 24).map((x) => x.cmd);
   }, [cmds, q, recentIds]);
 
-  // Render grouped by category, preserving CAT_ORDER. Build a flat index map so
-  // ↑↓/↵ still operate on a single linear list across headers.
-  const grouped = useMemo(() => {
-    const out: { cat: Category; items: { cmd: Cmd; index: number }[] }[] = [];
-    results.forEach((cmd, index) => {
-      let bucket = out.find((b) => b.cat === cmd.cat);
-      if (!bucket) { bucket = { cat: cmd.cat, items: [] }; out.push(bucket); }
-      bucket.items.push({ cmd, index });
-    });
-    out.sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat));
-    return out;
+  // Render grouped by category, preserving CAT_ORDER; relevance order is kept
+  // WITHIN each group. The flat index is assigned AFTER grouping, so ↑/↓ walk
+  // the rows in exactly the order they are displayed.
+  const { grouped, flat } = useMemo(() => {
+    const buckets = new Map<Category, Cmd[]>();
+    for (const cmd of results) {
+      const b = buckets.get(cmd.cat) ?? [];
+      b.push(cmd);
+      buckets.set(cmd.cat, b);
+    }
+    const cats = [...buckets.keys()].sort((a, b) => CAT_ORDER.indexOf(a) - CAT_ORDER.indexOf(b));
+    const flatList: Cmd[] = [];
+    const groups = cats.map((cat) => ({
+      cat,
+      items: buckets.get(cat)!.map((cmd) => { flatList.push(cmd); return { cmd, index: flatList.length - 1 }; }),
+    }));
+    return { grouped: groups, flat: flatList };
   }, [results]);
-
-  useEffect(() => setActive(0), [q]);
 
   // Keep the keyboard-selected row in view (it can be off-screen after ↑↓).
   useEffect(() => {
@@ -344,28 +353,29 @@ export function CommandPalette() {
 
   if (!open) return null;
 
-  const run = (i: number) => results[i]?.run();
+  const run = (i: number) => flat[i]?.run();
 
-  return (
-    <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 80, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh", animation: "fadeIn .14s ease" }}>
-      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Recherche rapide" style={{ width: 560, maxWidth: "92%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.lg, overflow: "hidden", animation: "popIn .18s cubic-bezier(.2,.7,.2,1)" }}>
+  return createPortal(
+    <PaletteLayer onClose={() => setOpen(false)}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: `1px solid ${C.line}`, color: C.ink400 }}>
           <SearchIcon size={16} />
           <input
-            ref={inputRef}
+            autoFocus
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => { setQ(e.target.value); setActive(0); }}
             onKeyDown={(e) => {
-              if (e.key === "ArrowDown") { e.preventDefault(); usingMouse.current = false; setActive((a) => Math.min(a + 1, results.length - 1)); }
+              if (e.key === "ArrowDown") { e.preventDefault(); usingMouse.current = false; setActive((a) => Math.min(a + 1, flat.length - 1)); }
               else if (e.key === "ArrowUp") { e.preventDefault(); usingMouse.current = false; setActive((a) => Math.max(a - 1, 0)); }
               else if (e.key === "Enter") { e.preventDefault(); run(active); }
             }}
             placeholder="Rechercher ou exécuter une action…"
             role="combobox"
+            aria-label="Rechercher ou exécuter une action"
             aria-expanded
+            aria-autocomplete="list"
             aria-controls="cmdk-list"
-            aria-activedescendant={results.length ? `cmdk-row-${active}` : undefined}
-            style={{ flex: 1, border: "none", padding: 0, fontSize: 14, outline: "none", color: C.ink900, fontFamily: "inherit", background: "transparent" }}
+            aria-activedescendant={flat.length ? `cmdk-row-${active}` : undefined}
+            style={{ flex: 1, minWidth: 0, border: "none", padding: 0, fontSize: 16, outline: "none", color: C.ink900, fontFamily: "inherit", background: "transparent" }}
           />
         </div>
         <div
@@ -392,6 +402,7 @@ export function CommandPalette() {
                     key={it.id}
                     id={`cmdk-row-${i}`}
                     data-row={i}
+                    tabIndex={-1}
                     role="option"
                     onMouseEnter={() => { if (usingMouse.current) setActive(i); }}
                     onClick={() => run(i)}
@@ -423,6 +434,25 @@ export function CommandPalette() {
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Kbd>↵</Kbd>exécuter</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Kbd>échap</Kbd>fermer</span>
         </div>
+    </PaletteLayer>,
+    document.body,
+  );
+}
+
+/** Backdrop + dialog shell on the shared overlay layer (focus trap, Escape,
+ *  inert background, scroll lock, focus returned to the launcher). Mounted only
+ *  while the palette is open. */
+function PaletteLayer({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useOverlay(ref, { onEscape: onClose });
+  return (
+    <div
+      ref={ref}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: Z.palette, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh", animation: "fadeIn .14s ease" }}
+    >
+      <div data-overlay-focus="" tabIndex={-1} role="dialog" aria-modal="true" aria-label="Recherche rapide" style={{ width: 560, maxWidth: "92%", background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.overlay, overflow: "hidden", animation: "popIn .18s cubic-bezier(.2,.7,.2,1)", outline: "none" }}>
+        {children}
       </div>
     </div>
   );

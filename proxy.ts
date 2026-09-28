@@ -36,7 +36,9 @@ export async function proxy(request: NextRequest) {
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  if (user && path === "/login") {
+  // Signed-in users skip the login page, unless it's showing them an error
+  // (e.g. "forbidden": signed in but not granted access — avoids a redirect loop).
+  if (user && path === "/login" && !request.nextUrl.searchParams.has("error")) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
