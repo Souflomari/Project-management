@@ -3,13 +3,14 @@
 // Shared primitive kit. One source of truth for buttons, inputs, cards, etc.
 // so divergent inline styles stop being expressible across views.
 
-import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type KeyboardEvent, type ReactElement, type ReactNode, type Ref, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 
 import { CaretDownIcon, CheckIcon, CloseIcon, MinusIcon, SpinnerIcon } from "./icons";
-import { C, ELEV, num, PHASE_COLORS, R, SH, SP, SPRING, SURFACE, TX, Z } from "@/lib/tokens";
-import { PHASES, PHASES_FULL } from "@/lib/types";
+import { useOverlay } from "./overlay/overlay-stack";
+import { useIsClient } from "@/lib/use-media-query";
+import { C, ELEV, num, R, SH, SP, SPRING, SURFACE, TX, Z } from "@/lib/tokens";
 
 /** Make a clickable row keyboard-operable (WCAG 2.1.1). Spread onto the row;
  *  add `className="row-hover row-focus"`. */
@@ -19,6 +20,9 @@ export function rowProps(onActivate: () => void) {
     tabIndex: 0,
     onClick: onActivate,
     onKeyDown: (e: KeyboardEvent) => {
+      // Only when the row itself is focused — never hijack Enter/Space from a
+      // control nested inside it.
+      if (e.target !== e.currentTarget) return;
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         onActivate();
@@ -27,63 +31,46 @@ export function rowProps(onActivate: () => void) {
   };
 }
 
-/** True when the user has asked the OS to minimise motion. JS-driven animation
- *  (count-up, exit choreography) must short-circuit on this; CSS is handled by
- *  the global prefers-reduced-motion rule. */
+/** True when the user has asked the OS to minimise motion. Only for imperative
+ *  JS choreography run AFTER mount (never during render — that would differ
+ *  between server and client). CSS is handled by the global media query and
+ *  motion's animations by <MotionConfig reducedMotion="user">. */
 export const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /** Manage a brief "closing" phase so an overlay can animate out before it
  *  unmounts. Returns the flag + a wrapped close that plays the exit then calls
- *  the real `onClose` (immediately under reduced motion). */
+ *  the real `onClose` exactly once (immediately under reduced motion). The
+ *  timer is cleared on unmount and the latest `onClose` is always used. */
 export function useExitClose(onClose: () => void, ms = 160) {
   const [closing, setClosing] = useState(false);
+  const latest = useRef(onClose);
+  const timer = useRef<number | undefined>(undefined);
+  const fired = useRef(false);
+  useEffect(() => { latest.current = onClose; });
+  useEffect(() => () => window.clearTimeout(timer.current), []);
   const requestClose = useCallback(() => {
-    if (prefersReducedMotion()) return onClose();
+    if (fired.current) return;
+    fired.current = true;
+    if (prefersReducedMotion()) { latest.current(); return; }
     setClosing(true);
-    window.setTimeout(onClose, ms);
-  }, [onClose, ms]);
+    timer.current = window.setTimeout(() => latest.current(), ms);
+  }, [ms]);
   return { closing, requestClose };
-}
-
-/** Trap Tab focus within `ref`, focus the first control on mount, restore focus
- *  on unmount, and close on Escape. Shared by Modal and the project Drawer. */
-export function useFocusTrap(ref: { current: HTMLElement | null }, onClose: () => void) {
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    const node = ref.current;
-    const sel = "button,[href],input,select,textarea,[tabindex]:not([tabindex='-1'])";
-    (node?.querySelector<HTMLElement>("[autofocus]," + sel) ?? node)?.focus();
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") return onClose();
-      if (e.key !== "Tab" || !node) return;
-      const f = Array.from(node.querySelectorAll<HTMLElement>(sel)).filter(
-        (el) => !el.hasAttribute("disabled") && el.offsetParent !== null,
-      );
-      if (!f.length) return;
-      const first = f[0];
-      const last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); prev?.focus?.(); };
-  }, [ref, onClose]);
 }
 
 // ───────────────────────────────────────── Spinner
 
-/** Indeterminate activity ring. Spins via framer-motion (the motion engine), so
- *  it honours reduced-motion by simply not animating the rotation. `currentColor`
- *  so it inherits the button/control ink. */
+/** Indeterminate activity ring, spun by motion. `currentColor` so it inherits
+ *  the button/control ink. */
 export function Spinner({ size = 16, style }: { size?: number; style?: CSSProperties }) {
-  const reduce = prefersReducedMotion();
+  // Reduced motion is honoured by the app-wide <MotionConfig reducedMotion="user">.
   return (
     <motion.span
       aria-hidden
       style={{ display: "inline-flex", lineHeight: 0, ...style }}
-      animate={reduce ? undefined : { rotate: 360 }}
-      transition={reduce ? undefined : { repeat: Infinity, ease: "linear", duration: 0.7 }}
+      animate={{ rotate: 360 }}
+      transition={{ repeat: Infinity, ease: "linear", duration: 0.7 }}
     >
       <SpinnerIcon size={size} />
     </motion.span>
@@ -103,6 +90,7 @@ export function Button({
   children,
   style,
   disabled,
+  className,
   ...props
 }: {
   variant?: ButtonVariant;
@@ -112,6 +100,7 @@ export function Button({
    *  label stays in flow at opacity 0) so the button doesn't jump on toggle. */
   loading?: boolean;
   fullWidth?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const sizes: Record<string, CSSProperties> = {
     sm: { fontSize: 12, padding: "6px 12px" },
@@ -128,7 +117,7 @@ export function Button({
   const isDisabled = disabled || loading;
   return (
     <button
-      className={`btn btn-${variant}`}
+      className={`btn btn-${variant}${className ? ` ${className}` : ""}`}
       disabled={isDisabled}
       aria-busy={loading || undefined}
       style={{
@@ -147,7 +136,7 @@ export function Button({
         transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)",
         ...sizes[size],
         ...variants[variant],
-        ...(isDisabled && !loading ? { background: C.subtle, color: C.ink300, borderColor: C.line } : null),
+        ...(isDisabled && !loading ? { background: C.subtle, color: C.ink300, border: `1px solid ${C.line}` } : null),
         ...style,
       }}
       {...props}
@@ -172,6 +161,7 @@ export function IconButton({
   children,
   style,
   disabled,
+  className,
   ...props
 }: {
   size?: number;
@@ -179,11 +169,12 @@ export function IconButton({
   /** Swap the glyph for a spinner, set aria-busy and block clicks. */
   loading?: boolean;
   children: ReactNode;
+  ref?: Ref<HTMLButtonElement>;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const isDisabled = disabled || loading;
   return (
     <button
-      className={`btn icon-btn${tone === "danger" ? " icon-danger" : ""}`}
+      className={`btn icon-btn${tone === "danger" ? " icon-danger" : ""}${className ? ` ${className}` : ""}`}
       disabled={isDisabled}
       aria-busy={loading || undefined}
       style={{
@@ -200,7 +191,7 @@ export function IconButton({
         padding: 0,
         flexShrink: 0,
         transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)",
-        ...(isDisabled && !loading ? { background: C.subtle, color: C.ink300, borderColor: C.line } : null),
+        ...(isDisabled && !loading ? { background: C.subtle, color: C.ink300, border: `1px solid ${C.line}` } : null),
         ...style,
       }}
       {...props}
@@ -262,7 +253,7 @@ export function Checkbox({
             : { background: C.subtle, border: `1.5px solid ${C.line}` }
           : on
             ? { background: fill, border: `1px solid ${fill}` }
-            : { background: C.surface, border: `1.5px solid ${C.lineStrong}` }),
+            : { background: C.surface, border: `1.5px solid ${C.field}` }),
       }}
     >
       <span aria-hidden style={{ position: "absolute", inset: -8 }} />
@@ -301,7 +292,7 @@ export function Input({
           ...s,
           padding: `0 ${padR}px 0 ${padL}px`,
           width: "100%",
-          border: `1px solid ${invalid ? C.danger : C.line}`,
+          border: `1px solid ${invalid ? C.danger : C.field}`,
           borderRadius: R.sm,
           background: C.surface,
           color: C.ink900,
@@ -342,7 +333,7 @@ export function Select({
           ...s,
           padding: `0 30px 0 ${leading ? 32 : 12}px`,
           width: "100%",
-          border: `1px solid ${invalid ? C.danger : C.line}`,
+          border: `1px solid ${invalid ? C.danger : C.field}`,
           borderRadius: R.sm,
           background: C.surface,
           color: C.ink900,
@@ -372,6 +363,7 @@ export function Textarea({
   ...props
 }: {
   invalid?: boolean;
+  ref?: Ref<HTMLTextAreaElement>;
 } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
@@ -384,7 +376,7 @@ export function Textarea({
         minHeight: 80,
         fontSize: 14,
         lineHeight: 1.5,
-        border: `1px solid ${invalid ? C.danger : C.line}`,
+        border: `1px solid ${invalid ? C.danger : C.field}`,
         borderRadius: R.sm,
         background: C.surface,
         color: C.ink900,
@@ -403,7 +395,8 @@ export function Textarea({
 
 /** Form-field wrapper: associates a visible label and an error/help line with
  *  the control via a generated id, so call sites stop hand-wiring htmlFor/id and
- *  aria-describedby. Pass the id down to your control as a render prop. */
+ *  aria-describedby. Spread the render-prop argument's `id` / `invalid` /
+ *  `describedBy` onto your control (`aria-describedby={describedBy}`). */
 export function Field({
   label,
   error,
@@ -416,20 +409,21 @@ export function Field({
   error?: string;
   hint?: string;
   required?: boolean;
-  /** Receives `{ id, invalid }` to spread onto the control. */
-  children: (a: { id: string; invalid: boolean }) => ReactNode;
+  /** Receives `{ id, invalid, describedBy }` to spread onto the control. */
+  children: (a: { id: string; invalid: boolean; describedBy: string | undefined }) => ReactNode;
   style?: CSSProperties;
 }) {
   const id = useId();
   const descId = `${id}-desc`;
   const invalid = !!error;
+  const describedBy = error || hint ? descId : undefined;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, ...style }}>
       <label htmlFor={id} style={{ ...TX.micro, color: C.ink700, fontWeight: 600 }}>
         {label}
         {required ? <span aria-hidden style={{ color: C.danger, marginLeft: 3 }}>*</span> : null}
       </label>
-      {children({ id, invalid })}
+      {children({ id, invalid, describedBy })}
       {error ? (
         <span id={descId} role="alert" style={{ ...TX.nano, color: C.danger }}>{error}</span>
       ) : hint ? (
@@ -446,24 +440,31 @@ export function Segmented<T extends string>({
   options,
   onChange,
   disabled = false,
+  "aria-label": ariaLabel,
 }: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (v: T) => void;
   disabled?: boolean;
+  "aria-label"?: string;
 }) {
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const move = (dir: 1 | -1) => {
     const i = options.findIndex((o) => o.value === value);
     if (i < 0) return;
-    onChange(options[(i + dir + options.length) % options.length].value);
+    const next = (i + dir + options.length) % options.length;
+    onChange(options[next].value);
+    refs.current[next]?.focus();
   };
   return (
-    <div role="radiogroup" aria-disabled={disabled || undefined} style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.sm, padding: 3, opacity: disabled ? 0.5 : 1 }}>
-      {options.map((o) => {
+    <div role="radiogroup" aria-label={ariaLabel} aria-disabled={disabled || undefined} style={{ display: "inline-flex", gap: 2, background: C.subtle, borderRadius: R.sm, padding: 3, opacity: disabled ? 0.5 : 1, maxWidth: "100%", overflowX: "auto", flexShrink: 1, minWidth: 0 }}>
+      {options.map((o, idx) => {
         const active = o.value === value;
         return (
           <button
             key={o.value}
+            ref={(el) => { refs.current[idx] = el; }}
+            type="button"
             role="radio"
             aria-checked={active}
             tabIndex={active ? 0 : -1}
@@ -482,6 +483,8 @@ export function Segmented<T extends string>({
               fontWeight: 600,
               padding: "5px 12px",
               borderRadius: R.sm,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               background: active ? C.surface : "transparent",
               color: active ? C.ink900 : C.ink500,
               boxShadow: active ? SH.sm : "none",
@@ -555,40 +558,6 @@ export function Toolbar({ children, style }: { children: ReactNode; style?: CSSP
   );
 }
 
-// ───────────────────────────────────────── SectionHeader (editorial framing)
-
-/** design.google-style section introduction: an uppercase eyebrow over a
- *  prominent heading, optional count, description and trailing action. */
-export function SectionHeader({
-  eyebrow,
-  title,
-  count,
-  description,
-  action,
-  style,
-}: {
-  eyebrow?: string;
-  title: string;
-  count?: number;
-  description?: string;
-  action?: ReactNode;
-  style?: CSSProperties;
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, margin: "0 0 16px", ...style }}>
-      <div style={{ minWidth: 0 }}>
-        {eyebrow ? <div style={{ ...TX.eyebrow, color: C.ink400, marginBottom: 6 }}>{eyebrow}</div> : null}
-        <h2 style={{ ...TX.sectionHd, margin: 0, color: C.ink900, display: "flex", alignItems: "baseline", gap: 10 }}>
-          {title}
-          {count != null ? <span style={{ ...num(14), color: C.ink400 }}>{count}</span> : null}
-        </h2>
-        {description ? <p style={{ ...TX.caption, color: C.ink500, margin: "6px 0 0", maxWidth: 560 }}>{description}</p> : null}
-      </div>
-      {action ? <div style={{ flexShrink: 0 }}>{action}</div> : null}
-    </div>
-  );
-}
-
 // ───────────────────────────────────────── EmptyState
 
 /** Illustrated empty state: a tonal disc framing a line icon, then title / hint
@@ -647,6 +616,11 @@ function EmptyGlyph({ size = 24 }: { size?: number }) {
 
 // ───────────────────────────────────────── Modal
 
+/** Dialog on the shared overlay layer: portal on <body>, focus trapped, Escape
+ *  closes only the top-most overlay, background inert + scroll-locked, focus
+ *  returned to the trigger. An `autoFocus` control inside keeps its focus;
+ *  otherwise the first field/control (not the ✕) receives it. `onClose` may be
+ *  an inline arrow — it never re-runs the focus logic. */
 export function Modal({
   title,
   subtitle,
@@ -662,33 +636,51 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const isClient = useIsClient();
+  if (!isClient) return null;
+  return createPortal(
+    <ModalPanel title={title} subtitle={subtitle} width={width} onClose={onClose} footer={footer}>{children}</ModalPanel>,
+    document.body,
+  );
+}
+
+function ModalPanel({ title, subtitle, width, onClose, children, footer }: {
+  title: string; subtitle?: string; width: number; onClose: () => void; children: ReactNode; footer?: ReactNode;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const subtitleId = useId();
   const { closing, requestClose } = useExitClose(onClose);
-  useFocusTrap(ref, requestClose);
+  useOverlay(ref, { active: !closing, onEscape: requestClose });
+  // Close on a genuine backdrop click only (a text selection that started in
+  // the dialog and ended on the backdrop must not dismiss it).
+  const downOnBackdrop = useRef(false);
 
   return (
     <div
-      onClick={requestClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", animation: closing ? "fadeOut var(--dur-fast) var(--ease-accel) forwards" : "fadeIn var(--dur-base) var(--ease-out)", padding: 20 }}
+      ref={ref}
+      onMouseDown={(e) => { downOnBackdrop.current = e.target === e.currentTarget; }}
+      onClick={(e) => { if (downOnBackdrop.current && e.target === e.currentTarget) requestClose(); }}
+      style={{ position: "fixed", inset: 0, background: "rgba(28,25,23,.34)", zIndex: Z.modal, display: "flex", alignItems: "center", justifyContent: "center", animation: closing ? "fadeOut var(--dur-fast) var(--ease-accel) forwards" : "fadeIn var(--dur-base) var(--ease-out)", padding: 20, overflowY: "auto" }}
     >
       <div
-        ref={ref}
+        data-overlay-focus=""
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
+        aria-describedby={subtitle ? subtitleId : undefined}
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        style={{ width, maxWidth: "100%", background: C.surface, borderRadius: R.lg, boxShadow: SH.overlay, padding: 24, color: C.ink900, animation: closing ? "popOut var(--dur-fast) var(--ease-accel) forwards" : "popIn var(--dur-base) var(--ease-out)", outline: "none" }}
+        style={{ width, maxWidth: "100%", maxHeight: "100%", overflowY: "auto", background: C.surface, borderRadius: R.lg, boxShadow: SH.overlay, padding: 24, color: C.ink900, animation: closing ? "popOut var(--dur-fast) var(--ease-accel) forwards" : "popIn var(--dur-base) var(--ease-out)", outline: "none" }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: subtitle ? 4 : 16 }}>
-          <h2 id="modal-title" style={{ ...TX.h2, margin: 0 }}>{title}</h2>
-          <IconButton size={28} onClick={requestClose} aria-label="Fermer">
+          <h2 id={titleId} style={{ ...TX.h2, margin: 0 }}>{title}</h2>
+          <IconButton size={28} onClick={requestClose} aria-label="Fermer" data-overlay-close="">
             <CloseIcon size={15} />
           </IconButton>
         </div>
-        {subtitle ? <p style={{ ...TX.caption, color: C.ink500, margin: "0 0 16px" }}>{subtitle}</p> : null}
+        {subtitle ? <p id={subtitleId} style={{ ...TX.caption, color: C.ink500, margin: "0 0 16px" }}>{subtitle}</p> : null}
         {children}
-        {footer ? <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>{footer}</div> : null}
+        {footer ? <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 20 }}>{footer}</div> : null}
       </div>
     </div>
   );
@@ -735,140 +727,6 @@ export function Avatar({
       <span aria-hidden>{initials}</span>
     </div>
   );
-}
-
-/** Editorial metadata chip — uppercase, tracked, small (design.google idiom).
- *  Calm by default: the LABEL is neutral ink on a quiet chip; `color` is spent
- *  only as a thin accent (the optional leading dot / the selected outline), never
- *  as a saturated fill. `tone`: outline (hairline), soft (faint neutral well), or
- *  plain. Optional leading dot carries the hue. */
-export function Chip({
-  label,
-  color = C.ink600,
-  tone = "outline",
-  dot = false,
-  title,
-  selected,
-  onClick,
-}: {
-  label: string;
-  color?: string;
-  tone?: "outline" | "soft" | "plain";
-  dot?: boolean;
-  title?: string;
-  /** When provided, the Chip becomes a toggle button (role + aria-pressed). */
-  selected?: boolean;
-  onClick?: () => void;
-}) {
-  const toneStyle: CSSProperties =
-    tone === "soft" ? { background: C.subtle } : tone === "outline" ? { border: `1px solid ${C.line}` } : {};
-  const base: CSSProperties = {
-    ...TX.eyebrow,
-    fontSize: 12,
-    letterSpacing: ".05em",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "3px 8px",
-    borderRadius: R.xs,
-    whiteSpace: "nowrap",
-    color: C.ink600,
-    ...toneStyle,
-  };
-  // Hue lives in the dot only — a thin accent, so the label stays neutral ink.
-  // Uses the shared Dot atom so the 6px circle is identical to StatusPill/legends.
-  const dotNode = dot ? <Dot color={color} /> : null;
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        className="btn"
-        title={title}
-        aria-pressed={!!selected}
-        onClick={onClick}
-        style={{
-          ...base,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          border: `1px solid ${selected ? color : C.line}`,
-          background: selected ? `${color}14` : tone === "soft" ? C.subtle : "transparent",
-          color: selected ? C.ink900 : C.ink600,
-        }}
-      >
-        {dotNode}
-        {label}
-      </button>
-    );
-  }
-  return (
-    <span title={title} style={base}>
-      {dotNode}
-      {label}
-    </span>
-  );
-}
-
-// ───────────────────────────────────────── ToggleButton (selectable control)
-
-/** Selectable button used for filters / pickers / status setters (was hand-rolled
- *  ≥4× with divergent active treatments). `selected` drives aria-pressed and a
- *  tonal fill; `tone` recolours the selected state. */
-export function ToggleButton({
-  selected = false,
-  tone = "ink",
-  size = "md",
-  icon,
-  children,
-  style,
-  onClick,
-  ...props
-}: {
-  selected?: boolean;
-  tone?: "ink" | "brand" | "danger";
-  size?: "sm" | "md";
-  icon?: ReactNode;
-} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "color">) {
-  const accent = tone === "brand" ? C.brand : tone === "danger" ? C.danger : C.ink900;
-  const sizes = size === "sm" ? { fontSize: 12, padding: "5px 10px" } : { fontSize: 14, padding: "7px 12px" };
-  return (
-    <button
-      type="button"
-      className="btn"
-      aria-pressed={selected}
-      onClick={onClick}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        fontFamily: "inherit",
-        fontWeight: 600,
-        borderRadius: R.sm,
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        transition: "background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard)",
-        ...sizes,
-        ...(selected
-          ? { background: `${accent}14`, border: `1px solid ${accent}`, color: accent }
-          : { background: C.surface, border: `1px solid ${C.line}`, color: C.ink600 }),
-        ...style,
-      }}
-      {...props}
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
-
-export function PhaseBadge({ label }: { label: string }) {
-  // The LETTER code (ESQ/APS/…) carries phase identity, in neutral ink on a quiet
-  // grey chip. The mono-slate ramp colour appears only as the thin accent dot —
-  // reinforcing sequence (light→dark) without a saturated fill.
-  const i = PHASES.indexOf(label as (typeof PHASES)[number]);
-  const full = i >= 0 ? PHASES_FULL[i] : undefined;
-  const color = i >= 0 ? PHASE_COLORS[i] : C.ink400;
-  return <Chip label={label} color={color} tone="soft" dot title={full ? `${label} · ${full}` : label} />;
 }
 
 export function StatusPill({
@@ -921,8 +779,8 @@ export function ProgressBar({
   color?: string;
   track?: string;
   height?: number;
-  /** Descriptive context for AT (e.g. "Avancement du projet"). The percentage
-   *  is appended automatically. */
+  /** Accessible name (e.g. "Avancement de <projet>"). Every progressbar needs
+   *  one (axe aria-progressbar-name); defaults to "Avancement". */
   label?: string;
 }) {
   const clamped = Math.min(100, Math.max(0, pct));
@@ -932,7 +790,8 @@ export function ProgressBar({
       aria-valuenow={Math.round(clamped)}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-label={label ? `${label} : ${Math.round(clamped)} %` : undefined}
+      aria-valuetext={`${Math.round(clamped)} %`}
+      aria-label={label ?? "Avancement"}
       style={{ flex: 1, height, background: track, borderRadius: R.pill, overflow: "hidden" }}
     >
       {/* `.anim-bar` grows the fill from 0 to `--fill` on mount (reduced-motion
@@ -945,8 +804,6 @@ export function ProgressBar({
     </div>
   );
 }
-
-let sparkSeq = 0;
 
 /** Compact trend line. Scales to its container width; non-scaling stroke.
  *  `gradient` swaps the flat-opacity area for a vertical <linearGradient> fade;
@@ -971,10 +828,8 @@ export function Sparkline({
    *  users. Defaults to first→last summary. */
   ariaLabel?: string;
 }) {
-  // Stable id per instance (SSR-safe: assigned once at module scope counter).
-  const gidRef = useRef<string | null>(null);
-  if (!gidRef.current) gidRef.current = `spark-grad-${sparkSeq++}`;
-  const gid = gidRef.current;
+  // Stable, SSR-consistent gradient id per instance.
+  const gid = `spark-grad-${useId().replace(/:/g, "")}`;
 
   if (values.length < 2) return null;
   const W = 100;
@@ -1070,12 +925,12 @@ export function Gauge({
   ariaLabel?: string;
 }) {
   const pct = Math.min(1, Math.max(0, value / max));
-  // Animate the sweep in from 0 on mount: render at 0, then flip to the real
-  // value on the next frame so the CSS transition fills the arc in. Reduced
-  // motion short-circuits to the final value (no transition runs).
-  const [mounted, setMounted] = useState(prefersReducedMotion());
+  // Animate the sweep in from 0 on mount: server + first client render agree on
+  // 0, then the next frame flips to the real value and the CSS transition fills
+  // the arc (under reduced motion the global rule makes that transition
+  // instant, so the arc simply appears — it never sticks at 0).
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    if (prefersReducedMotion()) return;
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
   }, []);
@@ -1160,247 +1015,6 @@ export function Dot({ color, size = 6, style }: { color: string; size?: number; 
   return <span aria-hidden style={{ display: "inline-block", width: size, height: size, borderRadius: "50%", background: color, flexShrink: 0, ...style }} />;
 }
 
-// ───────────────────────────────────────── Badge / Count
-
-/** Numeric/short badge. `tone` recolours; `dot` shows a leading status dot. Used
- *  for counts (nav, tabs), small status tags. */
-export function Badge({
-  children,
-  tone = "neutral",
-  dot = false,
-  style,
-}: {
-  children: ReactNode;
-  tone?: "neutral" | "brand" | "danger" | "warn" | "info";
-  dot?: boolean;
-  style?: CSSProperties;
-}) {
-  // Quiet by default: neutral is the resting tone. Colour is reserved for meaning
-  // — danger (the one alert) keeps its red; warn keeps a single amber. `brand` is
-  // the one positive identity accent; `info` rides the neutral well (no second
-  // decorative hue — its ink simply darkens for emphasis).
-  const tones: Record<string, { fg: string; bg: string }> = {
-    neutral: { fg: C.ink600, bg: C.subtle },
-    brand: { fg: C.brandText, bg: C.brand50 },
-    danger: { fg: "#7A2820", bg: "#FAEEEB" },
-    warn: { fg: "#9A4708", bg: "#FAF1E4" },
-    info: { fg: C.ink700, bg: C.subtle },
-  };
-  const t = tones[tone];
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        minWidth: 18,
-        height: 18,
-        padding: "0 6px",
-        borderRadius: R.pill,
-        ...num(12),
-        fontWeight: 600,
-        justifyContent: "center",
-        color: t.fg,
-        background: t.bg,
-        ...style,
-      }}
-    >
-      {dot ? <Dot color={t.fg} size={5} /> : null}
-      {children}
-    </span>
-  );
-}
-
-// ───────────────────────────────────────── Kbd
-
-/** Keyboard-shortcut hint key. Renders a single key cap; pass a string like
- *  "⌘K" or compose multiple <Kbd> for chords. */
-export function Kbd({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return (
-    <kbd
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 18,
-        height: 18,
-        padding: "0 5px",
-        borderRadius: R.xs,
-        border: `1px solid ${C.line}`,
-        borderBottomWidth: 2,
-        background: C.surface,
-        color: C.ink600,
-        fontFamily: "inherit",
-        fontSize: 12,
-        fontWeight: 600,
-        lineHeight: 1,
-        ...style,
-      }}
-    >
-      {children}
-    </kbd>
-  );
-}
-
-// ───────────────────────────────────────── Switch (role=switch)
-
-export function Switch({
-  checked,
-  onChange,
-  label,
-  disabled = false,
-  tone = "brand",
-}: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-  disabled?: boolean;
-  tone?: "brand" | "ink";
-}) {
-  const accent = tone === "brand" ? C.brand : C.solid;
-  const W = 36;
-  const H = 20;
-  const knob = 14;
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      className="btn"
-      onClick={() => !disabled && onChange(!checked)}
-      style={{
-        width: W,
-        height: H,
-        flexShrink: 0,
-        padding: 0,
-        borderRadius: R.pill,
-        border: "none",
-        cursor: disabled ? "not-allowed" : "pointer",
-        background: checked ? accent : C.lineStrong,
-        opacity: disabled ? 0.5 : 1,
-        position: "relative",
-        transition: "background var(--dur-base) var(--ease-standard)",
-      }}
-    >
-      <motion.span
-        aria-hidden
-        animate={{ x: checked ? W - knob - 3 : 3 }}
-        transition={SPRING.snappy}
-        style={{
-          position: "absolute",
-          top: (H - knob) / 2,
-          left: 0,
-          width: knob,
-          height: knob,
-          borderRadius: "50%",
-          background: C.surface,
-          boxShadow: SH.xs,
-        }}
-      />
-    </button>
-  );
-}
-
-// ───────────────────────────────────────── Tabs (roving-tabindex)
-
-type TabItem = { value: string; label: ReactNode; count?: number };
-
-/** Accessible tablist: roving tabindex, Arrow/Home/End keys, aria-controls wiring.
- *  Two looks: `underline` (editorial) and `pill` (segmented). Replaces the two
- *  hand-rolled tablists. Caller renders panels and reads `value`. */
-export function Tabs({
-  value,
-  options,
-  onChange,
-  variant = "underline",
-  idBase,
-  style,
-}: {
-  value: string;
-  options: TabItem[];
-  onChange: (v: string) => void;
-  variant?: "underline" | "pill";
-  /** Stable base for the generated tab/panel ids (aria-controls). */
-  idBase?: string;
-  style?: CSSProperties;
-}) {
-  const auto = useId();
-  const base = idBase ?? auto;
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const move = (i: number) => {
-    const next = (i + options.length) % options.length;
-    onChange(options[next].value);
-    refs.current[next]?.focus();
-  };
-  const onKey = (e: KeyboardEvent, i: number) => {
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); move(i + 1); }
-    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); move(i - 1); }
-    else if (e.key === "Home") { e.preventDefault(); move(0); }
-    else if (e.key === "End") { e.preventDefault(); move(options.length - 1); }
-  };
-  const pill = variant === "pill";
-  return (
-    <div
-      role="tablist"
-      style={{
-        display: "inline-flex",
-        gap: pill ? 2 : 4,
-        ...(pill ? { background: C.subtle, borderRadius: R.sm, padding: 3 } : { borderBottom: `1px solid ${C.line}` }),
-        ...style,
-      }}
-    >
-      {options.map((o, i) => {
-        const active = o.value === value;
-        return (
-          <button
-            key={o.value}
-            ref={(el) => { refs.current[i] = el; }}
-            role="tab"
-            id={`${base}-tab-${o.value}`}
-            aria-selected={active}
-            aria-controls={`${base}-panel-${o.value}`}
-            tabIndex={active ? 0 : -1}
-            onClick={() => onChange(o.value)}
-            onKeyDown={(e) => onKey(e, i)}
-            className="btn"
-            style={{
-              position: "relative",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: 14,
-              fontWeight: 600,
-              border: "none",
-              background: pill ? (active ? C.surface : "transparent") : "transparent",
-              color: active ? C.ink900 : C.ink500,
-              ...(pill
-                ? { padding: "5px 12px", borderRadius: R.sm, boxShadow: active ? SH.sm : "none" }
-                : { padding: "8px 4px", marginBottom: -1, borderBottom: `2px solid ${active ? C.ink900 : "transparent"}` }),
-            }}
-          >
-            {o.label}
-            {o.count != null ? <Badge tone={active ? "neutral" : "neutral"}>{o.count}</Badge> : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Companion id helpers so panels match the Tabs aria wiring. */
-export function tabPanelProps(idBase: string, value: string, active: string) {
-  return {
-    role: "tabpanel" as const,
-    id: `${idBase}-panel-${value}`,
-    "aria-labelledby": `${idBase}-tab-${value}`,
-    hidden: value !== active,
-  };
-}
-
 // ───────────────────────────────────────── Tooltip (portal, dark surface)
 
 /** Accessible tooltip. Opens on hover AND keyboard focus, dismisses on Escape /
@@ -1423,8 +1037,7 @@ export function Tooltip({
   const timer = useRef<number | undefined>(undefined);
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsClient();
 
   const place = useCallback(() => {
     const el = wrapRef.current?.firstElementChild ?? wrapRef.current;
@@ -1453,6 +1066,11 @@ export function Tooltip({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, hide]);
 
+  // aria-describedby belongs on the focusable trigger itself, not the wrapper.
+  const trigger = isValidElement(children)
+    ? cloneElement(children as ReactElement<{ "aria-describedby"?: string }>, { "aria-describedby": open ? id : undefined })
+    : children;
+
   return (
     <span
       ref={wrapRef}
@@ -1461,9 +1079,8 @@ export function Tooltip({
       onMouseLeave={hide}
       onFocus={() => { place(); setOpen(true); }}
       onBlur={hide}
-      aria-describedby={open ? id : undefined}
     >
-      {children}
+      {trigger}
       {mounted && coords
         ? createPortal(
             <AnimatePresence>
@@ -1471,6 +1088,7 @@ export function Tooltip({
                 <motion.span
                   role="tooltip"
                   id={id}
+                  data-overlay-exempt=""
                   initial={{ opacity: 0, y: placement === "top" ? 4 : -4, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.96 }}
