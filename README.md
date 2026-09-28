@@ -40,10 +40,18 @@ allocation.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm run build    # production build
-npm start        # serve the production build
+npm run dev        # http://localhost:3000
+npm run build      # production build
+npm start          # serve the production build
+
+npm run lint       # ESLint (flat config, next/core-web-vitals + typescript)
+npm run typecheck  # tsc --noEmit
+npm test           # vitest: scheduling/EVM/workload maths, formats,
+                   # validation and the sample repository
 ```
+
+CI (`.github/workflows/ci.yml`) runs `npm audit --audit-level=high`, lint,
+typecheck, tests and the build on every pull request.
 
 ## Deploying to Vercel
 
@@ -137,8 +145,9 @@ with it.
    needed locally for seeding — never expose it to the browser).
 
 > **Note:** "today" comes from `REFERENCE_DATE` in `lib/format.ts` (the current
-> date, Europe/Paris); relative labels, the sidebar week and default project
-> dates are all anchored to it.
+> date, Europe/Paris, re-read on every request and handed to the browser);
+> relative labels, the sidebar week and default project dates are all anchored
+> to it. Set `NEXT_PUBLIC_DEMO_DATE=yyyy-mm-dd` to pin it for demos.
 
 ## Original design
 
