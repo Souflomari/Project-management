@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { AppShell } from "@/components/app-shell";
 import { AppSkeleton } from "@/components/skeleton";
 import { getServerContext } from "@/lib/data/server";
+import { REFERENCE_DATE, resolveToday, setReferenceDate } from "@/lib/format";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { ProjectsProvider } from "@/lib/store/projects-context";
 
@@ -23,6 +24,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 }
 
 async function AppData({ children }: { children: React.ReactNode }) {
+  // Pin "today" for this request (a warm server may have started yesterday).
+  setReferenceDate(resolveToday());
   const { repository: repo, user, viewer } = await getServerContext();
   // Signed in but not granted access: RLS would return nothing, so say so instead
   // of showing an empty portfolio.
@@ -30,7 +33,7 @@ async function AppData({ children }: { children: React.ReactNode }) {
   const [projects, team] = await Promise.all([repo.listProjects(), repo.listTeam()]);
 
   return (
-    <ProjectsProvider initialProjects={projects} initialTeam={team} serverBacked={isSupabaseConfigured()} viewer={viewer}>
+    <ProjectsProvider initialProjects={projects} initialTeam={team} serverBacked={isSupabaseConfigured()} viewer={viewer} today={REFERENCE_DATE}>
       <AppShell>{children}</AppShell>
     </ProjectsProvider>
   );

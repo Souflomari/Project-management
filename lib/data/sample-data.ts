@@ -38,12 +38,15 @@ export const TEAM: TeamMember[] = [
 // to "today", just as it did at the anchor — deliverables due this week, a few
 // projects slipping, others archived.
 export const DEMO_ANCHOR = "2026-06-15";
-/** Whole-week offset (a multiple of 7 days) applied to every authored date. */
-export const DEMO_SHIFT_DAYS = daysBetween(DEMO_ANCHOR, weekRange(REFERENCE_DATE).start);
+/** Whole-week offset (a multiple of 7 days) applied to every authored date.
+ *  Computed on each call: the app clock can move (see setReferenceDate). */
+export function demoShiftDays(): number {
+  return daysBetween(DEMO_ANCHOR, weekRange(REFERENCE_DATE).start);
+}
 
 /** An authored (anchor-relative) date moved into the current week's frame. */
 function demoDate(iso: string): string {
-  return shiftISO(iso, DEMO_SHIFT_DAYS);
+  return shiftISO(iso, demoShiftDays());
 }
 
 // [name, client, discipline, leadIdx, phaseIndex, progress, status, budget(k€), start, deadline, renduLabel, renduDate]
@@ -84,11 +87,12 @@ const ROWS: Row[] = [
   ["Data center Sud — Lot CVC", "OVHcloud", "Bâtiment / Énergie", 3, 5, 84, "à jour", 460, "2025-01-01", "2026-09-05", "Visa exécution", "2026-06-21"],
 ];
 
-// Authored dates (a few days before the anchor), shifted like everything else.
+// Authored dates (a few days before the anchor), shifted like everything else
+// when the projects are built.
 const SEED_COMMENTS: Record<number, { ri: number; text: string; at: string }[]> = {
-  1: [{ ri: 0, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", at: demoDate("2026-06-13") }],
-  6: [{ ri: 1, text: "Accès à l'ouvrage soumis à autorisation — relance du MOA en cours.", at: demoDate("2026-06-14") }],
-  21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", at: demoDate("2026-06-11") }],
+  1: [{ ri: 0, text: "Coordination interfaces avec le lot génie civil à caler avant le DCE.", at: "2026-06-13" }],
+  6: [{ ri: 1, text: "Accès à l'ouvrage soumis à autorisation — relance du MOA en cours.", at: "2026-06-14" }],
+  21: [{ ri: 5, text: "Validation MOA en attente, planning à réajuster.", at: "2026-06-11" }],
 };
 
 // Effort model. Each project's five tasks share a total planned effort sized so
@@ -276,8 +280,8 @@ export function buildSampleProjects(): Project[] {
         initials: TEAM[c.ri].initials,
         color: TEAM[c.ri].color,
         text: c.text,
-        at: c.at,
-        when: relativeWhen(c.at),
+        at: demoDate(c.at),
+        when: relativeWhen(demoDate(c.at)),
       })),
     };
   });

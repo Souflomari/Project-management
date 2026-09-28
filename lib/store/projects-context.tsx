@@ -36,7 +36,7 @@ import type {
   TeamMemberPatch,
 } from "../data/repository";
 import { buildFilters, deriveAll, type DerivedProject, type FilterDef } from "../derive";
-import { REFERENCE_DATE, toISO, toDate } from "../format";
+import { REFERENCE_DATE, setReferenceDate, toISO, toDate } from "../format";
 import { toast, type ToastAction } from "../toast";
 import { STATUS_META } from "../tokens";
 import {
@@ -785,6 +785,7 @@ export function ProjectsProvider({
   initialTeam,
   serverBacked,
   viewer = null,
+  today,
   children,
 }: {
   initialProjects: Project[];
@@ -792,8 +793,12 @@ export function ProjectsProvider({
   serverBacked: boolean;
   /** Signed-in person (Supabase mode), resolved on the server. */
   viewer?: Viewer | null;
+  /** The server's "today" for this render. Pinned before anything below reads
+   *  REFERENCE_DATE, so hydration matches even across midnight. */
+  today?: string;
   children: ReactNode;
 }) {
+  if (today) setReferenceDate(today);
   const [projects, setProjectsState] = useState<Project[]>(initialProjects);
   const [team, setTeamState] = useState<TeamMember[]>(initialTeam);
 

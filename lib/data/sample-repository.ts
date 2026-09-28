@@ -24,7 +24,7 @@ import {
   parseTeamMemberPatch,
   parseTeamMemberRecord,
 } from "../validation";
-import { buildSampleProjects, buildSampleTeam } from "./sample-data";
+import { buildSampleProjects, buildSampleTeam, demoShiftDays } from "./sample-data";
 import type { ProjectRepository } from "./repository";
 
 /** Fallback daily rate (€) when a new member is created without one. */
@@ -59,6 +59,18 @@ function seedState(): SampleState {
 }
 
 let state: SampleState = seedState();
+
+/** Server copy only: the seed is dated relative to the app clock, which moves
+ *  (see setReferenceDate), so rebuild it when the demo week changes. The server
+ *  copy is never written to (server actions refuse writes in demo mode). */
+let seededShift = demoShiftDays();
+function serverSeed(): void {
+  if (typeof window !== "undefined") return;
+  const shift = demoShiftDays();
+  if (shift === seededShift) return;
+  seededShift = shift;
+  state = seedState();
+}
 
 // ── Browser persistence ──────────────────────────────────────────────────────
 // In sample mode there is no backend, so edits are kept in localStorage and the
@@ -282,10 +294,12 @@ function listTeam(): TeamMember[] {
 
 export const sampleRepository: ProjectRepository = {
   async listProjects() {
+    serverSeed();
     return state.projects.map(clone);
   },
 
   async getProject(id) {
+    serverSeed();
     const p = state.projects.find((x) => x.id === id);
     return p ? clone(p) : null;
   },

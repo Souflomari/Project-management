@@ -21,7 +21,7 @@ import {
   workloadSummary,
   type DerivedProject,
 } from "./derive";
-import { buildSampleProjects, buildSampleTeam, DEMO_SHIFT_DAYS } from "./data/sample-data";
+import { buildSampleProjects, buildSampleTeam, demoShiftDays } from "./data/sample-data";
 import { dayOfWeek, daysBetween, REFERENCE_DATE, shiftISO } from "./format";
 import type { Project, Status, Subtask, TeamMember } from "./types";
 
@@ -410,7 +410,7 @@ describe("sample data time-shift", () => {
 
   it("is unshifted at the anchor week", () => {
     expect(REFERENCE_DATE).toBe("2026-06-15");
-    expect(DEMO_SHIFT_DAYS).toBe(0);
+    expect(demoShiftDays()).toBe(0);
     expect(buildSampleProjects()[0].start).toBe("2025-03-01");
   });
 
@@ -420,7 +420,7 @@ describe("sample data time-shift", () => {
     vi.resetModules();
     const s = await import("./data/sample-data");
     const d = await import("./derive");
-    expect(s.DEMO_SHIFT_DAYS).toBe(105);
+    expect(s.demoShiftDays()).toBe(105);
     const shifted = plain(s.buildSampleProjects());
     expect(shifted).toHaveLength(anchorProjects.length);
     shifted.forEach((p, i) => {

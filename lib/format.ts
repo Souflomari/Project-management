@@ -166,19 +166,23 @@ export function eachDayISO(startIso: string, endIso: string): string[] {
 
 // ---------------------------------------------------------- the app clock
 
-function resolveReferenceDate(): string {
+/** Today in Europe/Paris (or NEXT_PUBLIC_DEMO_DATE when set). Reads the real
+ *  clock on every call — use REFERENCE_DATE for the app's pinned "today". */
+export function resolveToday(): string {
   const demo = process.env.NEXT_PUBLIC_DEMO_DATE?.trim();
   if (demo && isValidISODate(demo)) return demo;
   return parisISO(new Date());
 }
 
 /** The app's "today" — the current date in Europe/Paris (the server runs in UTC,
- *  so it's computed with an explicit time zone and SSR/CSR agree), or
- *  NEXT_PUBLIC_DEMO_DATE when set. Evaluated once per module load. */
-export const REFERENCE_DATE: string = resolveReferenceDate();
+ *  so it's computed with an explicit time zone), or NEXT_PUBLIC_DEMO_DATE when
+ *  set. A live binding: the server re-pins it on every request and hands the
+ *  value to the browser (ProjectsProvider `today`), so a long-running server
+ *  never serves a stale date and SSR and hydration always agree. */
+export let REFERENCE_DATE: string = resolveToday();
 
 /** Local-midnight timestamp of REFERENCE_DATE. */
-export const REFERENCE_TS = toDate(REFERENCE_DATE).getTime();
+export let REFERENCE_TS = toDate(REFERENCE_DATE).getTime();
 
 /** True if an ISO date is the app's "today". One definition, used everywhere. */
 export function isToday(iso: string): boolean {
@@ -213,8 +217,19 @@ export function weekLongLabel(iso: string): string {
 }
 
 /** The current week (from REFERENCE_DATE), short and long forms. */
-export const WEEK_SHORT = weekShortLabel(REFERENCE_DATE);
-export const WEEK_LABEL = weekLongLabel(REFERENCE_DATE);
+export let WEEK_SHORT = weekShortLabel(REFERENCE_DATE);
+export let WEEK_LABEL = weekLongLabel(REFERENCE_DATE);
+
+/** Re-pin the app clock (and everything derived from it). Idempotent, so it is
+ *  safe to call during render: the server calls it per request with
+ *  resolveToday(), the browser with the date the server rendered. */
+export function setReferenceDate(iso: string): void {
+  if (iso === REFERENCE_DATE || !isValidISODate(iso)) return;
+  REFERENCE_DATE = iso;
+  REFERENCE_TS = toDate(iso).getTime();
+  WEEK_SHORT = weekShortLabel(iso);
+  WEEK_LABEL = weekLongLabel(iso);
+}
 
 /** Signed calendar days from today to `iso` (NaN if invalid). */
 export function daysFromToday(iso: string): number {

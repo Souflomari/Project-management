@@ -348,3 +348,18 @@ describe("working-day helpers", () => {
     expect(workingDaysBetween("", "2026-06-19")).toBe(0);
   });
 });
+
+describe("setReferenceDate (live app clock)", () => {
+  it("re-pins today and the derived week labels, and is idempotent", async () => {
+    const f = await import("./format");
+    const before = f.REFERENCE_DATE;
+    f.setReferenceDate("2026-09-29");
+    expect(f.REFERENCE_DATE).toBe("2026-09-29");
+    expect(f.isToday("2026-09-29")).toBe(true);
+    expect(f.WEEK_LABEL).toBe("Semaine du 28 septembre au 4 octobre 2026");
+    f.setReferenceDate("not-a-date");
+    expect(f.REFERENCE_DATE).toBe("2026-09-29");
+    f.setReferenceDate(before);
+    expect(f.REFERENCE_DATE).toBe(before);
+  });
+});
