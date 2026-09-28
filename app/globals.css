@@ -16,6 +16,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Visually hidden but announced. `position:absolute` + a 1px clipped, overflow-
+   hidden BLOCK box: its content (e.g. a data table fallback) can never widen the
+   page, unlike a table styled `width:1px` (tables ignore that width). */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 /* Brand-tinted text selection — gives the governed green a presence beyond
    semantics (it was effectively benched, leaving a grayscale identity). */
 ::selection {
@@ -469,6 +485,58 @@ select:focus-visible,
 .cal-scroll {
   overflow-x: auto;
 }
+/* Wide enough for the table's 760px minimum: drop the horizontal scroll
+   container so the grid header can stick to the viewport (a scroll container
+   would capture `position:sticky`). */
+@media (min-width: 1100px) {
+  .table-scroll {
+    overflow-x: visible;
+  }
+  .table-sticky-head {
+    top: 64px !important;
+  }
+}
+
+/* Project workspace: main column + 360px rail, stacked on narrow screens. */
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+}
+
+/* Projects list: grid on wide screens, cards ≤720px; the in-page search shows
+   only where the header search is hidden (≤640px). CSS, not JS, so phones
+   never paint the desktop layout first. */
+.pt-cards,
+.pt-mobile-only {
+  display: none;
+}
+@media (max-width: 720px) {
+  .pt-table {
+    display: none;
+  }
+  .pt-cards {
+    display: block;
+  }
+}
+@media (max-width: 640px) {
+  .pt-mobile-only {
+    display: block;
+  }
+}
+
+/* Mobile-only surfaces (shown by the 768px query below). */
+.mobile-lenses,
+.header-search-mobile {
+  display: none !important;
+}
 .rail-only {
   display: none;
 }
@@ -525,6 +593,26 @@ select:focus-visible,
   .app-main {
     padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
+  /* Inside the Projets workspace the lens strip floats above the tab bar:
+     reserve its height too so it never covers the end of the content. */
+  .mobile-lenses {
+    display: flex !important;
+  }
+  .app-shell:has(.mobile-lenses) .app-main {
+    padding-bottom: calc(136px + env(safe-area-inset-bottom));
+  }
+  /* Toasts float above the bottom tab bar (and the lens strip when shown). */
+  .toast-stack {
+    right: 16px !important;
+    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  }
+  body:has(.mobile-lenses) .toast-stack {
+    bottom: calc(132px + env(safe-area-inset-bottom)) !important;
+  }
+  /* The lens strip replaces the header view switcher on phones. */
+  .ws-switcher {
+    display: none !important;
+  }
   /* Hide the verbose "Nouveau projet" label; the + icon + aria-label remain. */
   .btn-label-collapsible {
     display: none;
@@ -534,6 +622,13 @@ select:focus-visible,
 @media (max-width: 640px) {
   .app-main {
     padding: 20px 16px calc(76px + env(safe-area-inset-bottom));
+  }
+  .app-shell:has(.mobile-lenses) .app-main {
+    padding-bottom: calc(136px + env(safe-area-inset-bottom));
+  }
+  .app-header {
+    padding: 10px 16px !important;
+    gap: 12px !important;
   }
   .bento {
     grid-template-columns: 1fr;
@@ -545,5 +640,9 @@ select:focus-visible,
   }
   .header-search {
     display: none !important;
+  }
+  /* …replaced by an icon launcher so the command palette stays reachable. */
+  .header-search-mobile {
+    display: inline-flex !important;
   }
 }

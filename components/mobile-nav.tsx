@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 
 import { NAV_ICONS } from "./icons";
 import {
@@ -27,24 +26,18 @@ export function MobileNav() {
   const activeLens = workspaceLensForPath(pathname);
 
   // The lens strip is a mobile-only affordance (the sidebar's expandable group +
-  // header switcher cover desktop). The bottom tab bar shows ≤768px via CSS;
-  // mirror that breakpoint here so the strip never leaks onto desktop. Avoids
-  // adding CSS (globals.css is owned elsewhere).
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const sync = () => setIsMobile(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-  const showLenses = isMobile && isWorkspacePath(pathname);
+  // header switcher cover desktop). It is rendered whenever we are inside the
+  // workspace and shown ≤768px purely by CSS (`.mobile-lenses`) — no JS media
+  // query, so phones never paint a desktop frame first. Its presence also makes
+  // `.app-main` reserve room for it (globals.css, `:has(.mobile-lenses)`).
+  const showLenses = isWorkspacePath(pathname);
 
   return (
     <>
       {showLenses ? (
         <nav
           aria-label="Vue des projets"
+          className="mobile-lenses"
           style={{
             position: "fixed",
             left: 0,

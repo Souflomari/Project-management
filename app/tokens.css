@@ -14,6 +14,12 @@
                 nav + active filter move, OFF green -> C1)
      terracotta -> REMOVED. Team-load over-capacity now uses amber/red (C9).
 
+   SOURCE OF TRUTH: lib/tokens.ts owns every value that also exists in JS
+   (colours used inline, motion, shadows); it is projected onto :root as
+   --c-* / --ease-* / --dur-* / --sh-* by tokenCssVars(). This file only adds
+   the CSS-side semantic aliases and scales, pointing at those variables where
+   they overlap.
+
    !! BRAND GREEN: --green-700 below is matched to the current UI (#15803D — the
       confirmed setec brand green). It is borderline for body text (~4.6:1), so
       it is used for FILLS / large elements / status tints; text on tints uses
@@ -61,12 +67,12 @@
   --success-bg:        var(--green-bg);
   --warning:           var(--amber-700);
   --warning-bg:        var(--amber-bg);
-  --danger:            var(--red-700);
+  --danger:            var(--c-danger);   /* one danger hue — lib/tokens.ts C.danger */
   --danger-bg:         var(--red-bg);
   --selected:          var(--ink);          /* persistent active / selected */
   --accent:            var(--green-700);     /* the ONE high-signal accent   */
-  --data-fill:         var(--green-soft);    /* large chart / bar fills      */
-  --data-track:        var(--green-track);
+  --data-fill:         var(--c-data-fill);   /* bar fills — 3:1 vs track (C.dataFill) */
+  --data-track:        var(--c-data-track);  /* C.dataTrack                           */
   --hover-wash:        var(--green-hover);   /* transient hover background    */
 
   /* ---- Spacing (4 / 8 grid) ---------------------------------------- */
@@ -83,11 +89,8 @@
   --font-sans:    system-ui, -apple-system, sans-serif;  /* your current text face */
   --font-display: var(--font-sans);  /* optional character face for big headings/numerals (C7) */
 
-  /* ---- Motion (functional only; reduced-motion honoured below) ----- */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-fast: 120ms; --dur: 200ms; --dur-slow: 300ms;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :root { --dur-fast: 0ms; --dur: 0ms; --dur-slow: 0ms; }
+  /* ---- Motion ------------------------------------------------------ */
+  /* --ease-* / --dur-* and --sh-* come from lib/tokens.ts (tokenCssVars) — the
+     single source of truth; they are NOT redeclared here. Reduced motion is
+     handled globally in globals.css. */
 }

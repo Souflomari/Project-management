@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
+import { parseFrenchNumber } from "../add-project-modal";
 import { FilterBar, type FacetControls } from "../filter-bar";
 import { CaretDownIcon, CheckIcon } from "../icons";
+import { Popover } from "../overlay/popover";
 import { Avatar, Button, Checkbox, ProgressBar, Select, StatusPill } from "../ui";
 import { buildBudget, type DerivedProject, type ProjectBudget } from "@/lib/derive";
 import { fmtBudget } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
+import { useStoredString } from "@/lib/use-stored-state";
 import { C, num, R, SH, SPRING, STATUS_META, TX, Z } from "@/lib/tokens";
 import { PHASES, STATUSES, type Status, type TeamMember } from "@/lib/types";
 
@@ -43,39 +46,17 @@ type GroupBy = "none" | "status" | "phase" | "resp";
 
 // ───────────────────────────────────────── small hooks
 
-function useMediaQuery(query: string): boolean {
-  const [match, setMatch] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const on = () => setMatch(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, [query]);
-  return match;
-}
-
+/** A persisted Set<string> (column visibility), hydration-safe. */
 function usePersistedSet(key: string, fallback: () => Set<string>): [Set<string>, (s: Set<string>) => void] {
-  const [set, setSet] = useState<Set<string>>(fallback);
-  useEffect(() => {
-    try { const raw = localStorage.getItem(key); if (raw) setSet(new Set(JSON.parse(raw))); } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const update = (s: Set<string>) => { setSet(s); try { localStorage.setItem(key, JSON.stringify([...s])); } catch {} };
-  return [set, update];
-}
-
-function useDismiss(open: boolean, onClose: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
-  }, [open, onClose]);
-  return ref;
+  const [raw, write] = useStoredString(key);
+  const set = useMemo(() => {
+    if (raw) {
+      try { const arr = JSON.parse(raw); if (Array.isArray(arr)) return new Set(arr.map(String)); } catch { /* corrupt → default */ }
+    }
+    return fallback();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `fallback` is a static factory; only the stored value matters
+  }, [raw]);
+  return [set, (s) => write(JSON.stringify([...s]))];
 }
 
 // ───────────────────────────────────────── sort compare
@@ -97,29 +78,23 @@ function compare(a: DerivedProject, b: DerivedProject, key: SortKey, budgets: Ma
 
 // ───────────────────────────────────────── generic inline-edit popover
 
+/** Cell editor behind a trigger. The menu renders through the shared Popover
+ *  (portal: never clipped by the grid / scroll container; outside press,
+ *  Escape and Tab-out close it; focus returns to the trigger). Clicks inside
+ *  never reach the row; the row ignores keys that don't target it directly
+ *  (keydown is NOT stopped here — the overlay layer needs Escape). */
 function InlinePopover({
-  trigger, children, label,
-}: { trigger: (open: boolean, toggle: () => void) => ReactNode; children: (close: () => void) => ReactNode; label: string }) {
+  trigger, children, label, role = "menu", width,
+}: { trigger: (open: boolean, toggle: () => void) => ReactNode; children: (close: () => void) => ReactNode; label: string; role?: "menu" | "dialog"; width?: number }) {
   const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const close = () => setOpen(false);
   return (
-    <span ref={ref} style={{ position: "relative", display: "inline-flex" }} onClick={(e) => e.stopPropagation()}>
+    <span ref={anchorRef} style={{ position: "relative", display: "inline-flex" }} onClick={(e) => e.stopPropagation()}>
       {trigger(open, () => setOpen((o) => !o))}
-      <AnimatePresence>
-        {open ? (
-          <motion.div
-            role="menu"
-            aria-label={label}
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={SPRING.snappy}
-            style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: Z.sticky + 2, minWidth: 180, maxHeight: 300, overflowY: "auto", background: C.surface, border: `1px solid ${C.lineStrong}`, borderRadius: R.md, boxShadow: SH.overlay, padding: 6 }}
-          >
-            {children(() => setOpen(false))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      <Popover open={open} onClose={close} anchorRef={anchorRef} label={label} role={role} width={width}>
+        {children(close)}
+      </Popover>
     </span>
   );
 }
@@ -216,8 +191,9 @@ function BudgetCell({ p, updateProject }: { p: DerivedProject; updateProject: (i
   return (
     <InlinePopover
       label={`Honoraires de ${p.name}`}
+      role="dialog"
       trigger={(open, toggle) => (
-        <button type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} className="soft-hover" style={{ ...editTrigger, ...num(14), fontWeight: 500, color: C.ink700 }}>
+        <button type="button" onClick={toggle} aria-haspopup="dialog" aria-expanded={open} className="soft-hover" style={{ ...editTrigger, ...num(14), fontWeight: 500, color: C.ink700 }}>
           {p.budgetFmt}
         </button>
       )}
@@ -229,24 +205,38 @@ function BudgetCell({ p, updateProject }: { p: DerivedProject; updateProject: (i
 
 function BudgetEditor({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
   const [v, setV] = useState(String(value));
+  const [err, setErr] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
+  const errId = useId();
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
-  const commit = () => { const n = Math.max(0, Math.round(Number(v) || 0)); onCommit(n); };
+  // French input: "12,5" and "1 200" are valid; empty is NOT zero. Honoraires
+  // are stored as whole k€, so decimals round to the nearest unit.
+  const commit = () => {
+    const n = parseFrenchNumber(v);
+    if (n === null) { setErr("Saisissez un montant (k€)."); return; }
+    if (!Number.isFinite(n) || n < 0) { setErr("Montant invalide — ex. 320 ou 12,5."); return; }
+    onCommit(Math.round(n));
+  };
   return (
-    <div style={{ padding: 4, minWidth: 150 }}>
-      <label style={{ ...TX.eyebrow, color: C.ink400, display: "block", marginBottom: 6 }}>Honoraires (k€)</label>
+    <div style={{ padding: 4, minWidth: 170 }}>
+      <label htmlFor={`${errId}-in`} style={{ ...TX.eyebrow, color: C.ink400, display: "block", marginBottom: 6 }}>Honoraires (k€)</label>
       <div style={{ display: "flex", gap: 6 }}>
         <input
           ref={ref}
-          type="number" min={0} inputMode="numeric"
+          id={`${errId}-in`}
+          type="text"
+          inputMode="decimal"
           value={v}
-          onChange={(e) => setV(e.target.value)}
+          onChange={(e) => { setV(e.target.value); setErr(null); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } }}
-          aria-label="Honoraires en milliers d’euros"
-          style={{ flex: 1, height: 32, padding: "0 10px", border: `1px solid ${C.line}`, borderRadius: R.sm, fontFamily: "inherit", fontSize: 14, color: C.ink900, outline: "none" }}
+          aria-invalid={!!err || undefined}
+          aria-describedby={err ? errId : undefined}
+          className="ui-field"
+          style={{ flex: 1, minWidth: 0, height: 32, padding: "0 10px", border: `1px solid ${err ? C.danger : C.field}`, borderRadius: R.sm, fontFamily: "inherit", fontSize: 14, color: C.ink900, outline: "none" }}
         />
         <Button size="sm" onClick={commit}>OK</Button>
       </div>
+      {err ? <div id={errId} role="alert" style={{ ...TX.nano, color: C.danger, marginTop: 6 }}>{err}</div> : null}
     </div>
   );
 }
@@ -354,50 +344,50 @@ export function ProjectsTable() {
     filter, setFilter, respFilter, setRespFilter, phaseFilter, setPhaseFilter,
   } = useProjects();
 
-  const isMobile = useMediaQuery("(max-width: 720px)");
+  // ---- multi-select facets (local; mirror a single selection to the store for URL/saved-views) ----
+  const [statusSel, setStatusSelLocal] = useState<Set<Status>>(filter === "all" ? new Set() : new Set([filter]));
+  const [respSel, setRespSelLocal] = useState<Set<number>>(respFilter != null ? new Set([respFilter]) : new Set());
+  const [phaseSel, setPhaseSelLocal] = useState<Set<number>>(phaseFilter != null ? new Set([phaseFilter]) : new Set());
 
-  // ---- multi-select facets (local; mirror first selection to store for URL/saved-views) ----
-  const [statusSel, setStatusSel] = useState<Set<Status>>(filter === "all" ? new Set() : new Set([filter]));
-  const [respSel, setRespSel] = useState<Set<number>>(respFilter != null ? new Set([respFilter]) : new Set());
-  const [phaseSel, setPhaseSel] = useState<Set<number>>(phaseFilter != null ? new Set([phaseFilter]) : new Set());
+  // Local → store, in the event (not an effect): single selection is shareable.
+  const setStatusSel = (next: Set<Status>) => { setStatusSelLocal(next); setFilter(next.size === 1 ? [...next][0] : "all"); };
+  const setRespSel = (next: Set<number>) => { setRespSelLocal(next); setRespFilter(next.size === 1 ? [...next][0] : null); };
+  const setPhaseSel = (next: Set<number>) => { setPhaseSelLocal(next); setPhaseFilter(next.size === 1 ? [...next][0] : null); };
 
-  // Keep store single-select roughly in sync (saved-views / URL / cross-view).
-  useEffect(() => { setFilter(statusSel.size === 1 ? [...statusSel][0] : "all"); }, [statusSel, setFilter]);
-  useEffect(() => { setRespFilter(respSel.size === 1 ? [...respSel][0] : null); }, [respSel, setRespFilter]);
-  useEffect(() => { setPhaseFilter(phaseSel.size === 1 ? [...phaseSel][0] : null); }, [phaseSel, setPhaseFilter]);
+  // Store → local (e.g. a saved view applied): adopted during render when the
+  // store value changes, instead of a setState-in-effect cascade.
+  const [seen, setSeen] = useState({ filter, respFilter, phaseFilter });
+  if (seen.filter !== filter || seen.respFilter !== respFilter || seen.phaseFilter !== phaseFilter) {
+    setSeen({ filter, respFilter, phaseFilter });
+    if (seen.filter !== filter) {
+      if (filter === "all") { if (statusSel.size === 1) setStatusSelLocal(new Set()); }
+      else if (!(statusSel.size === 1 && statusSel.has(filter))) setStatusSelLocal(new Set([filter]));
+    }
+    if (seen.respFilter !== respFilter) {
+      if (respFilter == null) { if (respSel.size === 1) setRespSelLocal(new Set()); }
+      else if (!(respSel.size === 1 && respSel.has(respFilter))) setRespSelLocal(new Set([respFilter]));
+    }
+    if (seen.phaseFilter !== phaseFilter) {
+      if (phaseFilter == null) { if (phaseSel.size === 1) setPhaseSelLocal(new Set()); }
+      else if (!(phaseSel.size === 1 && phaseSel.has(phaseFilter))) setPhaseSelLocal(new Set([phaseFilter]));
+    }
+  }
 
-  // Adopt single-select changes coming from the store (e.g. applying a saved view).
-  useEffect(() => {
-    if (filter === "all") { if (statusSel.size === 1) setStatusSel(new Set()); }
-    else if (!(statusSel.size === 1 && statusSel.has(filter))) setStatusSel(new Set([filter]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
-  useEffect(() => {
-    if (respFilter == null) { if (respSel.size === 1) setRespSel(new Set()); }
-    else if (!(respSel.size === 1 && respSel.has(respFilter))) setRespSel(new Set([respFilter]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [respFilter]);
-  useEffect(() => {
-    if (phaseFilter == null) { if (phaseSel.size === 1) setPhaseSel(new Set()); }
-    else if (!(phaseSel.size === 1 && phaseSel.has(phaseFilter))) setPhaseSel(new Set([phaseFilter]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phaseFilter]);
-
-  const matches = (p: DerivedProject, opts?: { ignore?: "status" | "resp" | "phase" }) =>
-    (opts?.ignore === "status" || statusSel.size === 0 || statusSel.has(p.status)) &&
-    (opts?.ignore === "resp" || respSel.size === 0 || respSel.has(p.responsableId)) &&
-    (opts?.ignore === "phase" || phaseSel.size === 0 || phaseSel.has(p.phaseIndex));
-
-  const filtered = useMemo(() => searched.filter((p) => matches(p)), [searched, statusSel, respSel, phaseSel]);
+  const filtered = useMemo(
+    () => searched.filter((p) => matchesFacets(p, statusSel, respSel, phaseSel)),
+    [searched, statusSel, respSel, phaseSel],
+  );
+  const matches = (p: DerivedProject, ignore?: "status" | "resp" | "phase") =>
+    matchesFacets(p, statusSel, respSel, phaseSel, ignore);
 
   const facets: FacetControls = {
-    statusSel, toggleStatus: (s) => setStatusSel((prev) => toggle(prev, s)), clearStatus: () => setStatusSel(new Set()),
-    respSel, toggleResp: (id) => setRespSel((prev) => toggle(prev, id)), clearResp: () => setRespSel(new Set()),
-    phaseSel, togglePhase: (i) => setPhaseSel((prev) => toggle(prev, i)), clearPhase: () => setPhaseSel(new Set()),
+    statusSel, toggleStatus: (s) => setStatusSel(toggle(statusSel, s)), clearStatus: () => setStatusSel(new Set()),
+    respSel, toggleResp: (id) => setRespSel(toggle(respSel, id)), clearResp: () => setRespSel(new Set()),
+    phaseSel, togglePhase: (i) => setPhaseSel(toggle(phaseSel, i)), clearPhase: () => setPhaseSel(new Set()),
     // honest counts: each facet's option count ignores its own dimension
-    statusCount: (s) => searched.filter((p) => matches(p, { ignore: "status" }) && (s === "all" || p.status === s)).length,
-    respCount: (id) => searched.filter((p) => matches(p, { ignore: "resp" }) && p.responsableId === id).length,
-    phaseCount: (i) => searched.filter((p) => matches(p, { ignore: "phase" }) && p.phaseIndex === i).length,
+    statusCount: (s) => searched.filter((p) => matches(p, "status") && (s === "all" || p.status === s)).length,
+    respCount: (id) => searched.filter((p) => matches(p, "resp") && p.responsableId === id).length,
+    phaseCount: (i) => searched.filter((p) => matches(p, "phase") && p.phaseIndex === i).length,
     resetAll: () => { setStatusSel(new Set()); setRespSel(new Set()); setPhaseSel(new Set()); setSearch(""); },
     hasAny: statusSel.size > 0 || respSel.size > 0 || phaseSel.size > 0,
   };
@@ -414,9 +404,8 @@ export function ProjectsTable() {
   const cols = COLUMNS.filter((c) => visibleCols.has(c.key));
 
   // ---- group-by ----
-  const [groupBy, setGroupBy] = useState<GroupBy>("none");
-  useEffect(() => { try { const g = localStorage.getItem(GROUP_KEY) as GroupBy | null; if (g) setGroupBy(g); } catch {} }, []);
-  const changeGroup = (g: GroupBy) => { setGroupBy(g); try { localStorage.setItem(GROUP_KEY, g); } catch {} };
+  const [storedGroup, changeGroup] = useStoredString(GROUP_KEY);
+  const groupBy: GroupBy = storedGroup === "status" || storedGroup === "phase" || storedGroup === "resp" ? storedGroup : "none";
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   // ---- sort ----
@@ -468,6 +457,7 @@ export function ProjectsTable() {
 
   // keyboard row navigation (up/down move focus between rows)
   const onRowKeyNav = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.target !== e.currentTarget) return;
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     const rows = Array.from((e.currentTarget.closest("[data-rowgroup]") ?? document).querySelectorAll<HTMLElement>("[data-row]"));
     const i = rows.indexOf(e.currentTarget as HTMLElement);
@@ -489,16 +479,16 @@ export function ProjectsTable() {
         />
       } />
 
-      {/* mobile search (header search is hidden ≤640) */}
-      {isMobile ? (
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher un projet…"
-          aria-label="Rechercher un projet"
-          style={{ width: "100%", height: 38, padding: "0 12px", marginBottom: 12, border: `1px solid ${C.line}`, borderRadius: R.sm, fontFamily: "inherit", fontSize: 14, color: C.ink900, outline: "none" }}
-        />
-      ) : null}
+      {/* mobile search (the header search is hidden ≤640px — CSS switch) */}
+      <input
+        className="pt-mobile-only ui-field"
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Rechercher un projet…"
+        aria-label="Rechercher un projet"
+        style={{ width: "100%", height: 38, padding: "0 12px", marginBottom: 12, border: `1px solid ${C.field}`, borderRadius: R.sm, fontFamily: "inherit", fontSize: 16, color: C.ink900, outline: "none" }}
+      />
 
       {selectedIds.length > 0 ? (
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px 9px 16px", marginBottom: 12, background: C.ink900, color: C.surface, borderRadius: R.md, boxShadow: SH.md, flexWrap: "wrap" }}>
@@ -524,24 +514,30 @@ export function ProjectsTable() {
         </div>
       ) : null}
 
-      {isMobile ? (
+      {/* Layout switch is pure CSS (≤720px → cards), so a phone never paints the
+          desktop grid first. Both trees exist; the hidden one is display:none. */}
+      <div className="pt-cards">
         <MobileCards groups={groups} groupBy={groupBy} budgets={budgets} sel={sel} toggleOne={toggleOne} openProject={openProject} cellCtx={cellCtx} empty={searched.length === 0} openAdd={openAdd} />
-      ) : (
+      </div>
+      <div className="pt-table">
         <div className="table-scroll">
           <div
             className="enter-rise"
             role="grid"
             aria-label="Projets"
-            aria-rowcount={sorted.length}
-            style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "hidden", minWidth: 760 }}
+            aria-rowcount={sorted.length + 1}
+            // `clip` (not `hidden`): rounds the corners without creating a scroll
+            // container, so the header below can stick to the viewport.
+            style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, overflow: "clip", minWidth: 760 }}
           >
-            {/* sticky header */}
+            {/* sticky header (top offset for the app header set in globals.css) */}
             <div
               role="row"
+              className="table-sticky-head"
               style={{
                 display: "grid", gridTemplateColumns: gridTemplate, gap: 12, padding: "10px 18px",
                 borderBottom: `1px solid ${C.line}`, ...TX.overline, color: C.ink400, alignItems: "center",
-                position: "sticky", top: 0, zIndex: Z.sticky, background: C.surface,
+                position: "sticky", top: 0, zIndex: Z.sticky - 1, background: C.surface,
               }}
             >
               <span role="columnheader" style={{ position: "sticky", left: 0, background: C.surface, zIndex: 1 }}>
@@ -561,10 +557,8 @@ export function ProjectsTable() {
                     <GroupHeader
                       label={g.label}
                       rows={g.rows}
-                      budgets={budgets}
                       collapsed={isCollapsed}
                       onToggle={() => setCollapsed((prev) => toggle(prev, g.key))}
-                      cols={cols.length + 2}
                     />
                   ) : null}
                   <AnimatePresence initial={false}>
@@ -584,6 +578,9 @@ export function ProjectsTable() {
                           transition={SPRING.gentle}
                           onClick={() => openProject(p.id)}
                           onKeyDown={(e) => {
+                            // Only the row itself — never steal Enter/Space
+                            // from a checkbox or cell editor inside it.
+                            if (e.target !== e.currentTarget) return;
                             if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProject(p.id); }
                             else onRowKeyNav(e);
                           }}
@@ -624,8 +621,22 @@ export function ProjectsTable() {
             ) : null}
           </div>
         </div>
-      )}
+      </div>
     </>
+  );
+}
+
+function matchesFacets(
+  p: DerivedProject,
+  statusSel: Set<Status>,
+  respSel: Set<number>,
+  phaseSel: Set<number>,
+  ignore?: "status" | "resp" | "phase",
+): boolean {
+  return (
+    (ignore === "status" || statusSel.size === 0 || statusSel.has(p.status)) &&
+    (ignore === "resp" || respSel.size === 0 || respSel.has(p.responsableId)) &&
+    (ignore === "phase" || phaseSel.size === 0 || phaseSel.has(p.phaseIndex))
   );
 }
 
@@ -665,8 +676,8 @@ function HeaderCell({
 // ───────────────────────────────────────── group header (subtotals)
 
 function GroupHeader({
-  label, rows, budgets, collapsed, onToggle, cols,
-}: { label: string; rows: DerivedProject[]; budgets: Map<number, ProjectBudget>; collapsed: boolean; onToggle: () => void; cols: number }) {
+  label, rows, collapsed, onToggle,
+}: { label: string; rows: DerivedProject[]; collapsed: boolean; onToggle: () => void }) {
   const count = rows.length;
   const fees = rows.reduce((s, p) => s + p.budget, 0);
   const avg = count ? Math.round(rows.reduce((s, p) => s + p.progress, 0) / count) : 0;
@@ -710,23 +721,16 @@ function DisplayControl({
     { v: "none", label: "Aucun" }, { v: "status", label: "Statut" }, { v: "phase", label: "Phase" }, { v: "resp", label: "Responsable" },
   ];
   const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
+  const anchorRef = useRef<HTMLButtonElement>(null);
   const active = groupBy !== "none";
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
-      <button type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="btn state-layer" style={controlBtn(active)}>
+    <div style={{ position: "relative", display: "inline-flex" }}>
+      <button ref={anchorRef} type="button" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="btn state-layer" style={controlBtn(active)}>
         Affichage{active ? ` : ${groupOpts.find((o) => o.v === groupBy)!.label}` : ""}
         <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .12s", color: C.ink500 }}><CaretDownIcon size={12} /></span>
       </button>
-      <AnimatePresence>
-        {open ? (
-          <motion.div
-            role="dialog" aria-label="Affichage de la table"
-            initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={SPRING.snappy}
-            style={{ ...menuShell, width: 224, right: 0, left: "auto" }}
-          >
-            <div style={{ ...TX.eyebrow, color: C.ink400, padding: "4px 8px 2px" }}>Grouper par</div>
+      <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} role="dialog" label="Affichage de la table" width={224} align="end" maxHeight={420}>
+            <div role="presentation" style={{ ...TX.eyebrow, color: C.ink400, padding: "4px 8px 2px" }}>Grouper par</div>
             {groupOpts.map((o) => (
               <MenuOption key={o.v} selected={groupBy === o.v} label={o.label} onSelect={() => onGroup(o.v)} />
             ))}
@@ -752,17 +756,10 @@ function DisplayControl({
                 </button>
               );
             })}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      </Popover>
     </div>
   );
 }
-
-const menuShell: React.CSSProperties = {
-  position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: Z.sticky + 2, minWidth: 170,
-  background: C.surface, border: `1px solid ${C.lineStrong}`, borderRadius: R.md, boxShadow: SH.overlay, padding: 6,
-};
 
 function controlBtn(active: boolean): React.CSSProperties {
   // Quiet toolbar control: an active group-by reads as neutral ink on a subtle
@@ -817,18 +814,25 @@ function MobileCards({
                   <motion.div
                     key={p.id} layout
                     initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SPRING.gentle}
-                    {...{ role: "button", tabIndex: 0 }}
+                    // The card is a click target for the pointer only; for the
+                    // keyboard / AT the project name is the "open" button (a
+                    // role=button card can't contain the cell editors).
                     onClick={() => openProject(p.id)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openProject(p.id); } }}
-                    className="row-focus"
-                    style={{ border: `1px solid ${on ? C.brand : C.line}`, borderRadius: R.lg, background: C.surface, boxShadow: SH.sm, padding: 14, cursor: "pointer", outline: "none" }}
+                    style={{ border: `1px solid ${on ? C.brand : C.line}`, borderRadius: R.lg, background: C.surface, boxShadow: SH.sm, padding: 14, cursor: "pointer" }}
                   >
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                       <span onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={on} onChange={() => toggleOne(p.id)} label={`Sélectionner ${p.name}`} />
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ ...TX.bodyStrong, color: C.ink900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); openProject(p.id); }}
+                          className="row-focus"
+                          style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", ...TX.bodyStrong, color: C.ink900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        >
+                          {p.name}
+                        </button>
                         <div style={{ ...TX.caption, color: C.ink500 }}>{p.client} · {p.discipline}</div>
                       </div>
                       <StatusCell p={p} setStatus={cellCtx.setStatus} />

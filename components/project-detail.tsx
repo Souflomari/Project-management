@@ -7,14 +7,16 @@
 // reads the store directly so callers just drop them in. `p` is the derived
 // project (extends the raw Project).
 
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 
 import { CloseIcon, PlusIcon, TrashIcon } from "./icons";
 import { Avatar, Button, Checkbox, IconButton, Input, ProgressBar, Select, Textarea } from "./ui";
 import type { SubtaskPatch } from "@/lib/data/repository";
 import { buildBudget, type DerivedProject, type DerivedSubtask } from "@/lib/derive";
-import { daysFromToday, fmtEur, fmtFull, fmtShort, formatDays, pct, REFERENCE_DATE, REFERENCE_TS, relativeWhen, toDate, workingDaysBetween } from "@/lib/format";
+import { daysFromToday, fmtEur, fmtFull, fmtShort, formatDays, pct, REFERENCE_DATE, relativeWhen } from "@/lib/format";
 import { useProjects } from "@/lib/store/projects-context";
+import { subscribeToasts } from "@/lib/toast";
 import { C, FONT_DISPLAY, num, R, SURFACE, STATUS_META, TX } from "@/lib/tokens";
 import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/types";
 
@@ -22,23 +24,6 @@ import { FINAL_PHASE_INDEX, PHASES, STATUSES, type TeamMember } from "@/lib/type
 // uppercase). Eyebrow (uppercase, tracked) is reserved for the few true category
 // tags — the stat-cell metadata labels below.
 const LABEL: React.CSSProperties = { ...TX.overline, color: C.ink700 };
-
-/** Schedule-derived expected progress "as of" today (the avancement we should
- *  have reached if every task ran on plan). Mirrors derive's internal
- *  `progressAsOf`, which isn't exported. // TODO(derive): export progressAsOf so
- *  this fallback can be removed. */
-function expectedProgressToday(p: DerivedProject): number {
-  let total = 0;
-  let done = 0;
-  for (const s of p.subtasksD) {
-    total += s.plannedDays;
-    if (toDate(s.start).getTime() > REFERENCE_TS) continue;
-    const upto = s.end <= REFERENCE_DATE ? s.end : REFERENCE_DATE;
-    done += Math.min(s.plannedDays, workingDaysBetween(s.start, upto));
-  }
-  if (total === 0) return p.progress;
-  return Math.min(100, Math.round((100 * done) / total));
-}
 
 /** Editable name + maître d'ouvrage · discipline. `titleStyle` lets the page
  *  render a larger heading than the drawer. */
@@ -186,12 +171,26 @@ export function ProjectProperties({ p }: { p: DerivedProject }) {
           {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
         </Select>
       </PropRow>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
         <PropRow label="Début">
-          <Input size="sm" type="date" aria-label="Date de début" value={p.start} onChange={(e) => updateProject(p.id, { start: e.target.value })} />
+          <DateField
+            key={`s-${p.start}`}
+            ariaLabel="Date de début"
+            value={p.start}
+            max={p.deadline}
+            validate={(v) => (v > p.deadline ? `Le début doit précéder l’échéance (${fmtShort(p.deadline)}).` : null)}
+            onCommit={(v) => updateProject(p.id, { start: v })}
+          />
         </PropRow>
         <PropRow label={`Échéance · ${p.deadlineDaysLabel}`}>
-          <Input size="sm" type="date" aria-label="Échéance finale" value={p.deadline} onChange={(e) => updateProject(p.id, { deadline: e.target.value })} />
+          <DateField
+            key={`d-${p.deadline}`}
+            ariaLabel="Échéance finale"
+            value={p.deadline}
+            min={p.start}
+            validate={(v) => (v < p.start ? `L’échéance doit suivre le début (${fmtShort(p.start)}).` : null)}
+            onCommit={(v) => updateProject(p.id, { deadline: v })}
+          />
         </PropRow>
       </div>
       <PropRow label="Équipe">
@@ -268,102 +267,6 @@ export function PhaseStepper({ p, compact = false }: { p: DerivedProject; compac
         </div>
       ) : null}
     </>
-  );
-}
-
-/** Honoraires + avancement, statut, phase stepper, responsable/dates, équipe.
- *  Retained for back-compat; the drawer now uses the peek pieces and the page
- *  uses ProjectProperties, but this remains a complete stacked overview. */
-export function ProjectOverview({ p }: { p: DerivedProject }) {
-  const { team, updateProject } = useProjects();
-  const doneCount = p.subtasksD.filter((s) => s.done).length;
-
-  return (
-    <>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-        <div style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
-          <div style={{ ...TX.overline, color: C.ink600 }}>Honoraires</div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 4 }}>
-            <Input
-              size="sm"
-              key={p.budget}
-              defaultValue={p.budget}
-              type="number"
-              min={0}
-              step={10}
-              aria-label="Honoraires en milliers d’euros"
-              onBlur={(e) => { const v = Math.max(0, Math.round(Number(e.target.value) || 0)); if (v !== p.budget) updateProject(p.id, { budget: v }); }}
-              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              trailing={<span style={{ ...TX.caption, color: C.ink500 }}>k€</span>}
-              style={{ ...num(20), width: 120, height: 34 }}
-            />
-          </div>
-          <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{p.budgetFmt}</div>
-        </div>
-        <Stat
-          label="Avancement"
-          value={pct(p.progress)}
-          valueColor={C.brand}
-          hint={`${doneCount} / ${p.subtasksD.length} tâches`}
-          title={`Avancement pondéré par la durée des tâches (jours terminés ÷ jours planifiés). Le décompte ${doneCount} / ${p.subtasksD.length} indique le nombre de tâches.`}
-        >
-          <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>pondéré par durée</div>
-          <div style={{ marginTop: 8 }}><AvancementBar p={p} /></div>
-        </Stat>
-      </div>
-
-      <ProjectBudget p={p} />
-
-      <div style={{ ...LABEL, marginBottom: 9 }}>Statut</div>
-      <div style={{ marginBottom: 24 }}><StatusPicker p={p} /></div>
-
-      <PhaseStepper p={p} />
-
-      <div style={{ ...LABEL, marginBottom: 10 }}>Détails</div>
-      <div style={{ marginBottom: 16 }}>
-        <Field label="Responsable">
-          <Select size="sm" aria-label="Responsable" value={p.responsableId} onChange={(e) => updateProject(p.id, { responsableId: Number(e.target.value) })}>
-            {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
-          </Select>
-        </Field>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-          <Field label="Début">
-            <Input size="sm" type="date" aria-label="Date de début" value={p.start} onChange={(e) => updateProject(p.id, { start: e.target.value })} />
-          </Field>
-          <Field label={`Échéance · ${p.deadlineDaysLabel}`}>
-            <Input size="sm" type="date" aria-label="Échéance finale" value={p.deadline} onChange={(e) => updateProject(p.id, { deadline: e.target.value })} />
-          </Field>
-        </div>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", paddingLeft: 7 }}>
-        {p.members.map((m) => (
-          <div key={m.id} style={{ marginLeft: -7 }}>
-            <Avatar initials={m.initials} color={m.color} size={28} fontSize={12} ring title={`${m.name} · ${m.role}`} />
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-/** Avancement bar with the "attendu aujourd'hui" expected-progress marker. */
-function AvancementBar({ p, height = 6 }: { p: DerivedProject; height?: number }) {
-  const expected = expectedProgressToday(p);
-  return (
-    <div title={`Avancement réel ${pct(p.progress)} — attendu aujourd’hui ${pct(expected)} selon le planning`}>
-      <div style={{ position: "relative" }}>
-        <ProgressBar pct={p.progress} color={p.progress + 4 < expected ? C.danger : C.brand} height={height} />
-        {/* "attendu aujourd'hui" marker */}
-        <div
-          aria-hidden
-          style={{ position: "absolute", top: -2, bottom: -2, left: `${expected}%`, width: 2, background: C.ink700, transform: "translateX(-1px)", borderRadius: 0 }}
-        />
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", ...TX.micro, color: C.ink500, marginTop: 5 }}>
-        <span>réel {pct(p.progress)}</span>
-        <span title="Avancement que le planning prévoit à ce jour">attendu {pct(expected)}</span>
-      </div>
-    </div>
   );
 }
 
@@ -454,8 +357,12 @@ export function ProjectTasks({ p }: { p: DerivedProject }) {
   const [ntName, setNtName] = useState("");
   const [ntAssignee, setNtAssignee] = useState<number | null>(null);
   const [ntStart, setNtStart] = useState(REFERENCE_DATE);
-  const [ntDays, setNtDays] = useState(5);
+  const [ntDays, setNtDays] = useState("5");
   const assigneeDefault = ntAssignee ?? p.responsableId;
+  const ntDaysErr = daysError(ntDays);
+  const ntStartErr = dateError(ntStart);
+  const ntErrId = useId();
+  const canAdd = !!ntName.trim() && !ntDaysErr && !ntStartErr;
   const doneCount = p.subtasksD.filter((s) => s.done).length;
 
   // Planning surface: sort by start date (the order work actually happens).
@@ -465,8 +372,8 @@ export function ProjectTasks({ p }: { p: DerivedProject }) {
   );
 
   function handleAdd() {
-    if (!ntName.trim()) return;
-    addSubtask(p.id, { name: ntName, assigneeId: assigneeDefault, start: ntStart, plannedDays: ntDays });
+    if (!canAdd) return;
+    addSubtask(p.id, { name: ntName.trim(), assigneeId: assigneeDefault, start: ntStart, plannedDays: Number(ntDays) });
     setNtName("");
   }
 
@@ -497,19 +404,23 @@ export function ProjectTasks({ p }: { p: DerivedProject }) {
           size="sm"
           value={ntName}
           onChange={(e) => setNtName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
           placeholder="Intitulé de la tâche"
+          aria-label="Intitulé de la nouvelle tâche"
           style={{ marginBottom: 8 }}
         />
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", gap: 8, alignItems: "center" }}>
           <Select size="sm" aria-label="Responsable" value={assigneeDefault} onChange={(e) => setNtAssignee(Number(e.target.value))}>
             {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
           </Select>
-          <Input size="sm" type="date" aria-label="Date de début" value={ntStart} onChange={(e) => setNtStart(e.target.value)} style={{ width: 150 }} />
-          <Input size="sm" type="number" min={1} aria-label="Jours planifiés" value={ntDays} onChange={(e) => setNtDays(Number(e.target.value))} style={{ width: 64 }} />
+          <Input size="sm" type="date" required aria-label="Date de début" invalid={!!ntStartErr} aria-describedby={ntStartErr ? ntErrId : undefined} value={ntStart} onChange={(e) => setNtStart(e.target.value)} style={{ width: 150 }} />
+          <Input size="sm" type="text" inputMode="numeric" aria-label="Jours planifiés" invalid={!!ntDaysErr} aria-describedby={ntDaysErr ? ntErrId : undefined} value={ntDays} onChange={(e) => setNtDays(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }} style={{ width: 64 }} />
         </div>
+        {ntStartErr || ntDaysErr ? (
+          <div id={ntErrId} role="alert" style={{ ...TX.nano, color: C.danger, marginTop: 6 }}>{ntStartErr ?? ntDaysErr}</div>
+        ) : null}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-          <Button size="sm" variant="secondary" icon={<PlusIcon size={14} />} onClick={handleAdd} disabled={!ntName.trim()}>Ajouter</Button>
+          <Button size="sm" variant="secondary" icon={<PlusIcon size={14} />} onClick={handleAdd} disabled={!canAdd}>Ajouter</Button>
         </div>
       </div>
     </>
@@ -520,19 +431,62 @@ export function ProjectTasks({ p }: { p: DerivedProject }) {
 
 const MENTION_RE = /@([\p{L}\p{M}'’-]+(?:\s+[\p{L}\p{M}'’-]+)?)/gu;
 
+// Comment drafts, keyed by project id. The store holds ONE shared draft, so a
+// half-written comment used to follow you from project to project; the drawer
+// and the full page of the SAME project still share theirs (same key).
+const drafts = new Map<number, string>();
+const draftListeners = new Set<() => void>();
+function setDraft(id: number, text: string) {
+  if (text) drafts.set(id, text); else drafts.delete(id);
+  draftListeners.forEach((l) => l());
+}
+function useDraft(id: number): [string, (t: string) => void] {
+  const text = useSyncExternalStore(
+    (cb) => { draftListeners.add(cb); return () => { draftListeners.delete(cb); }; },
+    () => drafts.get(id) ?? "",
+    () => "",
+  );
+  return [text, (t) => setDraft(id, t)];
+}
+
 /** Activity feed: richer comment thread — multiline composer (Shift+Enter for a
- *  newline), @mentions of team members, relative timestamps, delete-own. */
+ *  newline), @mentions of team members (↑/↓/Entrée/Échap), relative timestamps. */
 export function ProjectComments({ p }: { p: DerivedProject }) {
   const { team, addComment, commentDraft, setCommentDraft } = useProjects();
+  const [draft, setDraftText] = useDraft(p.id);
   const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionIdx, setMentionIdx] = useState(0);
+  const composerId = useId();
+  const listId = useId();
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  // Publishing: the store's addComment(id) reads ITS shared draft, so we hand it
+  // our text synchronously (flushSync) and post. The composer clears at once
+  // (a second Enter finds nothing to send → no double post) and stays locked
+  // while the store still holds our text. On failure (error toast) the text is
+  // put back for a retry.
+  const [pending, setPending] = useState<string | null>(null);
+  const isPending = pending !== null && commentDraft === pending;
+  useEffect(() => {
+    if (pending === null) return;
+    const text = pending;
+    const unsub = subscribeToasts((t) => {
+      if (t.variant === "error") { setDraft(p.id, text); setCommentDraft(""); }
+      setPending(null);
+    });
+    const timer = window.setTimeout(() => setPending(null), 15_000);
+    return () => { unsub(); window.clearTimeout(timer); };
+  }, [pending, p.id, setCommentDraft]);
 
   const teamFirstNames = useMemo(() => new Set(team.map((m) => m.name.split(" ")[0].toLowerCase())), [team]);
   const mentionMatches = useMemo(() => {
-    const m = commentDraft.match(/@([\p{L}\p{M}'’-]*)$/u);
+    const m = draft.match(/@([\p{L}\p{M}'’-]*)$/u);
     if (!m) return [];
     const q = m[1].toLowerCase();
     return team.filter((tm) => tm.name.toLowerCase().includes(q)).slice(0, 5);
-  }, [commentDraft, team]);
+  }, [draft, team]);
+  const showMentions = mentionOpen && mentionMatches.length > 0;
+  const activeMention = Math.min(mentionIdx, Math.max(0, mentionMatches.length - 1));
 
   // A real activity timeline derived from the project's OWN data (no event store
   // needed): every delivered task becomes a "rendu livré" milestone, plus the
@@ -547,16 +501,20 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
   }, [p]);
 
   function submit() {
-    if (!commentDraft.trim()) return;
-    addComment(p.id);
+    const text = draft.trim();
+    if (!text || isPending) return;
     setMentionOpen(false);
+    flushSync(() => setCommentDraft(text));
+    setPending(text);
+    setDraftText("");
+    addComment(p.id);
   }
 
   function applyMention(name: string) {
-    const next = commentDraft.replace(/@([\p{L}\p{M}'’-]*)$/u, `@${name.split(" ")[0]} `);
-    setCommentDraft(next);
+    const next = draft.replace(/@([\p{L}\p{M}'’-]*)$/u, `@${name.split(" ")[0]} `);
+    setDraftText(next);
     setMentionOpen(false);
-    document.getElementById("comment-composer")?.focus();
+    composerRef.current?.focus();
   }
 
   return (
@@ -566,42 +524,65 @@ export function ProjectComments({ p }: { p: DerivedProject }) {
       ))}
 
       <div style={{ marginTop: 12, position: "relative" }}>
+        <label htmlFor={composerId} className="sr-only">Ajouter un commentaire</label>
         <Textarea
-          id="comment-composer"
+          id={composerId}
+          ref={composerRef}
           rows={2}
-          value={commentDraft}
-          onChange={(e) => { setCommentDraft(e.target.value); setMentionOpen(/@[\p{L}\p{M}'’-]*$/u.test(e.target.value)); }}
+          value={draft}
+          readOnly={isPending}
+          aria-busy={isPending || undefined}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={showMentions}
+          aria-controls={showMentions ? listId : undefined}
+          aria-activedescendant={showMentions ? `${listId}-${activeMention}` : undefined}
+          onChange={(e) => {
+            setDraftText(e.target.value);
+            setMentionOpen(/@[\p{L}\p{M}'’-]*$/u.test(e.target.value));
+            setMentionIdx(0);
+          }}
           onKeyDown={(e) => {
+            if (showMentions) {
+              // The mention list owns ↑/↓/Entrée/Tab/Échap while open. Escape is
+              // marked handled so it never also closes the drawer/dialog.
+              if (e.key === "ArrowDown") { e.preventDefault(); setMentionIdx((activeMention + 1) % mentionMatches.length); return; }
+              if (e.key === "ArrowUp") { e.preventDefault(); setMentionIdx((activeMention - 1 + mentionMatches.length) % mentionMatches.length); return; }
+              if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); applyMention(mentionMatches[activeMention].name); return; }
+              if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); return; }
+            }
             // Enter submits; Shift+Enter inserts a newline.
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
-            if (e.key === "Escape") setMentionOpen(false);
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); }
           }}
           placeholder="Ajouter à l’activité…  (@ pour mentionner · Maj+Entrée pour un retour à la ligne)"
           style={{ minHeight: 60 }}
         />
-        {mentionOpen && mentionMatches.length > 0 ? (
+        {showMentions ? (
           <div
+            id={listId}
             role="listbox"
             aria-label="Mentionner un membre"
             style={{ position: "absolute", left: 0, bottom: "100%", marginBottom: 4, background: C.surface, border: `1px solid ${C.lineStrong}`, borderRadius: R.md, boxShadow: "0 8px 16px -6px rgba(28,25,23,.18)", padding: 4, zIndex: 5, minWidth: 200 }}
           >
-            {mentionMatches.map((tm) => (
-              <button
+            {mentionMatches.map((tm, i) => (
+              <div
                 key={tm.id}
+                id={`${listId}-${i}`}
                 role="option"
-                aria-selected={false}
+                aria-selected={i === activeMention}
                 onMouseDown={(e) => { e.preventDefault(); applyMention(tm.name); }}
-                className="btn soft-hover"
-                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", border: "none", background: "transparent", borderRadius: R.sm, padding: "6px 8px", cursor: "pointer", textAlign: "left" }}
+                onMouseEnter={() => setMentionIdx(i)}
+                className="soft-hover"
+                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", borderRadius: R.sm, padding: "6px 8px", cursor: "pointer", background: i === activeMention ? C.subtle : "transparent" }}
               >
                 <Avatar initials={tm.initials} color={tm.color} size={22} fontSize={12} />
                 <span style={{ ...TX.caption, color: C.ink900 }}>{tm.name}</span>
-              </button>
+              </div>
             ))}
           </div>
         ) : null}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-          <Button variant="secondary" onClick={submit} disabled={!commentDraft.trim()}>Publier</Button>
+          <Button variant="secondary" onClick={submit} loading={isPending} disabled={!draft.trim()}>Publier</Button>
         </div>
       </div>
 
@@ -635,18 +616,16 @@ function CommentItem({ cm, teamFirstNames }: { cm: { author: string; initials: s
   // Render @mentions of real team members as accented tokens.
   const parts: React.ReactNode[] = [];
   let last = 0;
-  let m: RegExpExecArray | null;
-  MENTION_RE.lastIndex = 0;
-  while ((m = MENTION_RE.exec(cm.text)) !== null) {
+  for (const m of cm.text.matchAll(MENTION_RE)) {
     const name = m[1].split(/\s+/)[0].toLowerCase();
     const isMember = teamFirstNames.has(name);
-    if (m.index > last) parts.push(cm.text.slice(last, m.index));
+    if ((m.index ?? 0) > last) parts.push(cm.text.slice(last, m.index));
     parts.push(
       isMember
         ? <span key={`${m.index}`} style={{ color: C.brand, fontWeight: 600 }}>@{m[1]}</span>
         : `@${m[1]}`,
     );
-    last = m.index + m[0].length;
+    last = (m.index ?? 0) + m[0].length;
   }
   if (last < cm.text.length) parts.push(cm.text.slice(last));
 
@@ -764,8 +743,8 @@ function SubtaskRow({
             <Select size="sm" aria-label="Responsable" value={subtask.assigneeId} onChange={(e) => onUpdate(projectId, subtask.id, { assigneeId: Number(e.target.value) })}>
               {team.map((m) => (<option key={m.id} value={m.id}>{m.name}</option>))}
             </Select>
-            <Input size="sm" type="date" aria-label="Date de début" value={subtask.start} onChange={(e) => onUpdate(projectId, subtask.id, { start: e.target.value })} style={{ width: 148 }} />
-            <Input size="sm" type="number" min={1} aria-label="Jours planifiés" value={subtask.plannedDays} onChange={(e) => onUpdate(projectId, subtask.id, { plannedDays: Math.max(1, Number(e.target.value)) })} />
+            <DateField key={`st-${subtask.start}`} ariaLabel="Date de début" value={subtask.start} onCommit={(v) => onUpdate(projectId, subtask.id, { start: v })} style={{ width: 148 }} />
+            <DaysField key={`pd-${subtask.plannedDays}`} value={subtask.plannedDays} onCommit={(n) => onUpdate(projectId, subtask.id, { plannedDays: n })} />
           </div>
           <div style={{ ...TX.micro, color: C.ink500, marginTop: 6 }}>fin {fmtFull(subtask.end)}</div>
 
@@ -813,7 +792,7 @@ export function EditableText({ value, onSave, ariaLabel, style }: { value: strin
       onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== value) onSave(v); else e.target.value = value; }}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") { (e.currentTarget as HTMLInputElement).value = value; e.currentTarget.blur(); }
+        if (e.key === "Escape") { e.preventDefault(); (e.currentTarget as HTMLInputElement).value = value; e.currentTarget.blur(); }
       }}
       style={{ font: "inherit", ...style, border: "1px solid transparent", background: "transparent", borderRadius: R.xs, padding: "1px 4px", margin: "-1px -4px", outline: "none", minWidth: 0, width: "auto", maxWidth: "100%" }}
       size={Math.max(4, value.length)}
@@ -821,22 +800,102 @@ export function EditableText({ value, onSave, ariaLabel, style }: { value: strin
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+// ───────────────────────────────────────── validated inputs
+
+const MAX_TASK_DAYS = 1000;
+
+/** Planned working days: a whole number between 1 and 1000. */
+function daysError(raw: string): string | null {
+  const t = raw.trim();
+  if (!/^\d+$/.test(t)) return "Durée : un nombre entier de jours.";
+  const n = Number(t);
+  if (n < 1 || n > MAX_TASK_DAYS) return `Durée : entre 1 et ${MAX_TASK_DAYS} jours.`;
+  return null;
+}
+
+/** A real, plausible calendar date (also rejects the transient years a date
+ *  input reports while the user is still typing, e.g. 0002-06-15). */
+function dateError(v: string): string | null {
+  if (!v) return "Date requise.";
+  const y = Number(v.slice(0, 4));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || y < 2000 || y > 2100) return "Date invalide.";
+  return null;
+}
+
+/** Date input that never saves an empty/invalid value: an invalid entry shows
+ *  an inline error and, on blur, reverts to the last saved value. Pickers
+ *  commit on change; a valid typed date commits as soon as it is complete. */
+function DateField({ value, onCommit, validate, ariaLabel, min, max, style }: {
+  value: string;
+  onCommit: (v: string) => void;
+  validate?: (v: string) => string | null;
+  ariaLabel: string;
+  min?: string;
+  max?: string;
+  style?: React.CSSProperties;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const errId = useId();
   return (
-    <label style={{ display: "block" }}>
-      <span style={{ ...TX.overline, color: C.ink600, display: "block", marginBottom: 5 }}>{label}</span>
-      {children}
-    </label>
+    <div style={{ minWidth: 0 }}>
+      <Input
+        size="sm"
+        type="date"
+        required
+        aria-label={ariaLabel}
+        min={min}
+        max={max}
+        invalid={!!err}
+        aria-describedby={err ? errId : undefined}
+        value={draft ?? value}
+        onChange={(e) => {
+          const v = e.target.value;
+          const msg = dateError(v) ?? validate?.(v) ?? null;
+          if (msg) { setDraft(v); setErr(msg); return; }
+          setDraft(null);
+          setErr(null);
+          if (v !== value) onCommit(v);
+        }}
+        onBlur={() => { if (draft !== null) { setDraft(null); setErr((m) => (m ? `${m} Valeur précédente conservée.` : m)); } }}
+        style={style}
+      />
+      {err ? <div id={errId} role="alert" style={{ ...TX.nano, color: C.danger, marginTop: 4 }}>{err}</div> : null}
+    </div>
   );
 }
 
-function Stat({ label, value, hint, title, valueColor, children }: { label: string; value: string; hint?: string; title?: string; valueColor?: string; children?: React.ReactNode }) {
+/** Planned-days input: edits locally, commits on blur/Enter only (not on every
+ *  keystroke), integer 1..1000; Escape or an invalid value reverts. */
+function DaysField({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
+  const [text, setText] = useState(String(value));
+  const [err, setErr] = useState<string | null>(null);
+  const errId = useId();
+  const commit = () => {
+    const msg = daysError(text);
+    if (msg) { setErr(`${msg} Valeur précédente conservée.`); setText(String(value)); return; }
+    setErr(null);
+    const n = Number(text.trim());
+    if (n !== value) onCommit(n);
+  };
   return (
-    <div title={title} style={{ background: SURFACE.container, border: `1px solid ${C.line}`, borderRadius: R.md, padding: "12px 14px" }}>
-      <div style={{ ...TX.overline, color: C.ink600 }}>{label}</div>
-      <div style={{ ...num(28), marginTop: 4, color: valueColor ?? C.ink900 }}>{value}</div>
-      {hint ? <div style={{ ...TX.micro, color: C.ink500, marginTop: 3 }}>{hint}</div> : null}
-      {children}
+    <div style={{ minWidth: 0 }}>
+      <Input
+        size="sm"
+        type="text"
+        inputMode="numeric"
+        aria-label="Jours planifiés"
+        invalid={!!err}
+        aria-describedby={err ? errId : undefined}
+        value={text}
+        onChange={(e) => { setText(e.target.value); setErr(null); }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { e.preventDefault(); setText(String(value)); setErr(null); }
+        }}
+      />
+      {err ? <div id={errId} role="alert" style={{ ...TX.nano, color: C.danger, marginTop: 4 }}>{err}</div> : null}
     </div>
   );
 }

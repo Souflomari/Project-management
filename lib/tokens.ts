@@ -21,11 +21,12 @@ export const C = {
   ink800: "#2E2A27", // strong body (evened L* step from 900)
   ink700: "#44403C", // body
   ink600: "#574F4A", // tertiary text (bridges the 700→500 gap)
-  ink500: "#78716C", // secondary (receded) — AA floor for body text ≈ 4.7:1
-  ink400: "#6F6862", // muted label / eyebrow — 5.48:1 on white (was #857E78 ≈ 4.0:1, just under AA). Small 11–12px labels need ≥4.5:1; there is no lighter-than-ink500 grey that clears AA, so this tier sits at full legibility.
+  ink500: "#6B645F", // secondary (receded) — 5.8:1 on white, 5.2:1 on `subtle` (unselected segmented/tab labels sit on the well)
+  ink400: "#736C67", // muted label / eyebrow — one step LIGHTER than ink500 (the scale was inverted) yet ≥4.6:1 on white and on `subtle`
   ink300: "#BDB8B2", // disabled text/control
   line: "#EAE8E4", // hairline — visible on the unified white field without reading as noise
   lineStrong: "#DAD7D1", // hover / modal border / visible divider
+  field: "#928B85", // form-control boundary (inputs, selects, checkboxes) — 3.4:1 on white (WCAG 1.4.11 needs ≥3:1)
   surface: "#FFFFFF",
   canvas: "#FFFFFF", // unified white app background — depth now comes from borders + soft shadow, not tone
   subtle: "#F4F3F1", // inset / track / rail — a clean near-neutral well on white
@@ -44,6 +45,8 @@ export const C = {
   inversePrimary: "#6FCF8E", // green legible on the dark (inverse) toast surface
   ink350: "#A8A29E", // named warm grey between ink400/ink300 (gantt secondary, rings)
   danger: "#B5392E", // single danger hue
+  dataFill: "#3F9A5F", // progress / data-viz fill — 3.1:1 against dataTrack (was #5FB87F ≈ 2.2:1)
+  dataTrack: "#E8F5EE", // empty track behind progress bars
   surfaceHigh: "#FFFFFF", // raised overlays — white, lifted by shadow (not tone)
   surfaceLow: "#F4F3F1", // tracks / insets, a step below cards
 } as const;
@@ -169,10 +172,7 @@ export const SPRING = {
 } as const;
 
 /** Stacking order — one governed ladder so overlays never collide ad-hoc. */
-export const Z = { base: 0, sticky: 30, drawer: 60, modal: 70, palette: 80, toast: 90 } as const;
-
-/** Comfortable reading measure for running text (comments, descriptions). */
-export const MEASURE = "66ch";
+export const Z = { base: 0, sticky: 30, drawer: 60, modal: 70, popover: 75, palette: 80, toast: 90 } as const;
 
 // ── Elevation (tone-first) ───────────────────────────────────────────────────
 // M3 expresses elevation primarily as surface TONE; we add a whisper of shadow
@@ -243,21 +243,9 @@ export function ringColor(status: Status): string {
 export function dueColor(days: number, delivered: boolean): string {
   if (delivered) return "#A8A29E";
   if (days < 0) return "#B5392E";
-  if (days <= 6) return "#15803D";
-  return "#78716C";
+  if (days <= 6) return C.brand;
+  return C.ink500;
 }
-
-/** Drawer palette — aliases onto the unified tokens. `ac` = action (near-black),
- *  `done` = positive/complete (green). */
-export const DRAWER = {
-  ac: C.solid,
-  done: C.brand,
-  ink: C.ink900,
-  paper: C.surface,
-  panel: C.subtle,
-  line: C.line,
-  sub: C.ink500,
-} as const;
 
 /** Phase ramp (ESQ → RÉC) — minimalism: a single low-chroma slate progression,
  *  light→dark, so phases stay ordered and distinguishable WITHOUT a rainbow. The
@@ -286,25 +274,11 @@ export function chargeColor(pct: number): string {
   }
 }
 
-/** Heatmap cell colour by load % — C9: terracotta REMOVED. Load now speaks the
- *  SAME colour language as project-status — green (within capacity) → amber
- *  (≈100–120 %, mild over) → red (> ≈120 %, severe over). Within-capacity stays a
- *  quiet soft-green intensity ramp; over-capacity escalates green→amber→red so a
- *  strained week reads with the same semantics as an at-risk / late project. The
- *  cell's % figure carries the precise load (dark ink, legible on every tint). */
-export function heatColor(pct: number): string {
-  if (pct <= 0) return "#F4F3F1"; // empty — neutral well
-  if (pct < 50) return "#E8F1EA"; // light load — faint green
-  if (pct < 85) return "#CFE3D4"; // moderate — soft green
-  if (pct <= 100) return "#A9CDB2"; // at capacity — clearest soft green (within capacity → success)
-  if (pct <= 120) return "#EAB871"; // mild over (≈100–120 %) → amber (warning)
-  return "#D98A78"; // severe over (> ≈120 %) → red (danger)
-}
-
 // ── CSS-variable bridge ──────────────────────────────────────────────────────
-// The JS token objects above stay the single source of truth; this projects them
-// onto CSS custom properties so stylesheets (which can't import TS) reference the
-// *same* values, and a theme swap becomes "remap :root", not "edit every file".
+// The JS token objects above are the SINGLE source of truth; this projects them
+// onto CSS custom properties (--c-*, --surface-*, --state-*, --role-*, --ease-*,
+// --dur-*, --sh-*) so stylesheets (which can't import TS) reference the *same*
+// values. app/tokens.css only aliases these — it never redeclares them.
 
 const kebab = (s: string) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 
@@ -318,16 +292,6 @@ export function tokenCssVars(): string {
   for (const [k, v] of Object.entries(ROLE)) decls.push(`--role-${kebab(k)}:${v}`);
   for (const [k, v] of Object.entries(EASE)) decls.push(`--ease-${kebab(k)}:${v}`);
   for (const [k, v] of Object.entries(DUR)) decls.push(`--dur-${k}:${v}`);
+  for (const [k, v] of Object.entries(SH)) decls.push(`--sh-${k}:${v}`);
   return `:root{${decls.join(";")}}`;
 }
-
-type Ref<T> = Record<keyof T, string>;
-const refs = <T extends Record<string, unknown>>(o: T, prefix: string): Ref<T> =>
-  Object.fromEntries(Object.keys(o).map((k) => [k, `var(--${prefix}-${kebab(k)})`])) as Ref<T>;
-
-/** `var(--c-*)` references for opt-in themeable inline styles (mirrors `C`). */
-export const CV = refs(C, "c");
-/** `var(--surface-*)` references for the tonal surface roles (mirrors `SURFACE`). */
-export const SV = refs(SURFACE, "surface");
-/** `var(--role-*)` references for the M3 colour roles (mirrors `ROLE`). */
-export const ROLEV = refs(ROLE, "role");
