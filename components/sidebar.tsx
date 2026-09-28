@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 import { CaretDownIcon, NAV_ICONS } from "./icons";
 import { signOutAction } from "@/app/actions";
-import { WEEK_SHORT } from "@/lib/format";
+import { MONTHS, NBSP, REFERENCE_DATE, fmtShort, toDate, weekRange } from "@/lib/format";
 import {
   ACCOUNT_ROUTES,
   SIDEBAR_ITEMS,
@@ -16,8 +16,19 @@ import {
   sidebarKeyForPath,
   workspaceLensForPath,
 } from "@/lib/nav";
-import { useProjects } from "@/lib/store/projects-context";
+import { useProjects, type Identity } from "@/lib/store/projects-context";
 import { C, DUR, EASE, FONT_DISPLAY, R, SP, SPRING, SURFACE, TX } from "@/lib/tokens";
+
+/** The Monday–Sunday week containing `iso`, compact: "15 – 21 juin", or
+ *  "29 juin – 5 juil." across a month boundary. */
+function weekShort(iso: string): string {
+  const { start, end } = weekRange(iso);
+  const a = toDate(start);
+  const b = toDate(end);
+  return a.getMonth() === b.getMonth()
+    ? `${a.getDate()}${NBSP}–${NBSP}${b.getDate()} ${MONTHS[b.getMonth()]}`
+    : `${fmtShort(start)}${NBSP}–${NBSP}${fmtShort(end)}`;
+}
 
 function navLinkStyle(active: boolean): React.CSSProperties {
   return {
@@ -72,10 +83,13 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
   const groupActive = sidebarKeyForPath(pathname) === "projets";
   const [open, setOpen] = useState(inWorkspace);
 
-  // Keep the group open whenever the user navigates into it.
-  useEffect(() => {
+  // Keep the group open whenever the user navigates into it (adjusted during
+  // render when the route changes — no effect round-trip).
+  const [wasInWorkspace, setWasInWorkspace] = useState(inWorkspace);
+  if (inWorkspace !== wasInWorkspace) {
+    setWasInWorkspace(inWorkspace);
     if (inWorkspace) setOpen(true);
-  }, [inWorkspace]);
+  }
 
   const Icon = NAV_ICONS.projets;
 
@@ -180,15 +194,10 @@ function ProjetsGroup({ pathname }: { pathname: string }) {
   );
 }
 
-/** Avatar + name footer that opens an account menu (Profil/Paramètres/Thème/Se déconnecter). */
-function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
-  // TODO(auth): surface the real authenticated user. The Supabase session is
-  // available server-side (getServerContext().user) but isn't threaded through
-  // ProjectsProvider yet — wire `user` into the provider and read it here to
-  // replace the placeholder identity below.
-  const name = "Mehrnaz";
-  const role = "Responsable du département";
-  const initials = "ME";
+/** Avatar + name footer that opens an account menu (Profil/Paramètres/Se déconnecter). */
+function AccountMenu({ serverBacked, identity }: { serverBacked: boolean; identity: Identity }) {
+  // The signed-in member (Supabase) or the demo identity (sample mode).
+  const { name, role, initials, color } = identity;
 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -237,6 +246,9 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
               bottom: "calc(100% + 8px)",
               left: 4,
               right: 4,
+              // In the 64px icon rail (769–860px) the footer is narrow: keep the
+              // menu readable by letting it overflow to the right of the rail.
+              minWidth: 200,
               background: C.surface,
               border: `1px solid ${C.line}`,
               borderRadius: R.md,
@@ -294,7 +306,7 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
             calm, low-chroma treatment the rest of the app uses for avatars (no
             saturated hue), so identity reads quietly and the one green accent is
             never diluted. */}
-        <div aria-hidden style={{ width: 30, height: 30, borderRadius: "50%", background: "#4F5A63", color: C.surface, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
+        <div aria-hidden style={{ width: 30, height: 30, borderRadius: "50%", background: color, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
           {initials}
         </div>
         <div className="rail-hide" style={{ minWidth: 0, flex: 1 }}>
@@ -314,7 +326,7 @@ function AccountMenu({ serverBacked }: { serverBacked: boolean }) {
 export function Sidebar() {
   const pathname = usePathname();
   const activeKey = sidebarKeyForPath(pathname);
-  const { serverBacked } = useProjects();
+  const { serverBacked, identity } = useProjects();
 
   return (
     <aside
@@ -376,10 +388,10 @@ export function Sidebar() {
           (Von Restorff: keep the accent reserved for what actually matters). */}
       <div className="rail-hide" style={{ display: "flex", alignItems: "center", gap: SP[3], margin: "16px 10px 0", color: C.ink500, ...TX.micro }}>
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.ink350, flexShrink: 0 }} />
-        Semaine {WEEK_SHORT}
+        Semaine {weekShort(REFERENCE_DATE)}
       </div>
 
-      <AccountMenu serverBacked={serverBacked} />
+      <AccountMenu serverBacked={serverBacked} identity={identity} />
     </aside>
   );
 }

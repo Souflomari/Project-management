@@ -7,15 +7,6 @@ import { clearSampleData } from "@/lib/data";
 import { useProjects } from "@/lib/store/projects-context";
 import { C, SP, TX } from "@/lib/tokens";
 
-// Fixed demo persona (mirrors the sidebar account control). Real auth is not yet
-// wired through the provider, so the identity here is a placeholder.
-const PERSONA = {
-  name: "Mehrnaz",
-  role: "Responsable du département",
-  initials: "ME",
-  color: "#4F5A63",
-} as const;
-
 /** Small editorial frame for each settings block: an h-less label + helper line
  *  over a flat white card, matching the app's section idiom. */
 function Section({
@@ -41,7 +32,9 @@ function Section({
 }
 
 export default function ParametresPage() {
-  const { projects, team } = useProjects();
+  // Same identity as the sidebar account control: the signed-in member
+  // (Supabase) or the demo identity (sample mode).
+  const { projects, team, identity, serverBacked } = useProjects();
   const [confirmReset, setConfirmReset] = useState(false);
 
   // Export {projects, team} as a downloadable JSON file via a transient anchor.
@@ -75,15 +68,16 @@ export default function ParametresPage() {
         <Card padding={`${SP[5]}px ${SP[6]}px`}>
           <div style={{ display: "flex", alignItems: "center", gap: SP[5] }}>
             <Avatar
-              initials={PERSONA.initials}
-              color={PERSONA.color}
+              initials={identity.initials}
+              color={identity.color}
               size={48}
-              title={PERSONA.name}
+              title={identity.name}
             />
             <div style={{ minWidth: 0 }}>
-              <div style={{ ...TX.bodyStrong, color: C.ink900 }}>{PERSONA.name}</div>
+              <div style={{ ...TX.bodyStrong, color: C.ink900 }}>{identity.name}</div>
               <div style={{ ...TX.caption, color: C.ink500, marginTop: 2 }}>
-                {PERSONA.role}
+                {identity.role}
+                {identity.email ? ` · ${identity.email}` : null}
               </div>
             </div>
           </div>
@@ -95,8 +89,9 @@ export default function ParametresPage() {
               margin: `${SP[5]}px 0 0`,
             }}
           >
-            Identité de démonstration. L{"’"}authentification réelle, qui affichera
-            votre véritable compte, arrive prochainement.
+            {identity.demo
+              ? "Mode démonstration : aucun compte n’est connecté. Les commentaires que vous publiez sont signés « Vous »."
+              : "Votre nom, vos initiales et votre couleur proviennent de votre fiche dans l’équipe ; modifiez-les depuis la page Équipe."}
           </p>
         </Card>
       </Section>
@@ -104,7 +99,11 @@ export default function ParametresPage() {
       {/* ── Données & confidentialité ───────────────────────────────────────── */}
       <Section
         title="Données & confidentialité"
-        description="En mode démonstration, vos modifications sont enregistrées localement, dans ce navigateur uniquement. Rien n’est envoyé à un serveur."
+        description={
+          serverBacked
+            ? "Les projets, l’équipe et les commentaires sont enregistrés sur le serveur de l’application (base Supabase) et partagés avec les personnes autorisées. Chaque modification y est enregistrée aussitôt."
+            : "En mode démonstration, vos modifications sont enregistrées localement, dans ce navigateur uniquement. Rien n’est envoyé à un serveur."
+        }
       >
         <Card padding={`${SP[5]}px ${SP[6]}px`}>
           <div
@@ -131,30 +130,35 @@ export default function ParametresPage() {
             </Button>
           </div>
 
-          <div style={{ height: 1, background: C.line, margin: `${SP[5]}px 0` }} />
+          {/* Resetting only makes sense for the browser-local demo copy. */}
+          {!serverBacked ? (
+            <>
+              <div style={{ height: 1, background: C.line, margin: `${SP[5]}px 0` }} />
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              gap: SP[5],
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ minWidth: 0, flex: "1 1 280px" }}>
-              <div style={{ ...TX.bodyStrong, color: C.danger }}>
-                Réinitialiser la démonstration
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: SP[5],
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ minWidth: 0, flex: "1 1 280px" }}>
+                  <div style={{ ...TX.bodyStrong, color: C.danger }}>
+                    Réinitialiser la démonstration
+                  </div>
+                  <p style={{ ...TX.caption, color: C.ink500, margin: `${SP[2]}px 0 0` }}>
+                    Efface toutes vos modifications locales et restaure les données
+                    d{"’"}exemple d{"’"}origine. Cette action est irréversible.
+                  </p>
+                </div>
+                <Button variant="secondary" onClick={() => setConfirmReset(true)}>
+                  Réinitialiser
+                </Button>
               </div>
-              <p style={{ ...TX.caption, color: C.ink500, margin: `${SP[2]}px 0 0` }}>
-                Efface toutes vos modifications locales et restaure les données
-                d{"’"}exemple d{"’"}origine. Cette action est irréversible.
-              </p>
-            </div>
-            <Button variant="secondary" onClick={() => setConfirmReset(true)}>
-              Réinitialiser
-            </Button>
-          </div>
+            </>
+          ) : null}
         </Card>
       </Section>
 
@@ -168,7 +172,7 @@ export default function ParametresPage() {
         </Card>
       </Section>
 
-      {confirmReset ? (
+      {confirmReset && !serverBacked ? (
         <Modal
           title="Réinitialiser la démonstration ?"
           subtitle="Toutes vos modifications locales seront définitivement effacées et remplacées par les données d’exemple. Cette action est irréversible."
