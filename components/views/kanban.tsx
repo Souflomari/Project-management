@@ -226,12 +226,14 @@ export function Kanban() {
 
   // Keyboard move re-parents the card (new column → remount), so focus is
   // restored onto the moved card once it has rendered in its new column.
-  const refocusId = useRef<number | null>(null);
+  // The old card lingers in its former column during the exit animation, so
+  // look the card up inside its TARGET column.
+  const refocus = useRef<{ id: number; col: string } | null>(null);
   useEffect(() => {
-    const id = refocusId.current;
-    if (id == null) return;
-    const el = boardRef.current?.querySelector<HTMLElement>(`[data-card-id="${id}"]`);
-    if (el) { refocusId.current = null; el.focus(); }
+    const r = refocus.current;
+    if (!r) return;
+    const el = boardRef.current?.querySelector<HTMLElement>(`[data-col-key="${CSS.escape(r.col)}"] [data-card-id="${r.id}"]`);
+    if (el) { refocus.current = null; el.focus(); }
   });
 
   const onCardKey = (card: DerivedProject) => (e: React.KeyboardEvent) => {
@@ -243,7 +245,7 @@ export function Kanban() {
     const from = columns.findIndex((c) => c.cards.some((x) => x.id === card.id));
     const to = columns[from + (e.key === "ArrowRight" ? 1 : -1)];
     if (from < 0 || !to) return;
-    refocusId.current = card.id;
+    refocus.current = { id: card.id, col: to.key };
     applyMove(card, to);
   };
 
