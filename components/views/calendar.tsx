@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, FlagIcon } from "../icons";
+import { Popover } from "../overlay/popover";
 import { Button, IconButton, rowProps, Segmented, Toolbar } from "../ui";
 import {
   buildTaskSpans,
@@ -13,10 +14,12 @@ import {
   type TaskSpan,
   type TaskSpanSegment,
 } from "@/lib/derive";
+import { weekRangeLabel } from "@/lib/date-labels";
 import {
   dueLabel,
   fmtFull,
   isToday,
+  monthRange,
   MONS_LONG,
   MONTHS_FULL,
   REFERENCE_DATE,
@@ -29,6 +32,8 @@ import {
 } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import { useProjects, type CalMode } from "@/lib/store/projects-context";
+import { useMediaQuery } from "@/lib/use-media-query";
+import { usePointerDrag } from "@/lib/use-pointer-drag";
 import { C, num, R, SH, SURFACE, TX, Z } from "@/lib/tokens";
 import { PHASES, PHASES_FULL } from "@/lib/types";
 
@@ -65,37 +70,15 @@ function relativeLabel(iso: string): string {
   return dueLabel(daysFromToday(iso));
 }
 
-/** Track the viewport so we can default to Agenda on phones (≤640) instead of
- *  side-scrolling a fixed 640px grid (audit P1). */
-function useIsMobile(): boolean {
-  const [mobile, setMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width:${MOBILE_BP}px)`);
-    const on = () => setMobile(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return mobile;
-}
-
 interface Dnd {
-  onStart: (s: TaskSpan, ev: React.PointerEvent, onOpen: (id: number) => void) => void;
-  onMove: (ev: React.PointerEvent) => void;
-  onUp: (ev: React.PointerEvent, onOpen: (id: number) => void) => void;
-  onCancel: () => void;
+  /** Pointer handlers for a span bar (tap opens, drag reschedules). */
+  bind: (s: TaskSpan) => ReturnType<ReturnType<typeof usePointerDrag<TaskSpan>>["bind"]>;
   /** ISO of the day cell under the active drag (drop-target highlight). */
   overISO: string | null;
   /** Working-day the drop would actually snap to (drawn distinctly during drag). */
   snapISO: string | null;
   /** subtaskId being dragged, so its source bar can dim. */
   dragId: number | null;
-}
-
-interface DragGhost {
-  label: string;
-  x: number;
-  y: number;
 }
 
 export function CalendarView() {
@@ -112,7 +95,9 @@ export function CalendarView() {
     updateSubtask,
   } = useProjects();
 
-  const isMobile = useIsMobile();
+  // Phones get the agenda instead of side-scrolling a 640px grid. The hook reads
+  // the real viewport on the first client render (no desktop→phone flash).
+  const isMobile = useMediaQuery(`(max-width:${MOBILE_BP}px)`);
   // On a phone the month/week grids side-scroll a 640px slab; default to agenda.
   const effectiveMode: CalMode = isMobile ? "agenda" : calMode;
 
@@ -122,14 +107,17 @@ export function CalendarView() {
   const [projectSel, setProjectSel] = useState<Set<number>>(
     () => (calProjectFilter !== null ? new Set([calProjectFilter]) : new Set()),
   );
-  useEffect(() => {
+  // Adopt a new store filter during render (no setState-in-effect cascade).
+  const [seenProjectFilter, setSeenProjectFilter] = useState(calProjectFilter);
+  if (seenProjectFilter !== calProjectFilter) {
+    setSeenProjectFilter(calProjectFilter);
     if (calProjectFilter !== null) setProjectSel(new Set([calProjectFilter]));
-  }, [calProjectFilter]);
+  }
   const [phaseSel, setPhaseSel] = useState<Set<number>>(new Set());
 
   const toggleSet = (set: Set<number>, v: number) => {
     const next = new Set(set);
-    next.has(v) ? next.delete(v) : next.add(v);
+    if (next.has(v)) next.delete(v); else next.add(v);
     return next;
   };
 
@@ -150,26 +138,14 @@ export function CalendarView() {
   const month = anchor.getMonth();
   const label = effectiveMode === "semaine" ? weekLabel(calAnchor) : `${MONS_LONG[month]} ${year}`;
 
-  const spanFilter = (s: TaskSpan) => !phaseSel.size || phaseSel.has(s.phaseIndex);
+  // Stable identity so the grids' span memos actually hold between renders.
+  const spanFilter = useCallback((s: TaskSpan) => !phaseSel.size || phaseSel.has(s.phaseIndex), [phaseSel]);
+  const { jumpTo } = useCalAnchorSetter();
+  // Phones show the agenda by MONTH whatever the stored mode, so ←/→ step months.
+  const prev = isMobile ? () => jumpTo(shiftMonthISO(calAnchor, -1)) : calPrev;
+  const next = isMobile ? () => jumpTo(shiftMonthISO(calAnchor, 1)) : calNext;
 
-  // ---- pointer drag (works on touch AND mouse) ----
-  const drag = useRef<{
-    span: TaskSpan;
-    startX: number;
-    startY: number;
-    moved: boolean;
-    iso: string | null;
-  } | null>(null);
-  const [overISO, setOverISO] = useState<string | null>(null);
-  const [snapISO, setSnapISO] = useState<string | null>(null);
-  const [dragId, setDragId] = useState<number | null>(null);
-  const [ghost, setGhost] = useState<DragGhost | null>(null);
-
-  function isoAtPoint(x: number, y: number): string | null {
-    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-cal-iso]");
-    return el?.dataset.calIso ?? null;
-  }
-
+  // ---- pointer drag (mouse: threshold; touch: long-press) — shared hook ----
   function commitMove(span: TaskSpan, rawISO: string) {
     const target = snapToWeekday(rawISO);
     if (target === span.deadline) return;
@@ -186,50 +162,20 @@ export function CalendarView() {
     });
   }
 
+  const { drag, bind } = usePointerDrag<TaskSpan>({
+    targetAt: (x, y) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-cal-iso]")?.dataset.calIso ?? null,
+    onTap: (s) => openProject(s.projectId),
+    // Dropped outside any day cell → cancelled (never the last hovered day).
+    onDrop: (s, iso) => commitMove(s, iso),
+  });
+  const overISO = drag?.over ?? null;
   const dnd: Dnd = {
-    onStart: (s, ev) => {
-      drag.current = { span: s, startX: ev.clientX, startY: ev.clientY, moved: false, iso: null };
-      (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
-    },
-    onMove: (ev) => {
-      const d = drag.current;
-      if (!d) return;
-      if (!d.moved && Math.hypot(ev.clientX - d.startX, ev.clientY - d.startY) < 5) return;
-      if (!d.moved) setDragId(d.span.subtaskId);
-      d.moved = true;
-      const iso = isoAtPoint(ev.clientX, ev.clientY);
-      d.iso = iso;
-      setOverISO(iso);
-      // Compute the weekend-snap target DURING the move so the highlight tells
-      // the truth (audit: the old highlight "lied").
-      setSnapISO(iso ? snapToWeekday(iso) : null);
-      setGhost({ label: d.span.taskName, x: ev.clientX, y: ev.clientY });
-    },
-    onUp: (ev, onOpen) => {
-      const d = drag.current;
-      drag.current = null;
-      setOverISO(null);
-      setSnapISO(null);
-      setDragId(null);
-      setGhost(null);
-      if (!d) return;
-      if (d.moved) {
-        const iso = isoAtPoint(ev.clientX, ev.clientY) ?? d.iso;
-        if (iso) commitMove(d.span, iso);
-      } else {
-        onOpen(d.span.projectId);
-      }
-    },
-    onCancel: () => {
-      drag.current = null;
-      setOverISO(null);
-      setSnapISO(null);
-      setDragId(null);
-      setGhost(null);
-    },
+    bind,
     overISO,
-    snapISO,
-    dragId,
+    // The weekend-snap target is computed DURING the move so the highlight
+    // tells the truth (audit: the old highlight "lied").
+    snapISO: overISO ? snapToWeekday(overISO) : null,
+    dragId: drag?.item.subtaskId ?? null,
   };
 
   // Keyboard reschedule: ±1 working day on the focused span (a11y path).
@@ -242,11 +188,11 @@ export function CalendarView() {
   return (
     <>
       <Toolbar>
-        <IconButton onClick={calPrev} size={34} aria-label="Période précédente">
+        <IconButton onClick={prev} size={34} aria-label="Période précédente">
           <ChevronLeftIcon />
         </IconButton>
         <MiniMonthTitle label={label} anchorISO={calAnchor} />
-        <IconButton onClick={calNext} size={34} aria-label="Période suivante">
+        <IconButton onClick={next} size={34} aria-label="Période suivante">
           <ChevronRightIcon />
         </IconButton>
         <Button variant="secondary" size="sm" onClick={calToday}>
@@ -254,7 +200,7 @@ export function CalendarView() {
         </Button>
         {!isMobile ? (
           <div style={{ marginLeft: 4 }}>
-            <Segmented value={calMode} options={MODE_OPTS} onChange={setCalMode} />
+            <Segmented value={calMode} options={MODE_OPTS} onChange={setCalMode} aria-label="Affichage du calendrier" />
           </div>
         ) : (
           <span style={{ ...TX.caption, color: C.ink500, marginLeft: 4 }}>Agenda</span>
@@ -273,14 +219,13 @@ export function CalendarView() {
       <PhaseLegend selected={phaseSel} onToggle={(i) => setPhaseSel((s) => toggleSet(s, i))} onClear={() => setPhaseSel(new Set())} />
 
       {effectiveMode === "agenda" ? (
-        <AgendaView events={events} onOpen={openProject} />
+        <AgendaView events={events} anchorISO={calAnchor} onOpen={openProject} />
       ) : (
         <div className="cal-scroll">
           {effectiveMode === "mois" ? (
             <MonthView
               year={year}
               month={month}
-              events={events}
               projects={projects}
               spanFilter={spanFilter}
               onOpen={openProject}
@@ -301,7 +246,7 @@ export function CalendarView() {
         </div>
       )}
 
-      {ghost ? <ChipGhost ghost={ghost} /> : null}
+      {drag ? <ChipGhost ghost={{ label: drag.item.taskName, x: drag.x, y: drag.y }} /> : null}
     </>
   );
 }
@@ -309,31 +254,19 @@ export function CalendarView() {
 // ─────────────────────────────────────────────────────── title + mini-month
 
 function MiniMonthTitle({ label, anchorISO }: { label: string; anchorISO: string }) {
-  const { setCalAnchor } = useCalAnchorSetter();
+  const { jumpTo } = useCalAnchorSetter();
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const anchorRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div ref={wrapRef} style={{ position: "relative" }}>
+    <div style={{ position: "relative", minWidth: 0 }}>
       <button
+        ref={anchorRef}
         type="button"
         className="btn row-hover row-focus"
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label={`${label} — choisir une date`}
         onClick={() => setOpen((o) => !o)}
         style={{
           display: "inline-flex",
@@ -344,44 +277,64 @@ function MiniMonthTitle({ label, anchorISO }: { label: string; anchorISO: string
           cursor: "pointer",
           padding: "2px 6px",
           borderRadius: R.sm,
-          minWidth: 200,
+          minWidth: 0,
+          maxWidth: "100%",
         }}
       >
-        <h2 style={{ ...num(20), margin: 0, color: C.ink900 }}>{label}</h2>
+        <h2 style={{ ...num(20), margin: 0, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</h2>
         <span style={{ color: C.ink400, display: "flex" }}>
           <CalendarIcon size={16} />
         </span>
       </button>
-      {open ? (
+      <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} role="dialog" label="Choisir une date" width={248} padding={12} maxHeight={400}>
         <MiniMonth
           anchorISO={anchorISO}
           onPick={(iso) => {
-            setCalAnchor(iso);
+            jumpTo(iso);
             setOpen(false);
           }}
         />
-      ) : null}
+      </Popover>
     </div>
   );
 }
 
-/** The store exposes navigation helpers but not a direct anchor setter; derive a
- *  setter from prev/next + today by stepping months. Simpler: expose via context
- *  re-read. We piggyback on the store's calToday/calPrev/calNext for stepping but
- *  need an absolute jump, so we compute month deltas from the current anchor. */
+/** Month offset between two ISO dates (calendar months). */
+function monthDelta(fromISO: string, toISO_: string): number {
+  const a = toDate(fromISO);
+  const b = toDate(toISO_);
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+}
+
+/** Same day-of-month `delta` months away (clamped to the month's length). */
+function shiftMonthISO(iso: string, delta: number): string {
+  const d = toDate(iso);
+  const first = new Date(d.getFullYear(), d.getMonth() + delta, 1);
+  const dim = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  return toISO(new Date(first.getFullYear(), first.getMonth(), Math.min(d.getDate(), dim)));
+}
+
+/** The store exposes prev/next/today but no absolute anchor setter; jump by
+ *  stepping. The store steps WEEKS in "semaine" mode and MONTHS otherwise, so
+ *  the step count must be computed in the same unit (the old version always
+ *  counted months, landing on the wrong week). */
 function useCalAnchorSetter() {
-  const { calAnchor, calPrev, calNext } = useProjects();
-  const setCalAnchor = (targetISO: string) => {
-    // Step month-by-month from the current anchor to the target's month. This
-    // keeps to the store's public API (no setCalAnchor is exported).
-    const cur = toDate(calAnchor);
-    const tgt = toDate(targetISO);
-    let delta = (tgt.getFullYear() - cur.getFullYear()) * 12 + (tgt.getMonth() - cur.getMonth());
+  const { calAnchor, calMode, calPrev, calNext } = useProjects();
+  const jumpTo = (targetISO: string) => {
+    let delta: number;
+    if (calMode === "semaine") {
+      const from = toDate(weekRange(calAnchor).start);
+      const to = toDate(weekRange(targetISO).start);
+      // Calendar-day diff via UTC dates (DST-proof), then whole weeks.
+      const days = Math.round((Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) / 86_400_000);
+      delta = Math.round(days / 7);
+    } else {
+      delta = monthDelta(calAnchor, targetISO);
+    }
     const step = delta > 0 ? calNext : calPrev;
-    delta = Math.abs(delta);
-    for (let i = 0; i < delta; i++) step();
+    for (let i = 0; i < Math.abs(delta); i++) step();
   };
-  return { setCalAnchor };
+  return { jumpTo };
 }
 
 function MiniMonth({ anchorISO, onPick }: { anchorISO: string; onPick: (iso: string) => void }) {
@@ -402,22 +355,7 @@ function MiniMonth({ anchorISO, onPick }: { anchorISO: string; onPick: (iso: str
   };
 
   return (
-    <div
-      role="dialog"
-      aria-label="Choisir un mois"
-      style={{
-        position: "absolute",
-        top: "calc(100% + 6px)",
-        left: 0,
-        zIndex: Z.palette,
-        width: 248,
-        background: C.surface,
-        border: `1px solid ${C.lineStrong}`,
-        borderRadius: R.lg,
-        boxShadow: SH.overlay,
-        padding: 12,
-      }}
-    >
+    <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <IconButton size={28} onClick={() => stepMonth(-1)} aria-label="Mois précédent">
           <ChevronLeftIcon size={14} />
@@ -448,6 +386,7 @@ function MiniMonth({ anchorISO, onPick }: { anchorISO: string; onPick: (iso: str
               className={today ? "btn" : "btn row-hover"}
               onClick={() => onPick(iso)}
               aria-current={today ? "date" : undefined}
+              aria-label={fmtFull(iso)}
               style={{
                 border: "none",
                 cursor: "pointer",
@@ -481,33 +420,21 @@ function ProjectFacet({
   onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const anchorRef = useRef<HTMLButtonElement>(null);
 
   const count = selected.size;
   const labelText = count === 0 ? "Tous les projets" : `${count} projet${count > 1 ? "s" : ""}`;
 
   return (
-    <div ref={wrapRef} style={{ position: "relative" }}>
+    <div style={{ position: "relative" }}>
       <button
+        ref={anchorRef}
         type="button"
         // btn-secondary supplies the designed hover/active (wash + border lift) so
         // the trigger reacts like every other secondary control (it's the same
         // white-surface look as the "Aujourd'hui" button), not just a 1px nudge.
         className="btn btn-secondary"
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         style={{
@@ -527,32 +454,13 @@ function ProjectFacet({
       >
         {labelText}
       </button>
-      {open ? (
-        <div
-          role="listbox"
-          aria-multiselectable
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            zIndex: Z.palette,
-            width: 264,
-            maxHeight: 320,
-            overflowY: "auto",
-            background: C.surface,
-            border: `1px solid ${C.lineStrong}`,
-            borderRadius: R.lg,
-            boxShadow: SH.overlay,
-            padding: 6,
-          }}
-        >
+      <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} role="dialog" label="Filtrer par projet" width={264} align="end">
           <button
             type="button"
             className="btn row-hover row-focus"
             onClick={onClear}
             style={facetRowStyle(count === 0)}
-            role="option"
-            aria-selected={count === 0}
+            aria-pressed={count === 0}
           >
             <span style={{ ...checkboxDot(count === 0) }} />
             Tous les projets
@@ -564,8 +472,7 @@ function ProjectFacet({
                 key={p.id}
                 type="button"
                 className="btn row-hover row-focus"
-                role="option"
-                aria-selected={sel}
+                aria-pressed={sel}
                 onClick={() => onToggle(p.id)}
                 style={facetRowStyle(sel)}
               >
@@ -574,8 +481,7 @@ function ProjectFacet({
               </button>
             );
           })}
-        </div>
-      ) : null}
+      </Popover>
     </div>
   );
 }
@@ -647,7 +553,10 @@ function PhaseLegend({
               borderRadius: R.sm,
               border: `1px solid ${explicit ? C.lineStrong : "transparent"}`,
               background: explicit ? SURFACE.containerHigh : "transparent",
-              color: explicit ? C.ink800 : on ? C.ink500 : C.ink300,
+              color: explicit ? C.ink800 : C.ink500,
+              // Phases filtered OUT read as struck-through (not as faint,
+              // illegible text — they are still actionable toggles).
+              textDecoration: on ? "none" : "line-through",
               cursor: "pointer",
               ...TX.nano,
               fontWeight: 600,
@@ -675,7 +584,7 @@ function PhaseLegend({
 
 // ───────────────────────────────────────────────────────────── ghost
 
-function ChipGhost({ ghost }: { ghost: DragGhost }) {
+function ChipGhost({ ghost }: { ghost: { label: string; x: number; y: number } }) {
   if (typeof document === "undefined") return null;
   return createPortal(
     <div
@@ -709,9 +618,7 @@ function ChipGhost({ ghost }: { ghost: DragGhost }) {
 
 function weekLabel(iso: string): string {
   const { start, end } = weekRange(iso);
-  const a = toDate(start);
-  const b = toDate(end);
-  return `${a.getDate()} – ${b.getDate()} ${MONTHS_FULL[b.getMonth()]} ${b.getFullYear()}`;
+  return weekRangeLabel(start, end);
 }
 
 // ───────────────────────────────────────────────────────────── span bars
@@ -757,23 +664,13 @@ function SpanBar({
 
   return (
     <div
-      role="gridcell"
+      role="button"
       // `.cal-chip` carries the complete pointer affordance (hover wash + grab,
       // and grabbing on :active) so EVERY chip reacts identically — replacing the
       // hand-rolled hover state that only some surfaces wired up. `.row-focus`
       // adds the designed keyboard focus ring (the bar is tab-stop + drag target).
       className="cal-chip row-focus"
-      onPointerDown={(ev) => {
-        if (ev.button != null && ev.button !== 0) return;
-        ev.stopPropagation();
-        dnd.onStart(span, ev, onOpen);
-      }}
-      onPointerMove={(ev) => dnd.onMove(ev)}
-      onPointerUp={(ev) => {
-        ev.stopPropagation();
-        dnd.onUp(ev, onOpen);
-      }}
-      onPointerCancel={dnd.onCancel}
+      {...dnd.bind(span)}
       tabIndex={0}
       aria-label={`${span.taskName} — ${span.projectName}, ${PHASES_FULL[span.phaseIndex]}, échéance ${fmtFull(span.deadline)}${overdue ? ", en retard" : ""}`}
       title={`${span.projectName} — ${span.taskName} · ${PHASES[span.phaseIndex]} · ${fmtFull(span.deadline)}`}
@@ -810,9 +707,13 @@ function SpanBar({
         // Overdue is the ONE status colour (red ring); everything else stays neutral.
         boxShadow: overdue ? `inset 0 0 0 1.5px ${C.danger}` : "none",
         cursor: "grab",
-        touchAction: "pan-y",
+        // Touch scrolls; a long press starts the drag (usePointerDrag).
+        touchAction: "manipulation",
+        WebkitTouchCallout: "none",
+        userSelect: "none",
         overflow: "hidden",
-        opacity: dragging ? 0.4 : span.done ? 0.55 : 1,
+        // Done bars recede via ink + strike-through (legible), not by fading the text.
+        opacity: dragging ? 0.4 : 1,
         // `.cal-chip` transitions background + shadow; add opacity for the drag/done fade.
         transition: "opacity var(--dur-fast) var(--ease-standard)",
       }}
@@ -877,7 +778,7 @@ function DayCell({
     ? { background: C.brand50 }
     : null;
   return (
-    <div data-cal-iso={iso} role="gridcell" aria-current={today ? "date" : undefined} style={{ ...style, ...dropStyle }}>
+    <div data-cal-iso={iso} aria-current={today ? "date" : undefined} style={{ ...style, ...dropStyle }}>
       {children}
     </div>
   );
@@ -886,7 +787,6 @@ function DayCell({
 function MonthView({
   year,
   month,
-  events,
   projects,
   spanFilter,
   onOpen,
@@ -895,7 +795,6 @@ function MonthView({
 }: {
   year: number;
   month: number;
-  events: TaskEvent[];
   projects: ReturnType<typeof useProjects>["allDerived"];
   spanFilter: (s: TaskSpan) => boolean;
   onOpen: (id: number) => void;
@@ -905,31 +804,16 @@ function MonthView({
   // Full 6-row grid: always render 42 day cells (incl. faded adjacent-month days).
   const first = new Date(year, month, 1);
   const startW = (first.getDay() + 6) % 7;
-  const gridStart = new Date(year, month, 1 - startW);
-  const days = Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(gridStart);
-    d.setDate(gridStart.getDate() + i);
-    return d;
-  });
-  const rangeStart = toISO(days[0]);
-  const rangeEnd = toISO(days[41]);
+  // Calendar-day arithmetic via the Date constructor (DST-safe, no mutation).
+  const days = Array.from({ length: 42 }, (_, i) => new Date(year, month, 1 - startW + i));
+  const rangeStart = toISO(new Date(year, month, 1 - startW));
+  const rangeEnd = toISO(new Date(year, month, 1 - startW + 41));
 
   // Spans across the full visible 6-week window, segmented per week.
   const spans = useMemo(
     () => buildTaskSpans(projects, { start: rangeStart, end: rangeEnd }).filter(spanFilter),
     [projects, rangeStart, rangeEnd, spanFilter],
   );
-
-  // Group span segments by week (0..5) so each week row can lay them out.
-  const eventsByDate = useMemo(() => {
-    const m = new Map<string, TaskEvent[]>();
-    for (const e of events) {
-      const arr = m.get(e.date) ?? [];
-      arr.push(e);
-      m.set(e.date, arr);
-    }
-    return m;
-  }, [events]);
 
   // Per-week: which spans have a segment in that week.
   const weeks = Array.from({ length: 6 }, (_, w) => {
@@ -950,21 +834,24 @@ function MonthView({
   return (
     <div
       className="enter-rise"
-      role="grid"
+      // A labelled group, not an ARIA grid: the continuous span bars overlay the
+      // day cells and can't be expressed as grid rows/cells. Each bar is a
+      // labelled button; the agenda view is the linear alternative.
+      role="group"
       aria-label={`Calendrier ${MONS_LONG[month]} ${year}`}
       style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}
     >
       {/* Quiet weekday header: white field, separation carried by the hairline only. */}
-      <div role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.surface, borderBottom: `1px solid ${C.line}` }}>
+      <div aria-hidden style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.surface, borderBottom: `1px solid ${C.line}` }}>
         {WEEKDAYS_SHORT.map((wd, i) => (
-          <div key={wd} role="columnheader" title={WEEKDAYS_LONG[i]} aria-label={WEEKDAYS_LONG[i]} style={{ padding: "8px 12px", ...TX.nano, fontWeight: 600, color: i >= 5 ? C.ink300 : C.ink400 }}>
+          <div key={wd} title={WEEKDAYS_LONG[i]} style={{ padding: "8px 12px", ...TX.nano, fontWeight: i >= 5 ? 500 : 600, color: C.ink400 }}>
             {wd}
           </div>
         ))}
       </div>
 
       {weeks.map((week) => (
-        <div key={week.w} role="row" style={{ position: "relative", borderBottom: `1px solid ${C.line}` }}>
+        <div key={week.w} style={{ position: "relative", borderBottom: `1px solid ${C.line}` }}>
           {/* Day-number layer + drop cells */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)" }}>
             {week.dayObjs.map((d) => {
@@ -972,7 +859,7 @@ function MonthView({
               const inMonth = d.getMonth() === month;
               const today = isToday(iso);
               const weekend = d.getDay() === 0 || d.getDay() === 6;
-              const overflow = (eventsByDate.get(iso) ?? []).length; // events ending that day
+
               return (
                 <DayCell
                   key={iso}
@@ -993,9 +880,9 @@ function MonthView({
                   {today ? (
                     <div style={{ ...num(14), width: 22, height: 22, borderRadius: "50%", background: C.brand, color: C.surface, display: "flex", alignItems: "center", justifyContent: "center" }}>{d.getDate()}</div>
                   ) : (
-                    <div style={{ ...num(14), color: inMonth ? C.ink600 : C.ink300, padding: "1px 2px" }}>{d.getDate()}</div>
+                    <div style={{ ...num(14), color: inMonth ? C.ink600 : C.ink400, fontWeight: inMonth ? 600 : 400, padding: "1px 2px" }}>{d.getDate()}</div>
                   )}
-                  <div aria-hidden style={{ height: week.rows.length ? Math.min(week.rows.length, MAX_VISIBLE) * 27 + (overflow ? 18 : 0) : 0 }} />
+                  <div aria-hidden style={{ height: week.rows.length ? Math.min(week.rows.length, MAX_VISIBLE) * 27 + (week.rows.length > MAX_VISIBLE ? 18 : 0) : 0 }} />
                 </DayCell>
               );
             })}
@@ -1005,13 +892,13 @@ function MonthView({
           <div style={{ position: "absolute", left: 0, right: 0, top: 28, padding: "0 4px", pointerEvents: "none" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {week.rows.slice(0, MAX_VISIBLE).map(({ span, seg }) => (
-                <div key={`${span.subtaskId}`} role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", pointerEvents: "auto" }}>
+                <div key={`${span.subtaskId}`} style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", pointerEvents: "auto" }}>
                   <SpanBar span={span} seg={seg} weekStartISO={week.weekStartISO} onOpen={onOpen} dnd={dnd} onKeyReschedule={onKeyReschedule} />
                 </div>
               ))}
             </div>
             {/* Overflow → floating per-day popover (replaces the grid-breaking "+N autres"). */}
-            <DayOverflowRow week={week} max={MAX_VISIBLE} eventsByDate={eventsByDate} onOpen={onOpen} />
+            <DayOverflowRow week={week} max={MAX_VISIBLE} onOpen={onOpen} />
           </div>
         </div>
       ))}
@@ -1020,95 +907,62 @@ function MonthView({
 }
 
 /** Per-day "+N" buttons that open a floating popover (rather than expanding the
- *  cell, which broke the grid). Counts the span rows beyond MAX that touch a day. */
+ *  cell, which broke the grid). The rows hidden in a week are the SAME for every
+ *  day of that week (rows beyond MAX_VISIBLE), so a day's "+N" counts exactly
+ *  those hidden rows that touch the day; the popover lists every task that day. */
 function DayOverflowRow({
   week,
   max,
-  eventsByDate,
   onOpen,
 }: {
   week: { weekStartISO: string; dayObjs: Date[]; rows: { span: TaskSpan; seg: TaskSpanSegment }[] };
   max: number;
-  eventsByDate: Map<string, TaskEvent[]>;
   onOpen: (id: number) => void;
 }) {
-  const [popISO, setPopISO] = useState<string | null>(null);
+  const hiddenRows = week.rows.slice(max);
+  if (hiddenRows.length === 0) return null;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", marginTop: 3, pointerEvents: "auto" }}>
       {week.dayObjs.map((d) => {
         const iso = toISO(d);
-        // Spans whose bar touches this day but sit beyond the visible cap.
-        const touching = week.rows.filter(({ span }) => span.start <= iso && span.end >= iso);
-        const hidden = Math.max(0, touching.length - max);
+        const touches = ({ span }: { span: TaskSpan }) => span.start <= iso && span.end >= iso;
+        const hidden = hiddenRows.filter(touches).length;
         if (hidden <= 0) return <div key={iso} />;
-        return (
-          <div key={iso} style={{ position: "relative" }}>
-            <button
-              type="button"
-              className="btn row-hover row-focus"
-              onClick={() => setPopISO((p) => (p === iso ? null : iso))}
-              aria-haspopup="dialog"
-              aria-expanded={popISO === iso}
-              style={{ appearance: "none", border: "none", background: "transparent", cursor: "pointer", padding: "1px 4px", borderRadius: R.xs, ...TX.nano, fontWeight: 600, color: C.brandText, minHeight: 16 }}
-            >
-              +{hidden}
-            </button>
-            {popISO === iso ? (
-              <DayPopover iso={iso} spans={touching.map((t) => t.span)} events={eventsByDate.get(iso) ?? []} onOpen={onOpen} onClose={() => setPopISO(null)} />
-            ) : null}
-          </div>
-        );
+        return <DayOverflowButton key={iso} iso={iso} hidden={hidden} spans={week.rows.filter(touches).map((t) => t.span)} onOpen={onOpen} />;
       })}
     </div>
   );
 }
 
-function DayPopover({
-  iso,
-  spans,
-  onOpen,
-  onClose,
-}: {
-  iso: string;
-  spans: TaskSpan[];
-  events: TaskEvent[];
-  onOpen: (id: number) => void;
-  onClose: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
-
+function DayOverflowButton({ iso, hidden, spans, onOpen }: { iso: string; hidden: number; spans: TaskSpan[]; onOpen: (id: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLButtonElement>(null);
   return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-label={`Tâches du ${fmtFull(iso)}`}
-      style={{
-        position: "absolute",
-        top: "calc(100% + 4px)",
-        left: 0,
-        zIndex: Z.palette,
-        width: 248,
-        maxHeight: 280,
-        overflowY: "auto",
-        background: C.surface,
-        border: `1px solid ${C.lineStrong}`,
-        borderRadius: R.lg,
-        boxShadow: SH.overlay,
-        padding: 10,
-      }}
-    >
+    <div>
+      <button
+        ref={anchorRef}
+        type="button"
+        className="btn row-hover row-focus"
+        // Presses on the trigger are not "outside" for the popover, so this
+        // toggle really closes it (it used to close on mousedown, then reopen).
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`${hidden} autre${hidden > 1 ? "s" : ""} tâche${hidden > 1 ? "s" : ""} le ${fmtFull(iso)}`}
+        style={{ appearance: "none", border: "none", background: "transparent", cursor: "pointer", padding: "1px 4px", borderRadius: R.xs, ...TX.nano, fontWeight: 600, color: C.brandText, minHeight: 16 }}
+      >
+        +{hidden}
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} role="dialog" label={`Tâches du ${fmtFull(iso)}`} width={248} maxHeight={280} padding={10}>
+        <DayPopoverList iso={iso} spans={spans} onOpen={(id) => { setOpen(false); onOpen(id); }} />
+      </Popover>
+    </div>
+  );
+}
+
+function DayPopoverList({ iso, spans, onOpen }: { iso: string; spans: TaskSpan[]; onOpen: (id: number) => void }) {
+  return (
+    <>
       <div style={{ ...TX.eyebrow, color: C.ink400, marginBottom: 8 }}>{fmtFull(iso)}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {spans.map((s) => (
@@ -1116,10 +970,7 @@ function DayPopover({
             key={s.subtaskId}
             type="button"
             className="btn row-hover row-focus"
-            onClick={() => {
-              onOpen(s.projectId);
-              onClose();
-            }}
+            onClick={() => onOpen(s.projectId)}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 30, padding: "5px 6px", border: "none", background: "transparent", borderRadius: R.sm, cursor: "pointer", textAlign: "left" }}
           >
             {/* Same neutral phase-letter atom as the bars — one consistent cue. */}
@@ -1132,7 +983,7 @@ function DayPopover({
           </button>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1157,11 +1008,7 @@ function WeekView({
 }) {
   const { start, end } = weekRange(anchorISO);
   const startD = toDate(start);
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(startD);
-    d.setDate(startD.getDate() + i);
-    return d;
-  });
+  const days = Array.from({ length: 7 }, (_, i) => new Date(startD.getFullYear(), startD.getMonth(), startD.getDate() + i));
 
   const spans = useMemo(
     () => buildTaskSpans(projects, { start, end }).filter(spanFilter),
@@ -1183,17 +1030,17 @@ function WeekView({
   }, [events]);
 
   return (
-    <div className="enter-rise" role="grid" aria-label={weekLabel(anchorISO)} style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}>
+    <div className="enter-rise" role="group" aria-label={`Semaine du ${weekLabel(anchorISO)}`} style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden", minWidth: 640, boxShadow: SH.sm }}>
       {/* Quiet day headers with per-day load summary; today carried by the green date. */}
-      <div role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.surface, borderBottom: `1px solid ${C.line}` }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", background: C.surface, borderBottom: `1px solid ${C.line}` }}>
         {days.map((d, i) => {
           const iso = toISO(d);
           const today = isToday(iso);
           const weekend = i >= 5;
           const load = loadByISO.get(iso) ?? 0;
           return (
-            <div key={iso} role="columnheader" aria-current={today ? "date" : undefined} style={{ padding: "8px 10px", borderRight: `1px solid ${C.line}` }}>
-              <div title={WEEKDAYS_LONG[i]} style={{ ...TX.nano, fontWeight: 600, color: weekend ? C.ink300 : C.ink400 }}>{WEEKDAYS_SHORT[i]}</div>
+            <div key={iso} aria-current={today ? "date" : undefined} style={{ padding: "8px 10px", borderRight: `1px solid ${C.line}` }}>
+              <div title={WEEKDAYS_LONG[i]} style={{ ...TX.nano, fontWeight: weekend ? 500 : 600, color: C.ink400 }}>{WEEKDAYS_SHORT[i]}</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
                 {/* Today is the single accent: a filled green badge (mirrors the month
                  *  grid), so the lane below needs no redundant column tint. */}
@@ -1230,7 +1077,7 @@ function WeekView({
               <div style={{ ...TX.caption, color: C.ink400, padding: "12px 8px", pointerEvents: "auto" }}>Aucune tâche cette semaine.</div>
             ) : (
               rows.map(({ span, seg }) => (
-                <div key={span.subtaskId} role="row" style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", pointerEvents: "auto" }}>
+                <div key={span.subtaskId} style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", pointerEvents: "auto" }}>
                   <SpanBar span={span} seg={seg} weekStartISO={start} onOpen={onOpen} dnd={dnd} onKeyReschedule={onKeyReschedule} />
                 </div>
               ))
@@ -1244,11 +1091,15 @@ function WeekView({
 
 // ───────────────────────────────────────────────────────────── agenda
 
-/** Rolling/forward agenda grouped by day with sticky headers, a "today" anchor,
- *  and relative labels. Shows from today forward (audit: make agenda forward). */
-function AgendaView({ events, onOpen }: { events: TaskEvent[]; onOpen: (id: number) => void }) {
-  // Forward-rolling: today → +60 days, so the agenda doesn't stop at month-end.
-  const range = { start: REFERENCE_DATE, end: shiftISO(REFERENCE_DATE, 60) };
+/** Agenda grouped by day with sticky headers, a "today" anchor and relative
+ *  labels. It follows the toolbar period (←/→ and the date picker): the
+ *  anchored month — from today onwards when that month is the current one, so
+ *  the current view stays forward-looking. */
+function AgendaView({ events, anchorISO, onOpen }: { events: TaskEvent[]; anchorISO: string; onOpen: (id: number) => void }) {
+  const a = toDate(anchorISO);
+  const month = monthRange(a.getFullYear(), a.getMonth());
+  const fromToday = REFERENCE_DATE >= month.start && REFERENCE_DATE <= month.end;
+  const range = { start: fromToday ? REFERENCE_DATE : month.start, end: month.end };
   const list = eventsInRange(events, range);
 
   const todayRef = useRef<HTMLDivElement>(null);
@@ -1270,7 +1121,7 @@ function AgendaView({ events, onOpen }: { events: TaskEvent[]; onOpen: (id: numb
   return (
     <div className="enter-rise" style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden", boxShadow: SH.sm }}>
       {groups.length === 0 ? (
-        <div style={{ padding: 24, ...TX.body, color: C.ink500 }}>Aucune échéance à venir.</div>
+        <div style={{ padding: 24, ...TX.body, color: C.ink500 }}>{fromToday ? "Aucune échéance à venir ce mois-ci." : "Aucune échéance ce mois-ci."}</div>
       ) : (
         groups.map(([iso, evs], gi) => {
           const d = toDate(iso);
