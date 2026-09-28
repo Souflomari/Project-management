@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 
 import { FilterBar } from "../filter-bar";
 import { ChevronRightIcon } from "../icons";
+import { Popover } from "../overlay/popover";
 import { Avatar, Button, EmptyState, Segmented, StatusPill } from "../ui";
 import { buildGantt, type GanttBar, type GanttRow } from "@/lib/derive";
 import { fmtShort, shiftISO, toDate, workingDaysBetween } from "@/lib/format";
@@ -19,7 +20,35 @@ const HEADER_H = 48; // two-tier sticky header — airy two-row rhythm
 const MIN_LEFT_W = 240;
 const MAX_LEFT_W = 560;
 
-const DAY = 86_400_000;
+// ── Calendar-day helpers (DST-proof: dates are built from y/m/d, never from
+//    "start + i × 24h", which drifts an hour — or a day — across DST changes).
+const dayIndex = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
+const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const isWeekendISO = (iso: string) => { const g = toDate(iso).getDay(); return g === 0 || g === 6; };
+
+/** Move to the nearest weekday in `dir` when `iso` falls on a weekend. */
+function snapWeekday(iso: string, dir: 1 | -1): string {
+  let cur = iso;
+  while (isWeekendISO(cur)) cur = shiftISO(cur, dir);
+  return cur;
+}
+
+/** Shift by `n` WORKING days (Sat/Sun skipped). */
+function shiftWorkingDays(iso: string, n: number): string {
+  const dir = n >= 0 ? 1 : -1;
+  let cur = snapWeekday(iso, dir as 1 | -1);
+  for (let left = Math.abs(n); left > 0; ) {
+    cur = shiftISO(cur, dir);
+    if (!isWeekendISO(cur)) left--;
+  }
+  return cur;
+}
+
+/** Signed number of working days from `from` to `to` (0 when equal). */
+function workingDayDelta(from: string, to: string): number {
+  if (to === from) return 0;
+  return to > from ? workingDaysBetween(shiftISO(from, 1), to) : -workingDaysBetween(shiftISO(to, 1), from);
+}
 
 // Unified colour system: GREEN (C.brand) is the SINGLE accent — brand + progress
 // + active/healthy. Everything else is warm neutral (tracks, structure). Assignee
@@ -75,78 +104,49 @@ const MONS = ["jan", "fév", "mar", "avr", "mai", "jun", "jui", "aoû", "sep", "
 
 function buildAxis(windowStart: string, spanDays: number, pxPerDay: number, zoom: Zoom): Axis {
   const start = toDate(windowStart);
-  const startTs = start.getTime();
+  const start0 = dayIndex(start);
   const top: Tick[] = [];
   const bottom: Tick[] = [];
   const weekends: { px: number; w: number }[] = [];
   const weekLines: number[] = [];
 
-  const dayPx = (ts: number) => ((ts - startTs) / DAY) * pxPerDay;
+  const dayPx = (d: Date) => (dayIndex(d) - start0) * pxPerDay;
+  const end = addDays(start, spanDays);
   const weekZoom = zoom === "semaine" || zoom === "jour";
 
   // Weekend bands + week gridlines (calendar Saturdays/Sundays).
   for (let i = 0; i < spanDays; i++) {
-    const d = new Date(startTs + i * DAY);
-    const dow = d.getDay(); // 0 Sun … 6 Sat
+    const dow = addDays(start, i).getDay(); // 0 Sun … 6 Sat
     if (dow === 6 || dow === 0) weekends.push({ px: i * pxPerDay, w: pxPerDay });
     if (dow === 1) weekLines.push(i * pxPerDay); // Monday
   }
 
-  // ── bottom tier ──
-  if (weekZoom) {
-    // weeks (Mondays), labelled "S<weekday-of-month start>"
-    // find first Monday on/after window start
-    let cur = new Date(startTs);
-    const off = (8 - cur.getDay()) % 7; // days to next Monday (0 if Monday)
-    cur = new Date(startTs + off * DAY);
-    while (cur.getTime() < startTs + spanDays * DAY) {
-      const px = dayPx(cur.getTime());
-      bottom.push({ px, w: 7 * pxPerDay, label: `${cur.getDate()} ${MONS[cur.getMonth()]}` });
-      cur = new Date(cur.getTime() + 7 * DAY);
-    }
-  } else {
-    // months
-    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
-    const end = startTs + spanDays * DAY;
-    while (cur.getTime() < end) {
-      const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-      const px = dayPx(cur.getTime());
-      const w = ((next.getTime() - cur.getTime()) / DAY) * pxPerDay;
-      bottom.push({ px, w, label: MONS[cur.getMonth()] });
+  const months = (stepMonths: number, first: Date, label: (d: Date) => string, major: (d: Date) => boolean) => {
+    const out: Tick[] = [];
+    for (let cur = first; cur < end; ) {
+      const next = new Date(cur.getFullYear(), cur.getMonth() + stepMonths, 1);
+      out.push({ px: dayPx(cur), w: dayPx(next) - dayPx(cur), label: label(cur), major: major(cur) });
       cur = next;
     }
+    return out;
+  };
+
+  // ── bottom tier ──
+  if (weekZoom) {
+    // weeks from the first Monday on/after the window start
+    const off = (8 - start.getDay()) % 7; // days to next Monday (0 if Monday)
+    for (let cur = addDays(start, off); cur < end; cur = addDays(cur, 7)) {
+      bottom.push({ px: dayPx(cur), w: 7 * pxPerDay, label: `${cur.getDate()} ${MONS[cur.getMonth()]}` });
+    }
+  } else {
+    bottom.push(...months(1, new Date(start.getFullYear(), start.getMonth(), 1), (d) => MONS[d.getMonth()], () => false));
   }
 
   // ── top tier ──
   if (weekZoom) {
-    // months over weeks
-    let cur = new Date(start.getFullYear(), start.getMonth(), 1);
-    const end = startTs + spanDays * DAY;
-    while (cur.getTime() < end) {
-      const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-      top.push({
-        px: dayPx(cur.getTime()),
-        w: ((next.getTime() - cur.getTime()) / DAY) * pxPerDay,
-        label: `${MONS[cur.getMonth()]} ${cur.getFullYear()}`,
-        major: cur.getMonth() === 0,
-      });
-      cur = next;
-    }
+    top.push(...months(1, new Date(start.getFullYear(), start.getMonth(), 1), (d) => `${MONS[d.getMonth()]} ${d.getFullYear()}`, (d) => d.getMonth() === 0));
   } else {
-    // quarters/years over months
-    let cur = new Date(start.getFullYear(), Math.floor(start.getMonth() / 3) * 3, 1);
-    const end = startTs + spanDays * DAY;
-    while (cur.getTime() < end) {
-      const next = new Date(cur.getFullYear(), cur.getMonth() + 3, 1);
-      const q = Math.floor(cur.getMonth() / 3) + 1;
-      top.push({
-        px: dayPx(cur.getTime()),
-        w: ((next.getTime() - cur.getTime()) / DAY) * pxPerDay,
-        label: `T${q} ${cur.getFullYear()}`,
-        major: cur.getMonth() === 0,
-      });
-      cur = next;
-    }
+    top.push(...months(3, new Date(start.getFullYear(), Math.floor(start.getMonth() / 3) * 3, 1), (d) => `T${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`, (d) => d.getMonth() === 0));
   }
 
   return { top, bottom, weekends, weekLines };
@@ -182,21 +182,28 @@ export function PlanningGantt() {
   const { filtered, openProject, updateSubtask, updateProject, resetFilters } = useProjects();
   const { rows, todayLeft, spanDays, windowStart } = useMemo(() => buildGantt(filtered), [filtered]);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [scrollLeft, setScrollLeft] = useState(0);
+  // Only "scrolled past the start?" matters (left fade cue) — a boolean, so a
+  // scroll does not re-render every bar on every frame.
+  const [scrolledX, setScrolledX] = useState(false);
   const [zoom, setZoom] = useState<Zoom>("mois");
   const [fitPx, setFitPx] = useState(6);
   const [leftW, setLeftW] = useState(324);
   const [cols, setCols] = useState<Set<ColKey>>(new Set<ColKey>(["avancement"]));
   const [colsOpen, setColsOpen] = useState(false);
-  const [hoverDep, setHoverDep] = useState<number | null>(null);
+  const colsBtn = useRef<HTMLButtonElement>(null);
+  const [hoverDep, setHoverDep] = useState<{ pred: number; succ: number } | null>(null);
   const [live, setLive] = useState("");
 
   const scroller = useRef<HTMLDivElement>(null);
 
   // px-per-day drives the timeline width. "fit" derives it from the visible width
   // so the whole portfolio is shown at once.
-  const pxPerDay = zoom === "fit" ? fitPx : ZOOM_PX[zoom];
-  const timelineW = Math.max(900, Math.round(spanDays * pxPerDay));
+  const zoomPx = zoom === "fit" ? fitPx : ZOOM_PX[zoom];
+  const timelineW = Math.max(900, Math.round(spanDays * zoomPx));
+  // Bars are laid out in % of timelineW; when the 900px floor kicks in the real
+  // scale is wider than the zoom's nominal px/day. Derive it from the timeline
+  // so the axis, weekend bands and bars share ONE scale (no header drift).
+  const pxPerDay = spanDays > 0 ? timelineW / spanDays : zoomPx;
   const todayPx = (todayLeft / 100) * timelineW;
 
   const axis = useMemo(() => buildAxis(windowStart, spanDays, pxPerDay, zoom), [windowStart, spanDays, pxPerDay, zoom]);
@@ -228,7 +235,8 @@ export function PlanningGantt() {
 
   // Center on "today" on first paint / when zoom changes (skip for fit — it shows
   // everything). Retry on rAF until the scroller has measured its width.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const scrollToTodayRef = useRef(scrollToToday);
+  useLayoutEffect(() => { scrollToTodayRef.current = scrollToToday; });
   useLayoutEffect(() => {
     if (zoom === "fit") return;
     let raf = 0;
@@ -236,7 +244,7 @@ export function PlanningGantt() {
     const attempt = () => {
       const sc = scroller.current;
       if (sc && sc.clientWidth > 0) {
-        scrollToToday(false);
+        scrollToTodayRef.current(false);
         return;
       }
       if (tries++ < 20) raf = requestAnimationFrame(attempt);
@@ -248,7 +256,7 @@ export function PlanningGantt() {
   const toggle = (id: number) =>
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   const expandAll = () => setExpanded(new Set(rows.map((r) => r.id)));
@@ -257,7 +265,7 @@ export function PlanningGantt() {
   const toggleCol = (k: ColKey) =>
     setCols((prev) => {
       const next = new Set(prev);
-      next.has(k) ? next.delete(k) : next.add(k);
+      if (next.has(k)) next.delete(k); else next.add(k);
       return next;
     });
 
@@ -284,29 +292,34 @@ export function PlanningGantt() {
   };
 
   // ── Ctrl/⌘-scroll to zoom toward cursor ──
-  function onWheel(e: React.WheelEvent) {
-    if (!(e.ctrlKey || e.metaKey)) return;
+  // React's onWheel is PASSIVE, so preventDefault() there can't stop the
+  // browser's own page zoom. A native non-passive listener can.
+  const wheelState = useRef({ zoom, pxPerDay, leftW, spanDays });
+  useLayoutEffect(() => { wheelState.current = { zoom, pxPerDay, leftW, spanDays }; });
+  useEffect(() => {
     const sc = scroller.current;
     if (!sc) return;
-    e.preventDefault();
-    const order: Exclude<Zoom, "fit">[] = ["trimestre", "mois", "semaine", "jour"];
-    const cur: Exclude<Zoom, "fit"> = zoom === "fit" ? "mois" : zoom;
-    let i = order.indexOf(cur);
-    i = e.deltaY < 0 ? Math.min(order.length - 1, i + 1) : Math.max(0, i - 1);
-    const nextZoom = order[i];
-    if (nextZoom === zoom) return;
-    // keep the day under the cursor stable after the zoom change
-    const rect = sc.getBoundingClientRect();
-    const cursorTimelineX = sc.scrollLeft + (e.clientX - rect.left) - leftW;
-    const dayAtCursor = cursorTimelineX / pxPerDay;
-    const nextPx = ZOOM_PX[nextZoom];
-    setZoom(nextZoom);
-    requestAnimationFrame(() => {
-      const s = scroller.current;
-      if (!s) return;
-      s.scrollLeft = leftW + dayAtCursor * nextPx - (e.clientX - rect.left - leftW);
-    });
-  }
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const { zoom: z, pxPerDay: px, leftW: lw, spanDays: span } = wheelState.current;
+      const order: Exclude<Zoom, "fit">[] = ["trimestre", "mois", "semaine", "jour"];
+      const cur: Exclude<Zoom, "fit"> = z === "fit" ? "mois" : z;
+      let i = order.indexOf(cur);
+      i = e.deltaY < 0 ? Math.min(order.length - 1, i + 1) : Math.max(0, i - 1);
+      const nextZoom = order[i];
+      if (nextZoom === z) return;
+      // keep the day under the cursor stable after the zoom change
+      const rect = sc.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const dayAtCursor = (sc.scrollLeft + cursorX - lw) / px;
+      const nextPx = span > 0 ? Math.max(900, Math.round(span * ZOOM_PX[nextZoom])) / span : ZOOM_PX[nextZoom];
+      setZoom(nextZoom);
+      requestAnimationFrame(() => { sc.scrollLeft = lw + dayAtCursor * nextPx - (cursorX - lw); });
+    };
+    sc.addEventListener("wheel", onWheel, { passive: false });
+    return () => sc.removeEventListener("wheel", onWheel);
+  }, [rows.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps -- (re)bind when the scroller mounts; live values come from wheelState
 
   // ── left-panel resize ──
   const resizing = useRef(false);
@@ -340,20 +353,15 @@ export function PlanningGantt() {
               {allOpen ? "Tout replier" : "Tout déplier"}
             </Button>
             <div style={{ position: "relative" }}>
-              <Button variant="secondary" size="sm" onClick={() => setColsOpen((o) => !o)}>Colonnes</Button>
-              {colsOpen ? (
-                <div
-                  style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 30, background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.md, boxShadow: SH.overlay, padding: 8, minWidth: 150 }}
-                  onMouseLeave={() => setColsOpen(false)}
-                >
-                  {ALL_COLS.map((c) => (
-                    <label key={c.key} className="soft-hover" style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", cursor: "pointer", ...TX.caption, color: C.ink700, borderRadius: R.xs }}>
-                      <input type="checkbox" checked={cols.has(c.key)} onChange={() => toggleCol(c.key)} />
-                      {c.label}
-                    </label>
-                  ))}
-                </div>
-              ) : null}
+              <Button ref={colsBtn} variant="secondary" size="sm" aria-haspopup="dialog" aria-expanded={colsOpen} onClick={() => setColsOpen((o) => !o)}>Colonnes</Button>
+              <Popover open={colsOpen} onClose={() => setColsOpen(false)} anchorRef={colsBtn} role="dialog" label="Colonnes affichées" minWidth={160} align="end" padding={8}>
+                {ALL_COLS.map((c) => (
+                  <label key={c.key} className="soft-hover" style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 6px", cursor: "pointer", ...TX.caption, color: C.ink700, borderRadius: R.xs }}>
+                    <input type="checkbox" checked={cols.has(c.key)} onChange={() => toggleCol(c.key)} />
+                    {c.label}
+                  </label>
+                ))}
+              </Popover>
             </div>
             <Button variant="secondary" size="sm" onClick={() => scrollToToday()}>Aujourd&rsquo;hui</Button>
             {/* hairline chunk-break: view actions | zoom (Hick + Gestalt grouping) */}
@@ -361,6 +369,7 @@ export function PlanningGantt() {
             <Segmented
               value={zoom}
               onChange={setZoom}
+              aria-label="Échelle du planning"
               options={[
                 { value: "fit", label: "Tout afficher" },
                 { value: "trimestre", label: "Trimestre" },
@@ -373,7 +382,7 @@ export function PlanningGantt() {
         }
       />
 
-      <div aria-live="polite" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>{live}</div>
+      <div aria-live="polite" className="sr-only">{live}</div>
 
       {rows.length === 0 ? (
         <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, boxShadow: SH.sm }}>
@@ -390,12 +399,11 @@ export function PlanningGantt() {
             className="pan"
             tabIndex={0}
             aria-label="Diagramme de Gantt — défilable. Ctrl + molette pour zoomer."
-            onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}
+            onScroll={(e) => setScrolledX(e.currentTarget.scrollLeft > 4)}
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
             onMouseUp={endPan}
             onMouseLeave={endPan}
-            onWheel={onWheel}
             style={{
               background: C.surface,
               border: `1px solid ${C.line}`,
@@ -420,19 +428,18 @@ export function PlanningGantt() {
                 const cpCount = g.subtasks.filter((s) => s.onCriticalPath && !s.done).length;
                 return (
                   <div key={g.id}>
+                    {/* The whole row toggles on click (mouse convenience); keyboard
+                        and AT use the explicit disclosure button in the left
+                        cell — the row itself is NOT a role=button, since it
+                        contains focusable bars (no nested interactive). */}
                     <div
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={isOpen}
-                      aria-label={`${g.name} — ${isOpen ? "replier" : "déplier"} les tâches`}
                       onClick={clickGuard(() => toggle(g.id))}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(g.id); } }}
-                      className="row-hover row-focus"
+                      className="row-hover"
                       style={{ display: "flex", borderTop: `1px solid ${C.line}`, cursor: "pointer", background: isOpen ? `${C.subtle}cc` : "transparent" }}
                     >
-                      <ProjectLeftCell g={g} isOpen={isOpen} leftW={leftW} cols={cols} cpCount={cpCount} />
+                      <ProjectLeftCell g={g} isOpen={isOpen} leftW={leftW} cols={cols} cpCount={cpCount} onToggle={() => toggle(g.id)} />
                       <div style={{ flex: 1, position: "relative", height: PROJ_ROW_H }}>
-                        <ProjectBar g={g} timelineW={timelineW} spanDays={spanDays} onCommit={updateProject} onLive={setLive} cp={cpCount > 0} />
+                        <ProjectBar g={g} spanDays={spanDays} onCommit={updateProject} onCommitTask={updateSubtask} onLive={setLive} cp={cpCount > 0} />
                       </div>
                     </div>
 
@@ -464,7 +471,9 @@ export function PlanningGantt() {
                                   pxPerDay={pxPerDay}
                                   onCommit={updateSubtask}
                                   onLive={setLive}
-                                  dim={hoverDep != null && hoverDep !== s.id && !s.dependsOn.includes(hoverDep)}
+                                  // Hovering a link highlights exactly its two ends
+                                  // (predecessor + successor) and dims the rest.
+                                  dim={hoverDep != null && hoverDep.pred !== s.id && hoverDep.succ !== s.id}
                                 />
                               </div>
                             </div>
@@ -481,7 +490,7 @@ export function PlanningGantt() {
 
           {/* horizontal scroll cues */}
           <div style={{ position: "absolute", top: 1, right: 1, bottom: 1, width: 36, pointerEvents: "none", background: `linear-gradient(to right, rgba(255,255,255,0), ${C.surface})`, borderRadius: `0 ${R.lg - 1}px ${R.lg - 1}px 0` }} />
-          {scrollLeft > 4 ? (
+          {scrolledX ? (
             <div style={{ position: "absolute", top: 1, left: leftW + 1, bottom: 1, width: 28, pointerEvents: "none", background: `linear-gradient(to left, rgba(255,255,255,0), ${C.surface})` }} />
           ) : null}
         </div>
@@ -500,7 +509,7 @@ function colCells(cols: Set<ColKey>, vals: Partial<Record<ColKey, string>>) {
   ));
 }
 
-function ProjectLeftCell({ g, isOpen, leftW, cols, cpCount }: { g: GanttRow; isOpen: boolean; leftW: number; cols: Set<ColKey>; cpCount: number }) {
+function ProjectLeftCell({ g, isOpen, leftW, cols, cpCount, onToggle }: { g: GanttRow; isOpen: boolean; leftW: number; cols: Set<ColKey>; cpCount: number; onToggle: () => void }) {
   return (
     <div
       style={{
@@ -509,7 +518,16 @@ function ProjectLeftCell({ g, isOpen, leftW, cols, cpCount }: { g: GanttRow; isO
         display: "flex", gap: 9, alignItems: "center", zIndex: 2,
       }}
     >
-      <span style={{ color: C.ink400, display: "flex", flexShrink: 0, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard)" }}><ChevronRightIcon size={14} /></span>
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-label={`${g.name} — ${isOpen ? "replier" : "déplier"} les tâches`}
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        className="btn"
+        style={{ color: C.ink500, display: "flex", flexShrink: 0, padding: 3, margin: -3, border: "none", background: "transparent", borderRadius: R.xs, cursor: "pointer" }}
+      >
+        <span style={{ display: "flex", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform var(--dur-fast) var(--ease-standard)" }}><ChevronRightIcon size={14} /></span>
+      </button>
       <Avatar initials={g.responsableInitials} color={g.responsableColor} size={28} fontSize={12} title={`${g.responsable} · ${g.responsableRole}`} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ ...TX.bodyStrong, color: C.ink900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 6 }}>
@@ -618,7 +636,8 @@ function AxisHeader({ leftW, timelineW, axis, todayPx, onResize }: { leftW: numb
         </div>
         {/* Today marker — one quiet brand hairline + a tinted (not filled-slab)
             chip, so it locates without shouting. */}
-        <div style={{ position: "absolute", top: 0, bottom: 0, width: 1, background: C.brand, opacity: 0.75, left: todayPx, zIndex: 2 }}>
+        <div style={{ position: "absolute", top: 0, bottom: 0, width: 1, background: "rgba(21,128,61,.75)", left: todayPx, zIndex: 2 }}>
+          {/* full-opacity chip (an opacity on the parent dragged it under AA) */}
           <span style={{ position: "absolute", top: 3, left: 3, ...TX.nano, fontWeight: 600, color: C.brandText, background: C.brand50, borderRadius: R.xxs, padding: "0 4px", whiteSpace: "nowrap" }}>Auj.</span>
         </div>
       </div>
@@ -632,7 +651,7 @@ function AxisHeader({ leftW, timelineW, axis, todayPx, onResize }: { leftW: numb
  *  rounded-elbow 3-segment routing (stub-out / vertical / stub-in). Backward
  *  links (successor starts before predecessor finishes) get a dashed accent path.
  *  Hovering a link dims unrelated bars and highlights the pred/succ pair. */
-function DependencyArrows({ subtasks, leftW, timelineW, hoverDep, onHover }: { subtasks: GanttBar[]; leftW: number; timelineW: number; hoverDep: number | null; onHover: (id: number | null) => void }) {
+function DependencyArrows({ subtasks, leftW, timelineW, hoverDep, onHover }: { subtasks: GanttBar[]; leftW: number; timelineW: number; hoverDep: { pred: number; succ: number } | null; onHover: (link: { pred: number; succ: number } | null) => void }) {
   const byId = new Map(subtasks.map((s, i) => [s.id, { s, i }]));
   const pctToPx = timelineW / 100;
   const STUB = 9;
@@ -685,7 +704,7 @@ function DependencyArrows({ subtasks, leftW, timelineW, hoverDep, onHover }: { s
         </marker>
       </defs>
       {links.map((l, i) => {
-        const hot = hoverDep != null && (hoverDep === l.pred || hoverDep === l.succ);
+        const hot = hoverDep != null && hoverDep.pred === l.pred && hoverDep.succ === l.succ;
         // Always neutral; hover lifts to a darker ink. Backward links read via the
         // dash pattern, never via colour (red is reserved for genuinely late).
         const stroke = hot ? C.ink700 : C.ink350;
@@ -693,7 +712,7 @@ function DependencyArrows({ subtasks, leftW, timelineW, hoverDep, onHover }: { s
         return (
           <g key={i}>
             {/* fat invisible hit path for hover */}
-            <path d={l.d} stroke="transparent" strokeWidth={10} fill="none" style={{ pointerEvents: "stroke" }} onMouseEnter={() => onHover(l.succ)} onMouseLeave={() => onHover(null)} />
+            <path d={l.d} stroke="transparent" strokeWidth={10} fill="none" style={{ pointerEvents: "stroke" }} onMouseEnter={() => onHover({ pred: l.pred, succ: l.succ })} onMouseLeave={() => onHover(null)} />
             <path d={l.d} stroke={stroke} strokeWidth={hot ? 1.8 : 1.2} strokeDasharray={l.backward ? "4 3" : undefined} fill="none" markerEnd={`url(#${marker})`} strokeLinejoin="round" strokeLinecap="round" />
           </g>
         );
@@ -713,14 +732,22 @@ function DatePill({ text }: { text: string }) {
 
 // ── Project bar ────────────────────────────────────────────────────────────────
 
-function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: GanttRow; timelineW: number; spanDays: number; onCommit: (id: number, patch: { start?: string; deadline?: string }) => void; onLive: (m: string) => void; cp: boolean }) {
+function ProjectBar({ g, spanDays, onCommit, onCommitTask, onLive, cp }: {
+  g: GanttRow;
+  spanDays: number;
+  onCommit: (id: number, patch: { start?: string; deadline?: string }) => void;
+  onCommitTask: (projectId: number, subtaskId: number, patch: SubtaskPatch) => void;
+  onLive: (m: string) => void;
+  cp: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ mode: "move" | "resize"; startX: number; dxDays: number; dpx: number } | null>(null);
   const [focused, setFocused] = useState(false);
   if (g.width <= 0) return null;
 
   const pctPerDay = 100 / spanDays;
-  const begin = (mode: "move" | "resize") => (e: React.PointerEvent) => {
+  const begin = (mode: "move" | "resize", e: React.PointerEvent) => {
+    if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
     const w = ref.current?.parentElement?.getBoundingClientRect().width ?? 1;
@@ -728,12 +755,29 @@ function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: Gantt
     setDrag({ mode, startX: e.clientX, dxDays: 0, dpx: spanDays / w });
   };
   const onMove = (e: React.PointerEvent) => { if (drag) setDrag({ ...drag, dxDays: Math.round((e.clientX - drag.startX) * drag.dpx) }); };
+  const cancel = () => setDrag(null);
 
+  /** Move the project by `dxDays` calendar days AND carry its tasks along by the
+   *  same number of WORKING days (so the plan inside the envelope keeps its
+   *  shape and never lands on a weekend). One undo restores everything. */
   const commitMove = (dxDays: number) => {
     const prev = { start: g.start, deadline: g.deadline };
-    onCommit(g.id, { start: shiftISO(g.start, dxDays), deadline: shiftISO(g.deadline, dxDays) });
-    onLive(`« ${g.name} » déplacé au ${fmtShort(shiftISO(g.start, dxDays))}`);
-    toast({ message: `« ${g.name} » déplacé`, action: { label: "Annuler", onClick: () => onCommit(g.id, prev) } });
+    const newStart = shiftISO(g.start, dxDays);
+    const wd = workingDayDelta(g.start, newStart);
+    const taskPrev = g.subtasks.map((s) => ({ id: s.id, start: s.start }));
+    onCommit(g.id, { start: newStart, deadline: shiftISO(g.deadline, dxDays) });
+    if (wd !== 0) for (const s of g.subtasks) onCommitTask(g.id, s.id, { start: shiftWorkingDays(s.start, wd) });
+    onLive(`« ${g.name} » déplacé au ${fmtShort(newStart)}${wd && g.subtasks.length ? ` · ${g.subtasks.length} tâche(s) décalée(s) de ${wd} j ouvré(s)` : ""}`);
+    toast({
+      message: `« ${g.name} » déplacé${wd && g.subtasks.length ? " avec ses tâches" : ""}`,
+      action: {
+        label: "Annuler",
+        onClick: () => {
+          onCommit(g.id, prev);
+          if (wd !== 0) for (const t of taskPrev) onCommitTask(g.id, t.id, { start: t.start });
+        },
+      },
+    });
   };
   const commitResize = (dxDays: number) => {
     const minDeadline = shiftISO(g.start, 1);
@@ -749,7 +793,7 @@ function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: Gantt
     const { mode, dxDays } = drag;
     setDrag(null);
     if (dxDays === 0) return;
-    mode === "move" ? commitMove(dxDays) : commitResize(dxDays);
+    if (mode === "move") commitMove(dxDays); else commitResize(dxDays);
   };
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -769,16 +813,18 @@ function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: Gantt
       className="gantt-bar"
       tabIndex={0}
       role="slider"
-      aria-label={`${g.name} — ${fmtShort(g.start)} au ${fmtShort(g.deadline)}. Flèches pour décaler (Maj = 1 semaine).`}
+      aria-label={`${g.name} — ${fmtShort(g.start)} au ${fmtShort(g.deadline)}. Flèches pour décaler avec ses tâches (Maj = 1 semaine).`}
       aria-valuetext={`${fmtShort(g.start)} → ${fmtShort(g.deadline)}`}
       onClick={(e) => e.stopPropagation()}
-      onPointerDown={begin("move")}
+      onPointerDown={(e) => begin("move", e)}
       onPointerMove={onMove}
       onPointerUp={onUp}
+      onPointerCancel={cancel}
+      onLostPointerCapture={cancel}
       onKeyDown={onKey}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
-      title={`${g.name} — glisser pour déplacer · bord droit pour l'échéance`}
+      title={`${g.name} — glisser pour déplacer (avec ses tâches) · bord droit pour l'échéance`}
       animate={drag ? false : { left: `${left}%`, width: `${width}%` }}
       transition={SPRING.snappy}
       style={{
@@ -799,11 +845,12 @@ function ProjectBar({ g, timelineW, spanDays, onCommit, onLive, cp }: { g: Gantt
       {/* % label: white on the green fill when filled enough to sit on it, ink otherwise. */}
       {/* C2: fill is now the SOFT data-green (light) — keep the % label dark ink
           for legibility on both the fill and the track (white would fail AA). */}
-      <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, color: C.ink700 }}>
-        {g.progress} %
+      {/* On a light halo so it stays legible over the (now darker, 3:1) fill. */}
+      <span style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_NUM, fontSize: 12, fontWeight: 600, color: C.ink700, background: "rgba(255,255,255,.85)", borderRadius: R.xs, padding: "0 3px", lineHeight: "15px" }}>
+        {g.progress}&#8239;%
       </span>
       {drag ? <DatePill text={drag.mode === "move" ? `${fmtShort(pStart)} → ${fmtShort(pEnd)}` : fmtShort(pEnd)} /> : null}
-      <div onPointerDown={begin("resize")} style={{ position: "absolute", right: -5, top: -4, bottom: -4, width: 18, cursor: "ew-resize", touchAction: "none" }} />
+      <div onPointerDown={(e) => begin("resize", e)} style={{ position: "absolute", right: -5, top: -4, bottom: -4, width: 18, cursor: "ew-resize", touchAction: "none" }} />
     </motion.div>
   );
 }
@@ -818,7 +865,8 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
 
   const pctPerDay = 100 / spanDays;
 
-  const begin = (mode: "move" | "resize") => (e: React.PointerEvent) => {
+  const begin = (mode: "move" | "resize", e: React.PointerEvent) => {
+    if (e.button !== 0) return;
     e.stopPropagation();
     e.preventDefault();
     const w = ref.current?.parentElement?.getBoundingClientRect().width ?? 1;
@@ -829,13 +877,18 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
     if (!drag) return;
     setDrag({ ...drag, dxDays: Math.round((e.clientX - drag.startX) * drag.dpx) });
   };
+  const cancel = () => setDrag(null);
 
-  const commitMove = (dxDays: number) => {
+  /** Tasks start on working days: a drag snaps off a weekend in the drag
+   *  direction; the keyboard steps in working days. */
+  const moveTo = (newStart: string) => {
+    if (newStart === s.start) return;
     const prev = { start: s.start };
-    onCommit(projectId, s.id, { start: shiftISO(s.start, dxDays) });
-    onLive(`« ${s.name} » déplacée au ${fmtShort(shiftISO(s.start, dxDays))}`);
+    onCommit(projectId, s.id, { start: newStart });
+    onLive(`« ${s.name} » déplacée au ${fmtShort(newStart)}`);
     toast({ message: `« ${s.name} » déplacée`, action: { label: "Annuler", onClick: () => onCommit(projectId, s.id, prev) } });
   };
+  const commitMove = (dxDays: number) => moveTo(snapWeekday(shiftISO(s.start, dxDays), dxDays >= 0 ? 1 : -1));
   const commitResize = (dxDays: number) => {
     const newEnd = shiftISO(s.end, dxDays);
     const prev = { plannedDays: s.plannedDays };
@@ -850,13 +903,15 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
     const { mode, dxDays } = drag;
     setDrag(null);
     if (dxDays === 0) return;
-    mode === "move" ? commitMove(dxDays) : commitResize(dxDays);
+    if (mode === "move") commitMove(dxDays); else commitResize(dxDays);
   };
 
+  // ←/→ = 1 working day, Maj = 5 working days (one working week) — never a
+  // Saturday/Sunday start.
   const onKey = (e: React.KeyboardEvent) => {
     const step = e.shiftKey ? 5 : 1;
-    if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); commitMove(step); }
-    else if (e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); commitMove(-step); }
+    if (e.key === "ArrowRight") { e.preventDefault(); e.stopPropagation(); moveTo(shiftWorkingDays(s.start, step)); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); moveTo(shiftWorkingDays(s.start, -step)); }
   };
 
   const left = s.left + (drag?.mode === "move" ? drag.dxDays * pctPerDay : 0);
@@ -900,12 +955,14 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
         className="gantt-bar"
         tabIndex={0}
         role="slider"
-        aria-label={`${s.name} — ${fmtShort(s.start)}, ${s.plannedDays} jours${critTitle}. Flèches pour décaler (Maj = 1 semaine).`}
+        aria-label={`${s.name} — ${fmtShort(s.start)}, ${s.plannedDays} jours${critTitle}. Flèches pour décaler d’un jour ouvré (Maj = 5 jours ouvrés).`}
         aria-valuetext={`${fmtShort(s.start)} → ${fmtShort(s.end)}`}
         onClick={(e) => e.stopPropagation()}
-        onPointerDown={begin("move")}
+        onPointerDown={(e) => begin("move", e)}
         onPointerMove={onMove}
         onPointerUp={onUp}
+        onPointerCancel={cancel}
+        onLostPointerCapture={cancel}
         onKeyDown={onKey}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
@@ -934,7 +991,7 @@ function SubtaskBar({ projectId, s, timelineW, spanDays, pxPerDay, onCommit, onL
           </span>
         ) : null}
         {drag ? <DatePill text={drag.mode === "move" ? fmtShort(pStart) : `${pDays} j`} /> : null}
-        <div onPointerDown={begin("resize")} style={{ position: "absolute", right: -5, top: -4, bottom: -4, width: 18, cursor: "ew-resize", touchAction: "none" }} />
+        <div onPointerDown={(e) => begin("resize", e)} style={{ position: "absolute", right: -5, top: -4, bottom: -4, width: 18, cursor: "ew-resize", touchAction: "none" }} />
       </motion.div>
 
       {/* subtask name beside the bar */}
